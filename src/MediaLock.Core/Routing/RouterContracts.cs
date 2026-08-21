@@ -36,10 +36,18 @@ public enum FallbackPolicy
     DisableRouting,
 }
 
-public sealed record RouterOptions(FallbackPolicy FallbackPolicy)
+public sealed record RouterOptions(
+    FallbackPolicy FallbackPolicy,
+    TimeSpan RecoveryTimeout)
 {
+    public RouterOptions(FallbackPolicy fallbackPolicy)
+        : this(fallbackPolicy, TimeSpan.FromSeconds(15))
+    {
+    }
+
     public static RouterOptions Default { get; } = new(
-        FallbackPolicy.SameApplicationThenWindowsCurrentSession);
+        FallbackPolicy.SameApplicationThenWindowsCurrentSession,
+        TimeSpan.FromSeconds(15));
 }
 
 public enum RouteReason
@@ -97,7 +105,29 @@ public sealed record LockedTarget(
     SessionFingerprint Fingerprint,
     SessionKey? ResolvedSession);
 
-public sealed record RouterResult(RouterState State, RouteDecision Decision);
+public abstract record RouterEffect
+{
+    private RouterEffect()
+    {
+    }
+
+    public sealed record ScheduleRecoveryTimeout(
+        long RecoveryEpoch,
+        TimeSpan Delay) : RouterEffect;
+
+    public sealed record CancelRecoveryTimeout(long RecoveryEpoch) : RouterEffect;
+}
+
+public sealed record RouterResult(
+    RouterState State,
+    RouteDecision Decision,
+    ImmutableArray<RouterEffect> Effects)
+{
+    public RouterResult(RouterState state, RouteDecision decision)
+        : this(state, decision, [])
+    {
+    }
+}
 
 public interface IMediaRouter : IAsyncDisposable
 {

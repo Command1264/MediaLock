@@ -13,7 +13,8 @@ ValueTask<RouterResult> DispatchAsync(
     CancellationToken cancellationToken);
 ```
 
-The returned `RouterResult` contains the immutable state after that intent and one explicit `RouteDecision`.
+The returned `RouterResult` contains the immutable state after that intent, one explicit `RouteDecision`, and any
+deadline effects that the application layer must execute.
 Callers do not retain live GSMTC objects, rank candidates, apply fallback policy, or coordinate concurrent work.
 The Windows layer implements `IMediaController`, which receives a resolved ephemeral `SessionKey` only after Core
 has checked routing state and command capability.
@@ -29,9 +30,10 @@ has checked routing state and command capability.
 - A missing Locked Target enters Recovering. A unique Fingerprint successor restores Session Lock.
 - A Recovery epoch stays stable across unrelated catalog refreshes. Its timeout remains effective until recovery or
   policy resolution clears the epoch; later stale timeout intents are ignored.
-- When a result first enters Recovering, the caller schedules exactly one `RecoveryTimedOut(epoch)` intent after the
-  configured timeout. Catalog refreshes do not restart that timer; leaving Recovering cancels the caller's pending
-  timer, while a stale timeout is safe because Core ignores epochs that are no longer active.
+- When a result first enters Recovering, Core emits one `ScheduleRecoveryTimeout(epoch, delay)` effect. Catalog
+  refreshes do not emit another effect or restart that timer. Leaving Recovering emits `CancelRecoveryTimeout`; a
+  fired deadline submits `RecoveryTimedOut(epoch)`, and stale timeout intents are safe because Core ignores epochs
+  that are no longer active.
 - Fallback Policy values are Wait, Same Application, Windows Current Session, Same Application then Windows Current,
   and Disable Routing. The product default waits 15 seconds, tries Same Application, then uses Windows Current;
   every applied outcome has a distinct observable status or route reason.
@@ -48,8 +50,8 @@ that is still in flight.
 `MediaLockSettings` and `RuntimeStateDocument` begin at schema version 1. Both documents return path-specific,
 actionable validation issues for unsupported versions, invalid enum values, missing sections and inconsistent
 Locked Target state. Runtime state stores the complete persisted Fingerprint inputs used for recovery confidence:
-source application ID, optional stable instance hint, playback status, observation timestamp, title and artist. It
-never stores a live Session key or GSMTC object.
+source application ID, optional stable instance hint, playback status and type, observation timestamp, title and
+artist. It never stores a live Session key or GSMTC object.
 
 JSON serialization and atomic file replacement belong to the Windows persistence adapter and are scheduled for a
 later phase; Phase 1 defines the platform-independent documents and validation rules only.

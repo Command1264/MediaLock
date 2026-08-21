@@ -71,6 +71,13 @@ public sealed record RuntimeStateDocument(
                     "lockedTarget.fingerprint.playbackStatus",
                     $"Unknown playback status value {(int)LockedTarget.Fingerprint.PlaybackStatus}."));
             }
+
+            if (!Enum.IsDefined(LockedTarget.Fingerprint.PlaybackType))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "lockedTarget.fingerprint.playbackType",
+                    $"Unknown playback type value {(int)LockedTarget.Fingerprint.PlaybackType}."));
+            }
         }
 
         return issues.ToImmutable();
@@ -84,5 +91,6 @@ public sealed record PersistedSessionFingerprint(
     string? SessionInstanceHint,
     PlaybackStatus PlaybackStatus,
     DateTimeOffset ObservedAt,
+    MediaPlaybackType PlaybackType,
     string? Title,
     string? Artist);

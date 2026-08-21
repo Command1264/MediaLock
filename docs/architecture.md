@@ -72,8 +72,9 @@ Command against a resolved handle and reports supported, succeeded or failed. `I
 only after its backend has determined whether the underlying input was consumed.
 
 Phase 1 exposes routing through the deliberately small `IMediaRouter.DispatchAsync(RouterIntent,
-CancellationToken)` interface. A result contains the new immutable `RouterState` and one `RouteDecision`; callers
-do not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
+CancellationToken)` interface. A result contains the new immutable `RouterState`, one `RouteDecision`, and explicit
+deadline effects; callers execute those effects but do not decide when to schedule or cancel Recovery. They also do
+not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
 `IMediaController` is the platform adapter seam used by the router after it has resolved exactly one target.
 
 ## 4. State model

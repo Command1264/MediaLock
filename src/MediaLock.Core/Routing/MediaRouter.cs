@@ -26,6 +26,15 @@ public sealed class MediaRouter : IMediaRouter
                 "Unknown fallback policy.");
         }
 
+        if (this.options.RecoveryTimeout < TimeSpan.Zero ||
+            this.options.RecoveryTimeout > TimeSpan.FromMinutes(5))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                this.options.RecoveryTimeout,
+                "Recovery timeout must be between 0 seconds and 5 minutes.");
+        }
+
         intents = Channel.CreateUnbounded<PendingIntent>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -119,6 +128,7 @@ public sealed class MediaRouter : IMediaRouter
 
     private RouterResult UseWindowsAuto()
     {
+        var previous = state;
         state = state with
         {
             Mode = RoutingMode.WindowsAuto,
@@ -129,7 +139,7 @@ public sealed class MediaRouter : IMediaRouter
             Revision = state.Revision + 1,
         };
 
-        return new RouterResult(state, RouteDecision.StateUpdated);
+        return StateUpdated(previous);
     }
 
     private RouterResult ApplyRecoveryTimeout(long recoveryEpoch)
@@ -139,6 +149,7 @@ public sealed class MediaRouter : IMediaRouter
             return new RouterResult(state, RouteDecision.StateUpdated);
         }
 
+        var previous = state;
         var (status, target, activeFallback) = options.FallbackPolicy switch
         {
             FallbackPolicy.SameApplication => ResolveSameApplicationFallback(),
@@ -168,7 +179,7 @@ public sealed class MediaRouter : IMediaRouter
             Revision = state.Revision + 1,
         };
 
-        return new RouterResult(state, RouteDecision.StateUpdated);
+        return StateUpdated(previous, recoveryEpoch);
     }
 
     private (RouterStatus Status, LockedTarget? Target, FallbackPolicy ActiveFallback)
@@ -206,11 +217,13 @@ public sealed class MediaRouter : IMediaRouter
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceAppUserModelId);
 
+        var previous = state;
         var candidate = SelectApplicationCandidate(state.Sessions, sourceAppUserModelId);
         var fingerprint = new SessionFingerprint(
             new SessionDescriptor(sourceAppUserModelId, null),
             candidate?.PlaybackStatus ?? PlaybackStatus.Unknown,
             candidate?.ObservedAt ?? DateTimeOffset.MinValue,
+            candidate?.PlaybackType ?? MediaPlaybackType.Unknown,
             candidate?.Metadata?.Title,
             candidate?.Metadata?.Artist);
         state = state with
@@ -223,7 +236,7 @@ public sealed class MediaRouter : IMediaRouter
             Revision = state.Revision + 1,
         };
 
-        return new RouterResult(state, RouteDecision.StateUpdated);
+        return StateUpdated(previous);
     }
 
     private RouterResult LockSession(SessionKey sessionKey)
@@ -234,6 +247,7 @@ public sealed class MediaRouter : IMediaRouter
             throw new ArgumentException("The Session to lock is not present in the current catalog.", nameof(sessionKey));
         }
 
+        var previous = state;
         state = state with
         {
             Mode = RoutingMode.SessionLock,
@@ -244,7 +258,7 @@ public sealed class MediaRouter : IMediaRouter
             Revision = state.Revision + 1,
         };
 
-        return new RouterResult(state, RouteDecision.StateUpdated);
+        return StateUpdated(previous);
     }
 
     private RouterResult UpdateCatalog(RouterIntent.CatalogUpdated catalog)
@@ -257,6 +271,7 @@ public sealed class MediaRouter : IMediaRouter
             return new RouterResult(state, RouteDecision.StateUpdated);
         }
 
+        var previous = state;
         var sessions = catalog.Sessions;
         var (status, lockedTarget, activeFallback) = ResolveLockedTarget(sessions);
         var nextRevision = state.Revision + 1;
@@ -276,7 +291,7 @@ public sealed class MediaRouter : IMediaRouter
             Revision = nextRevision,
         };
 
-        return new RouterResult(state, RouteDecision.StateUpdated);
+        return StateUpdated(previous);
     }
 
     private static void ValidateCatalog(RouterIntent.CatalogUpdated catalog)
@@ -324,6 +339,13 @@ public sealed class MediaRouter : IMediaRouter
             {
                 throw new ArgumentException(
                     "Every catalog Session playback status must be defined.",
+                    nameof(catalog));
+            }
+
+            if (!Enum.IsDefined(session.PlaybackType))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session playback type must be defined.",
                     nameof(catalog));
             }
 
@@ -380,6 +402,13 @@ public sealed class MediaRouter : IMediaRouter
             return (state.Status, state.LockedTarget, state.ActiveFallback);
         }
 
+        if (lockedTarget.ResolvedSession is { } resolved &&
+            sessions.Any(session =>
+                session.Key == resolved && lockedTarget.Fingerprint.CanRepresent(session)))
+        {
+            return (RouterStatus.Locked, lockedTarget, null);
+        }
+
         var rankedCandidates = sessions
             .Select(session => new
             {
@@ -421,14 +450,29 @@ public sealed class MediaRouter : IMediaRouter
                     state.ActiveFallback);
         }
 
-        if (lockedTarget.ResolvedSession is { } resolved &&
-            sessions.Any(session =>
-                session.Key == resolved && lockedTarget.Fingerprint.CanRepresent(session)))
+        return (RouterStatus.Recovering, lockedTarget with { ResolvedSession = null }, null);
+    }
+
+    private RouterResult StateUpdated(
+        RouterState previous,
+        long? consumedRecoveryEpoch = null)
+    {
+        var effects = ImmutableArray.CreateBuilder<RouterEffect>();
+        if (previous.RecoveryEpoch is { } previousEpoch &&
+            previousEpoch != state.RecoveryEpoch &&
+            previousEpoch != consumedRecoveryEpoch)
         {
-            return (RouterStatus.Locked, lockedTarget, null);
+            effects.Add(new RouterEffect.CancelRecoveryTimeout(previousEpoch));
         }
 
-        return (RouterStatus.Recovering, lockedTarget with { ResolvedSession = null }, null);
+        if (state.RecoveryEpoch is { } nextEpoch && nextEpoch != previous.RecoveryEpoch)
+        {
+            effects.Add(new RouterEffect.ScheduleRecoveryTimeout(
+                nextEpoch,
+                options.RecoveryTimeout));
+        }
+
+        return new RouterResult(state, RouteDecision.StateUpdated, effects.ToImmutable());
     }
 
     private static MediaSessionSnapshot? SelectApplicationCandidate(

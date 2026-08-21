@@ -39,6 +39,7 @@ public sealed class ConfigurationSchemaTests
                 "pwa",
                 PlaybackStatus.Playing,
                 observedAt,
+                MediaPlaybackType.Music,
                 "title",
                 "artist")));
 
@@ -46,6 +47,7 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal("pwa", state.LockedTarget.Fingerprint.SessionInstanceHint);
         Assert.Equal(PlaybackStatus.Playing, state.LockedTarget.Fingerprint.PlaybackStatus);
         Assert.Equal(observedAt, state.LockedTarget.Fingerprint.ObservedAt);
+        Assert.Equal(MediaPlaybackType.Music, state.LockedTarget.Fingerprint.PlaybackType);
         Assert.Equal("title", state.LockedTarget.Fingerprint.Title);
         Assert.Equal("artist", state.LockedTarget.Fingerprint.Artist);
     }
@@ -61,12 +63,13 @@ public sealed class ConfigurationSchemaTests
                 " ",
                 (PlaybackStatus)99,
                 DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+                (MediaPlaybackType)99,
                 null,
                 null)));
 
         var issues = state.Validate();
 
-        Assert.Equal(5, issues.Length);
+        Assert.Equal(6, issues.Length);
         Assert.Contains(issues, issue => issue.Path == "schemaVersion");
         Assert.Contains(issues, issue =>
             issue.Path == "lockedTarget" &&
@@ -74,6 +77,7 @@ public sealed class ConfigurationSchemaTests
         Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sourceAppUserModelId");
         Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sessionInstanceHint");
         Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.playbackStatus");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.playbackType");
     }
 
     [Fact]

@@ -312,6 +312,19 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public void InvalidRecoveryTimeoutIsRejectedAtComposition()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MediaRouter(
+                controller,
+                new RouterOptions(FallbackPolicy.Wait, TimeSpan.FromMinutes(6))));
+
+        Assert.Equal("options", exception.ParamName);
+    }
+
+    [Fact]
     public void NullControllerIsRejectedAtComposition()
     {
         var exception = Assert.Throws<ArgumentNullException>(() => new MediaRouter(null!));
@@ -575,6 +588,104 @@ public sealed class MediaRouterTests
 
         Assert.Equal(RouterStatus.Locked, recovered.State.Status);
         Assert.Equal(likely.Key, recovered.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
+    public async Task LiveResolvedSessionIsPreservedBeforeRankingSuccessors()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var original = Session(
+            "original",
+            "browser",
+            observedAt: observedAt,
+            metadata: new MediaMetadata("old track", "artist", null, null));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([original], original.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(original.Key), CancellationToken.None);
+        var changedLiveSession = original with
+        {
+            ObservedAt = observedAt.AddSeconds(30),
+            Metadata = new MediaMetadata("new track", "artist", null, null),
+        };
+        var fingerprintLookalike = Session(
+            "lookalike",
+            "browser",
+            observedAt: observedAt.AddSeconds(10),
+            metadata: original.Metadata);
+
+        var refreshed = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated(
+                [fingerprintLookalike, changedLiveSession],
+                changedLiveSession.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Locked, refreshed.State.Status);
+        Assert.Equal(changedLiveSession.Key, refreshed.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
+    public async Task TrackChangeCanRecoverUniqueRecentSameSourceSuccessor()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var original = Session(
+            "original",
+            "browser",
+            observedAt: observedAt,
+            metadata: new MediaMetadata("old track", "artist", null, null));
+        var successor = Session(
+            "successor",
+            "browser",
+            observedAt: observedAt.AddSeconds(30),
+            metadata: new MediaMetadata("new track", "artist", null, null));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([original], original.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(original.Key), CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+
+        var recovered = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([successor], successor.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Locked, recovered.State.Status);
+        Assert.Equal(successor.Key, recovered.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
+    public async Task RecoveryEffectsScheduleOnceAndCancelAfterRecovery()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var original = Session("original", "music", "pwa");
+        var replacement = Session("replacement", "music", "pwa");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([original], original.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(original.Key), CancellationToken.None);
+
+        var lost = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+        var repeatedRefresh = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([Session("unrelated", "browser")], null),
+            CancellationToken.None);
+        var recovered = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([replacement], replacement.Key),
+            CancellationToken.None);
+
+        var scheduled = Assert.IsType<RouterEffect.ScheduleRecoveryTimeout>(Assert.Single(lost.Effects));
+        Assert.Equal(lost.State.RecoveryEpoch, scheduled.RecoveryEpoch);
+        Assert.Equal(TimeSpan.FromSeconds(15), scheduled.Delay);
+        Assert.Empty(repeatedRefresh.Effects);
+        var canceled = Assert.IsType<RouterEffect.CancelRecoveryTimeout>(Assert.Single(recovered.Effects));
+        Assert.Equal(scheduled.RecoveryEpoch, canceled.RecoveryEpoch);
     }
 
     [Fact]

@@ -16,6 +16,14 @@ public enum PlaybackStatus
     Paused,
 }
 
+public enum MediaPlaybackType
+{
+    Unknown,
+    Music,
+    Video,
+    Image,
+}
+
 public sealed record MediaSessionSnapshot(
     SessionKey Key,
     string SourceAppUserModelId,
@@ -24,7 +32,8 @@ public sealed record MediaSessionSnapshot(
     DateTimeOffset ObservedAt,
     string? SessionInstanceHint = null,
     MediaMetadata? Metadata = null,
-    MediaTimeline? Timeline = null)
+    MediaTimeline? Timeline = null,
+    MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown)
 {
     public SessionDescriptor Descriptor => new(
         SourceAppUserModelId,
@@ -51,6 +60,7 @@ public sealed record SessionFingerprint(
     SessionDescriptor Descriptor,
     PlaybackStatus PlaybackStatus,
     DateTimeOffset ObservedAt,
+    MediaPlaybackType PlaybackType,
     string? Title,
     string? Artist)
 {
@@ -58,6 +68,7 @@ public sealed record SessionFingerprint(
         session.Descriptor,
         session.PlaybackStatus,
         session.ObservedAt,
+        session.PlaybackType,
         session.Metadata?.Title,
         session.Metadata?.Artist);
 
@@ -90,12 +101,15 @@ public sealed record SessionFingerprint(
                 allAvailableMetadataMatches &&
                 proximity != ObservationProximity.Distant
                 ? SessionMatchConfidence.ObservedCharacteristics
-                : SessionMatchConfidence.Unacceptable;
+                : proximity != ObservationProximity.Distant
+                    ? SessionMatchConfidence.RecentSameSource
+                    : SessionMatchConfidence.Unacceptable;
 
         return new SessionMatchScore(
             confidence,
             Convert.ToInt32(titleMatches) + Convert.ToInt32(artistMatches),
             PlaybackStatus == candidate.PlaybackStatus,
+            PlaybackType == candidate.PlaybackType,
             proximity);
     }
 
@@ -114,6 +128,7 @@ public sealed record SessionFingerprint(
 internal enum SessionMatchConfidence
 {
     Unacceptable,
+    RecentSameSource,
     ObservedCharacteristics,
     StableDescriptor,
 }
@@ -130,6 +145,7 @@ internal readonly record struct SessionMatchScore(
     SessionMatchConfidence Confidence,
     int MetadataMatches,
     bool PlaybackStatusMatches,
+    bool PlaybackTypeMatches,
     ObservationProximity ObservationProximity) : IComparable<SessionMatchScore>
 {
     public bool IsAcceptable => Confidence != SessionMatchConfidence.Unacceptable;
@@ -149,6 +165,12 @@ internal readonly record struct SessionMatchScore(
         }
 
         comparison = PlaybackStatusMatches.CompareTo(other.PlaybackStatusMatches);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = PlaybackTypeMatches.CompareTo(other.PlaybackTypeMatches);
         return comparison != 0
             ? comparison
             : ObservationProximity.CompareTo(other.ObservationProximity);
