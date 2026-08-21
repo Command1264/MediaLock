@@ -95,13 +95,18 @@ public sealed record SessionFingerprint(
         var allAvailableMetadataMatches =
             (string.IsNullOrEmpty(Title) || titleMatches) &&
             (string.IsNullOrEmpty(Artist) || artistMatches);
+        var playbackTypeIsCompatible =
+            PlaybackType == MediaPlaybackType.Unknown ||
+            candidate.PlaybackType == MediaPlaybackType.Unknown ||
+            PlaybackType == candidate.PlaybackType;
         var confidence = Descriptor.SessionInstanceHint is not null
             ? SessionMatchConfidence.StableDescriptor
-            : hasMetadataEvidence &&
+            : playbackTypeIsCompatible &&
+                hasMetadataEvidence &&
                 allAvailableMetadataMatches &&
                 proximity != ObservationProximity.Distant
                 ? SessionMatchConfidence.ObservedCharacteristics
-                : proximity != ObservationProximity.Distant
+                : playbackTypeIsCompatible && proximity != ObservationProximity.Distant
                     ? SessionMatchConfidence.RecentSameSource
                     : SessionMatchConfidence.Unacceptable;
 

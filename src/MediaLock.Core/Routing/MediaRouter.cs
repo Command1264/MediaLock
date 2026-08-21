@@ -402,11 +402,16 @@ public sealed class MediaRouter : IMediaRouter
             return (state.Status, state.LockedTarget, state.ActiveFallback);
         }
 
-        if (lockedTarget.ResolvedSession is { } resolved &&
-            sessions.Any(session =>
-                session.Key == resolved && lockedTarget.Fingerprint.CanRepresent(session)))
+        var resolvedSession = lockedTarget.ResolvedSession is { } resolved
+            ? sessions.FirstOrDefault(session =>
+                session.Key == resolved && lockedTarget.Fingerprint.CanRepresent(session))
+            : null;
+        if (resolvedSession is not null)
         {
-            return (RouterStatus.Locked, lockedTarget, null);
+            return (
+                RouterStatus.Locked,
+                lockedTarget with { Fingerprint = SessionFingerprint.From(resolvedSession) },
+                null);
         }
 
         var rankedCandidates = sessions
@@ -426,7 +431,9 @@ public sealed class MediaRouter : IMediaRouter
         {
             return (
                 RouterStatus.Locked,
-                lockedTarget with { ResolvedSession = rankedCandidates[0].Session.Key },
+                new LockedTarget(
+                    SessionFingerprint.From(rankedCandidates[0].Session),
+                    rankedCandidates[0].Session.Key),
                 null);
         }
 

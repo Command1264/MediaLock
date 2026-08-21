@@ -24,8 +24,11 @@ has checked routing state and command capability.
 - Windows Auto resolves Windows Current Session at command time.
 - Session Lock preserves a `SessionFingerprint`; an ephemeral `SessionKey` is never persisted as identity.
 - Fingerprint ranking requires the stable source descriptor, treats an instance hint as the strongest match, and
-  then uses matching title／artist, playback status and observation-time proximity only as confidence signals.
-  Track metadata can rank candidates but never qualifies a different source or mismatched stable instance hint.
+  then uses matching title／artist, playback status, playback type and observation-time proximity only as confidence
+  signals. Without a stable hint, a known conflicting playback type is ineligible; track metadata can rank
+  candidates but never qualifies a different source or defines identity.
+- While the resolved live Session remains present, its trusted observations refresh the Fingerprint's auxiliary
+  metadata and timestamp. Successful recovery does the same, so a long-running lock does not retain stale track data.
 - App Lock selects deterministically: Playing first, then newest observation, then ordinal Session key.
 - A missing Locked Target enters Recovering. A unique Fingerprint successor restores Session Lock.
 - A Recovery epoch stays stable across unrelated catalog refreshes. Its timeout remains effective until recovery or

@@ -659,6 +659,78 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task LiveObservationsRefreshFingerprintBeforeLaterRecovery()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var original = Session(
+            "original",
+            "browser",
+            observedAt: observedAt,
+            metadata: new MediaMetadata("first track", "artist", null, null),
+            playbackType: MediaPlaybackType.Music);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([original], original.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(original.Key), CancellationToken.None);
+        var longRunning = original with
+        {
+            ObservedAt = observedAt.AddHours(1),
+            Metadata = new MediaMetadata("second track", "artist", null, null),
+        };
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([longRunning], longRunning.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+        var successor = Session(
+            "successor",
+            "browser",
+            observedAt: observedAt.AddHours(1).AddSeconds(30),
+            metadata: new MediaMetadata("third track", "artist", null, null),
+            playbackType: MediaPlaybackType.Music);
+
+        var recovered = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([successor], successor.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Locked, recovered.State.Status);
+        Assert.Equal(successor.Key, recovered.State.LockedTarget!.ResolvedSession);
+        Assert.Equal(successor.ObservedAt, recovered.State.LockedTarget.Fingerprint.ObservedAt);
+    }
+
+    [Fact]
+    public async Task ConflictingPlaybackTypeIsNotAnAcceptableSuccessor()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var music = Session(
+            "music",
+            "browser",
+            observedAt: observedAt,
+            playbackType: MediaPlaybackType.Music);
+        var video = Session(
+            "video",
+            "browser",
+            observedAt: observedAt.AddSeconds(10),
+            playbackType: MediaPlaybackType.Video);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([music], music.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(music.Key), CancellationToken.None);
+
+        var refreshed = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([video], video.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Recovering, refreshed.State.Status);
+        Assert.Null(refreshed.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
     public async Task RecoveryEffectsScheduleOnceAndCancelAfterRecovery()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);
@@ -833,14 +905,16 @@ public sealed class MediaRouterTests
         PlaybackStatus playbackStatus = PlaybackStatus.Paused,
         DateTimeOffset? observedAt = null,
         MediaCommandCapabilities capabilities = MediaCommandCapabilities.All,
-        MediaMetadata? metadata = null) => new(
+        MediaMetadata? metadata = null,
+        MediaPlaybackType playbackType = MediaPlaybackType.Unknown) => new(
         new SessionKey(key),
         source,
         playbackStatus,
         capabilities,
         observedAt ?? DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
         instanceHint,
-        metadata);
+        metadata,
+        PlaybackType: playbackType);
 
     private sealed class RecordingMediaController(MediaControlResult result) : IMediaController
     {
