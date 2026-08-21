@@ -1,0 +1,25 @@
+# .NET build output
+bin/
+obj/
+artifacts/
+
+# IDE and user state
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Runtime files
+logs/
+settings.json
+state.json
+
+# Publish output
+publish/

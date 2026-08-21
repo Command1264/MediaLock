@@ -1,0 +1,149 @@
+# Media Lock Architecture
+
+## 1. Architectural style
+
+Media Lock uses MVVM only in the WPF presentation shell. Its core is a UI-independent, state-machine-driven
+application with ports for media discovery/control, input, persistence, time and operating-system lifecycle.
+
+```text
+WPF Views
+    ↕ binding
+ViewModels
+    ↓ commands / projections
+Application Services
+    ↓ serialized intents
+Media Router + Router State Machine
+    ↓ ports
+GSMTC | Win32 Input | Tray | JSON | Startup adapters
+```
+
+ViewModels project application state and submit user intents. They do not match Session fingerprints, choose
+fallbacks, subscribe directly to GSMTC or persist JSON.
+
+## 2. Project boundaries
+
+The intended solution shape begins with a Console Prototype and grows into:
+
+```text
+MediaLock.sln
+├─ MediaLock.Core
+│  ├─ Media
+│  ├─ Routing
+│  ├─ Rules
+│  └─ Configuration
+├─ MediaLock.Windows
+│  ├─ Gsmtc
+│  ├─ Input
+│  ├─ Lifecycle
+│  ├─ Persistence
+│  └─ Startup
+├─ MediaLock.App
+│  ├─ Views
+│  ├─ ViewModels
+│  └─ Tray
+├─ MediaLock.Probe
+└─ MediaLock.Tests
+```
+
+- **Core** owns Media Command, Routing Mode, Route Decision, Session Fingerprint, Recovery and Fallback Policy.
+- **Windows** translates WinRT/Win32 behavior into Core ports and owns platform lifetimes.
+- **App** owns WPF composition, binding and tray presentation.
+- **Probe** is the Phase 0 executable for technical validation, not production UI.
+- **Tests** cover Core deterministically and adapters with integration or hardware-assisted tests.
+
+Dependency direction points inward: App and Windows depend on Core abstractions; Core does not depend on them.
+
+## 3. Core ports
+
+Names may evolve during implementation, but responsibilities remain separate:
+
+```csharp
+public interface IMediaSessionCatalog;
+public interface IMediaController;
+public interface IMediaInputSource;
+public interface ISettingsRepository;
+public interface IRuntimeStateRepository;
+public interface IClock;
+public interface ISystemLifecycle;
+```
+
+`IMediaSessionCatalog` publishes immutable snapshots and change notifications. `IMediaController` attempts a Media
+Command against a resolved handle and reports supported, succeeded or failed. `IMediaInputSource` emits a command
+only after its backend has determined whether the underlying input was consumed.
+
+## 4. State model
+
+Routing state is explicit and immutable at the Core boundary. A reducer-like transition function accepts the prior
+state plus an intent/event and returns a new state with effects to execute.
+
+```text
+WindowsAuto
+   ├─ LockApp ───────────────▶ AppLocked
+   └─ LockSession ───────────▶ SessionLocked
+                                  │ SessionLost
+                                  ▼
+                              Recovering
+                               │       │
+                         Recovered   PolicyDecision
+                               │       │
+                               ▼       ▼
+                         SessionLocked Fallback/Waiting
+```
+
+Effects such as GSMTC calls, persistence and logging run outside the transition function and feed their result back
+as events. This makes race handling and tests deterministic without replacing WPF MVVM with an MVC architecture.
+
+## 5. Command routing
+
+For every Media Command:
+
+1. Capture the input and determine whether the backend consumed the original action.
+2. Snapshot the current routing state and Sessions.
+3. Calculate one Route Decision.
+4. Attempt the command only against the resolved target.
+5. Record outcome and update observable state when needed.
+
+A consumed input must not also fall through to Windows default processing. Phase 0 must measure this behavior for
+each candidate backend (`WM_APPCOMMAND`, raw input, hooks or other justified mechanism) rather than assuming event
+observation implies suppression.
+
+## 6. Session lifecycle
+
+The Windows adapter obtains `GlobalSystemMediaTransportControlsSessionManager`, enumerates Sessions, and listens to
+manager and Session events. Each refresh creates an immutable snapshot for Core. Adapter code owns subscriptions;
+reacquisition or shutdown unsubscribes before discarding old manager and Session objects.
+
+On suspend/resume or adapter failure:
+
+1. Mark the catalog unavailable without discarding the Locked Target descriptor.
+2. Dispose old subscriptions.
+3. Reacquire the manager and publish a full snapshot.
+4. Submit recovery evaluation to the serialized router queue.
+
+## 7. Concurrency
+
+All router intents are serialized through one application-owned queue or dispatcher. Platform callbacks perform
+minimal work and enqueue events. UI state is projected onto the WPF dispatcher. Cancellation and shutdown are
+explicit; retries are bounded and observable.
+
+## 8. Persistence and diagnostics
+
+Settings and runtime state use separate repositories and files. Persistence uses replace-on-success semantics:
+serialize to a sibling temporary file, flush, then atomically replace where supported. Schema versions permit future
+migration.
+
+Structured logs include timestamps, state transitions, anonymizable Session source data, route reasons and control
+outcomes. Normal logs minimize title and artist retention; an explicit diagnostic mode may add metadata with clear
+user disclosure and bounded retention.
+
+## 9. Composition
+
+Application startup is the composition root. It creates adapters, repositories, router and ViewModels through
+constructor injection, enforces single-instance behavior, and starts services in a defined order. Shutdown stops
+input first, drains or cancels routing work, persists state, removes subscriptions and then exits the tray process.
+
+## 10. Publication
+
+The release candidate targets `win-x64`, self-contained, single-file publication. Single-file output can be larger
+and may interact with native libraries or extraction behavior, so build success, cold start, tray resources,
+settings paths and clean-machine execution are release gates rather than assumptions.
