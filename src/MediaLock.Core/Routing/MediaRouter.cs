@@ -514,12 +514,7 @@ public sealed class MediaRouter : IMediaRouter
             }
         }
 
-        var targetKey = state.Status == RouterStatus.Fallback &&
-            state.ActiveFallback == FallbackPolicy.WindowsCurrentSession
-                ? state.WindowsCurrentSession
-                : state.Mode is RoutingMode.SessionLock or RoutingMode.AppLock
-                    ? state.LockedTarget?.ResolvedSession
-                    : state.WindowsCurrentSession;
+        var targetKey = state.ActiveTarget;
         if (targetKey is null)
         {
             return Skipped(command, RouteReason.NoWindowsCurrentSession);

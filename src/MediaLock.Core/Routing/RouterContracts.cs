@@ -90,6 +90,13 @@ public sealed record RouterState(
     long? RecoveryEpoch,
     long Revision)
 {
+    public SessionKey? ActiveTarget => Status == RouterStatus.Fallback &&
+        ActiveFallback == FallbackPolicy.WindowsCurrentSession
+            ? WindowsCurrentSession
+            : Mode is RoutingMode.SessionLock or RoutingMode.AppLock
+                ? LockedTarget?.ResolvedSession
+                : WindowsCurrentSession;
+
     public static RouterState Initial { get; } = new(
         RoutingMode.WindowsAuto,
         RouterStatus.Ready,

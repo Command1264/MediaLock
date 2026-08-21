@@ -51,6 +51,10 @@ MediaLock.sln
 - **Probe** is the Phase 0 executable for technical validation, not production UI.
 - **Tests** cover Core deterministically and adapters with integration or hardware-assisted tests.
 
+`MediaLock.Application` is a UI-independent coordination module between Core and presentation. It consumes the
+catalog stream, owns Recovery deadline effects and exposes immutable application state plus application-level
+intents. This keeps both WPF and Windows adapters outside Core without duplicating orchestration in ViewModels.
+
 Dependency direction points inward: App and Windows depend on Core abstractions; Core does not depend on them.
 
 ## 3. Core ports
@@ -76,6 +80,10 @@ CancellationToken)` interface. A result contains the new immutable `RouterState`
 deadline effects; callers execute those effects but do not decide when to schedule or cancel Recovery. They also do
 not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
 `IMediaController` is the platform adapter seam used by the router after it has resolved exactly one target.
+
+Phase 2 uses `IMediaSessionCatalog.WatchAsync` as the catalog seam. The production `GsmtcMediaAdapter` implements
+both this interface and `IMediaController`, keeping the ephemeral-key-to-live-Session map local to one deep Windows
+module. The application module is the sole owner of that adapter and of `IMediaRouter` disposal.
 
 ## 4. State model
 
@@ -137,6 +145,13 @@ cancellation completes promptly without terminating the queue, and disposal canc
 the closed queue. Catalog intents carry an immutable array and identical refreshes are idempotent. A Recovery epoch
 stays stable across unrelated refreshes but is cleared after recovery, so the active deadline remains bounded while
 a stale timeout cannot override a target that has already recovered.
+
+The Phase 2 application dispatcher keeps router dispatch and result/effect projection in the same serialized
+critical section, so asynchronous continuations cannot publish an older revision after a newer one. A terminal
+catalog publishes an empty snapshot before its error, clearing stale live targets and entering normal Recovery.
+The GSMTC adapter uses one refresh worker with a capacity-one coalescing signal; event bursts therefore request at
+most one follow-up refresh instead of creating an unbounded task backlog. Adapter lifetime cancellation interrupts
+an in-flight Session read before shutdown waits for the worker.
 
 ## 8. Persistence and diagnostics
 
