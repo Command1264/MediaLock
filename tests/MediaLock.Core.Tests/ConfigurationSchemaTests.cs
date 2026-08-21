@@ -1,0 +1,111 @@
+using MediaLock.Core.Configuration;
+using MediaLock.Core.Media;
+using MediaLock.Core.Routing;
+
+namespace MediaLock.Core.Tests;
+
+public sealed class ConfigurationSchemaTests
+{
+    [Fact]
+    public void InvalidSettingsReturnActionableValidationIssues()
+    {
+        var settings = new MediaLockSettings(
+            SchemaVersion: 99,
+            DefaultRoutingMode: RoutingMode.AppLock,
+            Recovery: new RecoverySettings(
+                Timeout: TimeSpan.FromMilliseconds(-1),
+                FallbackPolicy.DisableRouting));
+
+        var issues = settings.Validate();
+
+        Assert.Equal(2, issues.Length);
+        Assert.Contains(issues, issue =>
+            issue.Path == "schemaVersion" &&
+            issue.Message == "Expected schema version 1, but found 99.");
+        Assert.Contains(issues, issue =>
+            issue.Path == "recovery.timeout" &&
+            issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
+    }
+
+    [Fact]
+    public void RuntimeStateSchemaStoresFingerprintInsteadOfLiveSessionKey()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var state = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "browser",
+                "pwa",
+                PlaybackStatus.Playing,
+                observedAt,
+                MediaPlaybackType.Music,
+                "title",
+                "artist")));
+
+        Assert.Equal("browser", state.LockedTarget!.Fingerprint.SourceAppUserModelId);
+        Assert.Equal("pwa", state.LockedTarget.Fingerprint.SessionInstanceHint);
+        Assert.Equal(PlaybackStatus.Playing, state.LockedTarget.Fingerprint.PlaybackStatus);
+        Assert.Equal(observedAt, state.LockedTarget.Fingerprint.ObservedAt);
+        Assert.Equal(MediaPlaybackType.Music, state.LockedTarget.Fingerprint.PlaybackType);
+        Assert.Equal("title", state.LockedTarget.Fingerprint.Title);
+        Assert.Equal("artist", state.LockedTarget.Fingerprint.Artist);
+    }
+
+    [Fact]
+    public void InvalidRuntimeStateReturnsActionableValidationIssues()
+    {
+        var state = new RuntimeStateDocument(
+            SchemaVersion: 99,
+            RoutingMode.WindowsAuto,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                " ",
+                " ",
+                (PlaybackStatus)99,
+                DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+                (MediaPlaybackType)99,
+                null,
+                null)));
+
+        var issues = state.Validate();
+
+        Assert.Equal(6, issues.Length);
+        Assert.Contains(issues, issue => issue.Path == "schemaVersion");
+        Assert.Contains(issues, issue =>
+            issue.Path == "lockedTarget" &&
+            issue.Message == "Windows Auto runtime state must not contain a Locked Target.");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sourceAppUserModelId");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sessionInstanceHint");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.playbackStatus");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.playbackType");
+    }
+
+    [Fact]
+    public void MissingPersistedFingerprintReturnsActionableValidationIssue()
+    {
+        var state = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            new PersistedLockedTarget(null!));
+
+        var issue = Assert.Single(state.Validate());
+
+        Assert.Equal("lockedTarget.fingerprint", issue.Path);
+        Assert.Equal("Locked Target fingerprint is required.", issue.Message);
+    }
+
+    [Fact]
+    public void MissingRecoverySettingsReturnActionableValidationIssue()
+    {
+        var settings = new MediaLockSettings(
+            MediaLockSettings.CurrentSchemaVersion,
+            RoutingMode.WindowsAuto,
+            Recovery: null);
+
+        var issues = settings.Validate();
+
+        var issue = Assert.Single(issues);
+        Assert.Equal("recovery", issue.Path);
+        Assert.Equal("Recovery settings are required.", issue.Message);
+    }
+}
