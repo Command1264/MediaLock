@@ -1,0 +1,54 @@
+# Media Lock Phase 0 Chrome evidence
+# Date: 2026-08-22 (Asia/Taipei)
+# Environment: Windows 11 Pro build 26200; Chrome 151.0.7922.140 (Stable, 64-bit, cohort: Control); YouTube
+# Other source: Brave 151.1.93.137 with YouTube Music PWA
+# Redaction: all media title and artist lines were removed; the Brave PWA source ID was replaced with <BRAVE_PWA>.
+# Scope: second independent GSMTC source enumeration, event refresh, manual dispatch, and Session recovery.
+# Physical-key capture/consume was not tested against Chrome.
+
+# Three sessions from two independent source applications were enumerated. Chrome was selected as session 3.
+[01:40:05.647] Selected [3] Chrome.
+
+# Earlier observation: six toggles were accepted. Only the first and fourth produced a playback change
+# within one second; the other four produced no observable action. Later UI playback changes remained visible.
+[01:40:33.871] ROUTE toggle -> Chrome: accepted
+[01:40:33.881] Selected playback changed: Playing.
+[01:40:35.777] ROUTE toggle -> Chrome: accepted
+[01:40:38.579] ROUTE toggle -> Chrome: accepted
+[01:40:48.902] Selected playback changed: Paused.
+[01:41:02.004] ROUTE toggle -> Chrome: accepted
+[01:41:02.023] Selected playback changed: Playing.
+[01:41:03.631] ROUTE toggle -> Chrome: accepted
+[01:41:05.869] ROUTE toggle -> Chrome: accepted
+[01:41:08.678] Selected playback changed: Paused.
+
+# Closing the Chrome tab moved the Locked Target through Recovering and Unavailable. Reopening recovered it.
+[01:41:29.993] Selected playback changed: Closed.
+[01:41:30.011] Selected session 'Chrome' was lost temporarily; recovering for up to 2 seconds.
+[01:41:32.020] Recovery window expired for locked target 'Chrome'. Target remains unavailable.
+[01:41:36.102] Locked target 'Chrome' became available and was reselected.
+
+# Brave YouTube Music remained operable after the Chrome lifecycle test.
+[01:42:03.976] ROUTE toggle -> <BRAVE_PWA>: accepted
+[01:42:03.992] Selected playback changed: Playing.
+[01:42:05.864] ROUTE toggle -> <BRAVE_PWA>: accepted
+[01:42:05.878] Selected playback changed: Paused.
+
+# Clean Chrome retest: both toggle directions and explicit pause/play changed state as expected.
+[01:47:26.072] Selected [3] Chrome.
+[01:47:30.347] ROUTE toggle -> Chrome: accepted
+[01:47:30.372] Selected playback changed: Playing.
+[01:47:32.936] Selected session: Chrome; status=Playing; controls(toggle=True, next=False, previous=False, stop=True)
+[01:47:36.806] ROUTE pause -> Chrome: accepted
+[01:47:36.816] Selected playback changed: Paused.
+[01:47:39.642] Selected session: Chrome; status=Paused; controls(toggle=True, next=False, previous=False, stop=True)
+[01:47:42.574] ROUTE play -> Chrome: accepted
+[01:47:42.598] Selected playback changed: Playing.
+[01:47:45.585] Selected session: Chrome; status=Playing; controls(toggle=True, next=False, previous=False, stop=True)
+[01:47:49.206] ROUTE toggle -> Chrome: accepted
+[01:47:49.222] Selected playback changed: Paused.
+[01:47:51.933] Selected session: Chrome; status=Paused; controls(toggle=True, next=False, previous=False, stop=True)
+
+# Result: Chrome qualifies as a second named independent GSMTC source for Phase 0.
+# The earlier accepted-without-observed-action behavior is intermittent and was not reproduced by the clean retest.
+# Queue errors = 0; process crashes = 0.
