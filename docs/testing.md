@@ -23,6 +23,11 @@ Cover:
 
 Use a fake clock and immutable fixtures. Every state transition should assert both new state and requested effects.
 
+Phase 1 tests the router through `IMediaRouter.DispatchAsync` with an in-memory `IMediaController` adapter. The
+suite covers Windows Auto, App Lock and Session Lock decisions; unique and ambiguous recovery; all Fallback Policy
+values; stale recovery deadlines; unsupported commands and failed controls; submission ordering, maximum
+concurrency and queued cancellation. Tests do not call reducer helpers or inspect the router's internal queue.
+
 ### Integration tests
 
 Cover:

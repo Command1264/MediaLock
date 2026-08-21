@@ -71,6 +71,11 @@ public interface ISystemLifecycle;
 Command against a resolved handle and reports supported, succeeded or failed. `IMediaInputSource` emits a command
 only after its backend has determined whether the underlying input was consumed.
 
+Phase 1 exposes routing through the deliberately small `IMediaRouter.DispatchAsync(RouterIntent,
+CancellationToken)` interface. A result contains the new immutable `RouterState` and one `RouteDecision`; callers
+do not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
+`IMediaController` is the platform adapter seam used by the router after it has resolved exactly one target.
+
 ## 4. State model
 
 Routing state is explicit and immutable at the Core boundary. A reducer-like transition function accepts the prior
@@ -125,6 +130,11 @@ On suspend/resume or adapter failure:
 All router intents are serialized through one application-owned queue or dispatcher. Platform callbacks perform
 minimal work and enqueue events. UI state is projected onto the WPF dispatcher. Cancellation and shutdown are
 explicit; retries are bounded and observable.
+
+The Phase 1 router owns a single-reader intent queue. Submission order is preserved across callers, queued
+cancellation completes promptly without terminating the queue, and disposal cancels in-flight work before draining
+the closed queue. Recovery deadlines carry the state revision that scheduled them, so a stale timeout cannot
+override a target that has already recovered.
 
 ## 8. Persistence and diagnostics
 
