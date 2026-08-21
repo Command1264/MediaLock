@@ -37,7 +37,8 @@ GSMTC 控制。輸入 `hook on` 後，只有目標 Session 宣告可處理的實
 - 同一次實體按住由首個 keydown 決定 consume 或 pass-through；auto-repeat 與 keyup 沿用相同決策，
   不會在按住期間因 Recovery 或 queue 狀態改變而產生不成對的 Windows key stream。
 - Input queue 上限為 128；佇列滿時該次按鍵不會被 consume，而會交回 Windows 原生處理。
-- 每個 consumed input 保留 capture 當下的 Session 參考；GSMTC 非同步呼叫由單一背景 consumer 依序處理。
+- 每個 consumed input 保留 capture 當下的 Session 參考；input consumer 將 route intent 轉交 application
+  serialized queue，GSMTC 非同步呼叫不會與 Recovery 或 lifecycle intent 並行。
 - GSMTC、Recovery timer、system lifecycle 與 console intent 透過同一個序列化 queue 處理；platform
   callback 只 enqueue，不直接改變 Locked Target 狀態。
 - 系統 suspend 時會將 catalog 標為 unavailable 並釋放 manager 訂閱；resume 後重新取得 manager、發布

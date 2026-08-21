@@ -58,7 +58,7 @@ internal static class ProbeApplication
             return inputQueue.Writer.TryWrite(new MediaKeyInput(command, route, reason));
         });
 
-        var inputWorker = ProcessInputsAsync(inputQueue.Reader);
+        var inputWorker = ProcessInputsAsync(inputQueue.Reader, intentQueue);
 
         ConsoleLog.Info("Media Lock Phase 0 probe. Type 'help' for commands.");
         await intentQueue.InvokeAsync(sessions.PrintSessionsAsync);
@@ -135,20 +135,27 @@ internal static class ProbeApplication
         return 0;
     }
 
-    private static async Task ProcessInputsAsync(ChannelReader<MediaKeyInput> reader)
+    internal static async Task ProcessInputsAsync(
+        ChannelReader<MediaKeyInput> reader,
+        SerializedIntentQueue intentQueue)
     {
         await foreach (var input in reader.ReadAllAsync())
         {
-            if (input.Route is null)
-            {
-                ConsoleLog.Info($"INPUT {input.Command}; pass-through ({input.Reason}).");
-                continue;
-            }
-
-            ConsoleLog.Info($"INPUT {input.Command}; consumed; queued for selected session.");
-            var result = await GsmtcSessionService.RouteAsync(input.Route);
-            LogResult(result);
+            await intentQueue.InvokeAsync(() => ProcessInputAsync(input));
         }
+    }
+
+    private static async Task ProcessInputAsync(MediaKeyInput input)
+    {
+        if (input.Route is null)
+        {
+            ConsoleLog.Info($"INPUT {input.Command}; pass-through ({input.Reason}).");
+            return;
+        }
+
+        ConsoleLog.Info($"INPUT {input.Command}; consumed; queued for selected session.");
+        var result = await GsmtcSessionService.RouteAsync(input.Route);
+        LogResult(result);
     }
 
     private static async Task SelectSessionAsync(

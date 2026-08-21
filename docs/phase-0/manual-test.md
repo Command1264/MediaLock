@@ -8,7 +8,7 @@
 | .NET SDK | 10.0.400 |
 | 權限（一般／系統管理員） | 一般使用者，Medium integrity（S-1-16-8192） |
 | 鍵盤／媒體鍵來源 | ASUS 華碩 ROG STRIX FLARE 機械式鍵盤的實體媒體鍵 |
-| Brave 與網站版本 | Brave 151.1.93.137；網站版本待實機矩陣記錄 |
+| Brave 與網站版本 | Brave 151.1.93.137；YouTube Music PWA 未公開穩定版本號，以測試日期 2026-08-22 識別部署版本 |
 | Spotify 版本 | 待測 |
 
 ## 2026-08-21 本機 smoke test
@@ -96,8 +96,9 @@ intent queue 與 press-cycle consume 決策後，必須依下方回歸流程重�
 - hardening 後睡眠／喚醒記錄到一次 `Reacquiring GSMTC manager after system resume.`；YouTube Music
   Media Session 在喚醒過程多次消失、替換及 Recovery，最後 Locked Target 成功 reselected。其後實體
   Play/Pause 為 1 INPUT consumed、1 ROUTE accepted，普通 YouTube 沒有改變。
-- 完整 transcript 中 `Serialized intent failed` 為 0、rejected route 為 0。原始 transcript 含媒體標題，
-  repository 只保存去識別化的計數與結果。
+- 完整 transcript 中 `Serialized intent failed` 為 0、rejected route 為 0。原始 transcript 含媒體標題；
+  repository 保存已移除媒體 metadata 的 [redacted event log](evidence/2026-08-22-hardening-redacted.log)，
+  並保留本文件中的環境、步驟、預期與實際結果。
 
 ## 基本 GSMTC
 
