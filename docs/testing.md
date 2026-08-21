@@ -29,6 +29,13 @@ values; stable Recovery epochs and stale deadlines; fingerprint confidence ranki
 refreshes; unsupported commands and failed controls; submission ordering, maximum concurrency and queued
 cancellation. Tests do not call reducer helpers or inspect the router's internal queue.
 
+Phase 2 tests application coordination through `IMediaLockApplication`: catalog snapshots enter the real router,
+UI intents lock and route, and Recovery deadline effects apply fallback without ViewModel coordination. ViewModel
+tests use only public binding properties and async commands. Windows adapter tests cross `IMediaSessionCatalog` and
+`IMediaController`, replacing only the external WinRT manager/Session boundary. Regression coverage also verifies
+ordered application projection under concurrent dispatch, stale-target removal after terminal catalog failure and
+capacity-one coalescing of burst GSMTC events, including cancellation of a blocked refresh during disposal.
+
 ### Integration tests
 
 Cover:

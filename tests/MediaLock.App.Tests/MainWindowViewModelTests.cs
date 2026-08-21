@@ -1,0 +1,193 @@
+using MediaLock.App.ViewModels;
+using MediaLock.Application;
+using MediaLock.Core.Media;
+using MediaLock.Core.Routing;
+using Xunit;
+
+namespace MediaLock.App.Tests;
+
+public sealed class MainWindowViewModelTests
+{
+    [Fact]
+    public async Task SessionSelectionCanBeLockedThroughTheApplicationSeam()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+            Metadata: new MediaMetadata("Song", "Artist", null, null));
+        var application = new FakeApplication(StateWith(session));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        var item = Assert.Single(viewModel.Sessions);
+        viewModel.SelectedSession = item;
+        await viewModel.LockCommand.ExecuteAsync(null);
+
+        Assert.Equal("Brave", item.SourceApplication);
+        Assert.Equal("Song", item.Title);
+        var intent = Assert.IsType<ApplicationIntent.LockSession>(Assert.Single(application.Intents));
+        Assert.Equal(session.Key, intent.Session);
+    }
+
+    [Fact]
+    public void RecoveringStateShowsAnActionableEmptyState()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(new MediaLockApplicationState(
+            RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Recovering,
+                RecoveryEpoch = 7,
+                Revision = 2,
+            }));
+
+        Assert.Equal("Recovering", viewModel.RoutingStatus);
+        Assert.Equal("Waiting for the locked Media Session to return.", viewModel.EmptyStateText);
+        Assert.False(viewModel.HasSessions);
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ManualCommandUsesResolvedTargetCapabilities()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Next,
+            DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        var application = new FakeApplication(new MediaLockApplicationState(
+            StateWith(session).Router with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                LockedTarget = new LockedTarget(
+                    new SessionFingerprint(
+                        session.Descriptor,
+                        session.PlaybackStatus,
+                        session.ObservedAt,
+                        session.PlaybackType,
+                        session.Metadata?.Title,
+                        session.Metadata?.Artist),
+                    session.Key),
+            }));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.True(viewModel.NextCommand.CanExecute(null));
+        Assert.False(viewModel.PauseCommand.CanExecute(null));
+        await viewModel.NextCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.Route>(Assert.Single(application.Intents));
+        Assert.Equal(MediaCommand.Next, intent.Command);
+    }
+
+    [Fact]
+    public void ApplicationFailureIsPresentedAsAnActionableErrorState()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(new MediaLockApplicationState(
+            RouterState.Initial,
+            "GSMTC catalog became unavailable."));
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal("GSMTC catalog became unavailable.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task FailedManualControlIsPresentedInsteadOfBeingSwallowed()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Next,
+            DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        var application = new FakeApplication(StateWith(session))
+        {
+            Decision = new RouteDecision(
+                RouteDecisionKind.Failed,
+                RouteReason.ControlFailed,
+                MediaCommand.Next,
+                session.Key,
+                Error: "GSMTC control failed."),
+        };
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        await viewModel.NextCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal("GSMTC control failed.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ApplicationExceptionBecomesUiErrorInsteadOfEscapingTheCommand()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Next,
+            DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        var application = new FakeApplication(StateWith(session))
+        {
+            DispatchException = new InvalidOperationException("Session changed before lock."),
+        };
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        await viewModel.NextCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal("Session changed before lock.", viewModel.ErrorMessage);
+    }
+
+    private static MediaLockApplicationState StateWith(MediaSessionSnapshot session) => new(
+        RouterState.Initial with
+        {
+            Sessions = [session],
+            WindowsCurrentSession = session.Key,
+            Revision = 1,
+        });
+
+    private sealed class FakeApplication(MediaLockApplicationState state) : IMediaLockApplication
+    {
+        public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
+
+        public List<ApplicationIntent> Intents { get; } = [];
+
+        public RouteDecision Decision { get; set; } = RouteDecision.StateUpdated;
+
+        public Exception? DispatchException { get; set; }
+
+        public MediaLockApplicationState State { get; private set; } = state;
+
+        public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<ApplicationResult> DispatchAsync(
+            ApplicationIntent intent,
+            CancellationToken cancellationToken)
+        {
+            if (DispatchException is not null)
+            {
+                throw DispatchException;
+            }
+
+            Intents.Add(intent);
+            return ValueTask.FromResult(new ApplicationResult(State, Decision));
+        }
+
+        public void Publish(MediaLockApplicationState next)
+        {
+            State = next;
+            StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(next));
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}
