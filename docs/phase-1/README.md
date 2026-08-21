@@ -22,11 +22,16 @@ has checked routing state and command capability.
 
 - Windows Auto resolves Windows Current Session at command time.
 - Session Lock preserves a `SessionFingerprint`; an ephemeral `SessionKey` is never persisted as identity.
+- Fingerprint ranking requires the stable source descriptor, treats an instance hint as the strongest match, and
+  then uses matching title／artist, playback status and observation-time proximity only as confidence signals.
+  Track metadata can rank candidates but never qualifies a different source or mismatched stable instance hint.
 - App Lock selects deterministically: Playing first, then newest observation, then ordinal Session key.
 - A missing Locked Target enters Recovering. A unique Fingerprint successor restores Session Lock.
-- A recovery timeout includes the scheduling state revision, so stale timeout intents are ignored.
-- Fallback Policy values are Wait, Same Application, Windows Current Session and Disable Routing. Every outcome has
-  a distinct observable status or route reason.
+- A Recovery epoch stays stable across unrelated catalog refreshes. Its timeout remains effective until recovery or
+  policy resolution clears the epoch; later stale timeout intents are ignored.
+- Fallback Policy values are Wait, Same Application, Windows Current Session, Same Application then Windows Current,
+  and Disable Routing. The product default waits 15 seconds, tries Same Application, then uses Windows Current;
+  every applied outcome has a distinct observable status or route reason.
 
 ## Ordering and cancellation
 
@@ -37,9 +42,10 @@ that is still in flight.
 
 ## Persistence schemas
 
-`MediaLockSettings` and `RuntimeStateDocument` begin at schema version 1. Settings validation returns path-specific,
-actionable issues. Runtime state stores only a persisted Locked Target descriptor (`SourceAppUserModelId` plus an
-optional stable instance hint), never a live Session key or GSMTC object.
+`MediaLockSettings` and `RuntimeStateDocument` begin at schema version 1. Both documents return path-specific,
+actionable validation issues for unsupported versions, invalid enum values, missing sections and inconsistent
+Locked Target state. Runtime state stores only a persisted Locked Target descriptor (`SourceAppUserModelId` plus
+an optional stable instance hint), never a live Session key or GSMTC object.
 
 JSON serialization and atomic file replacement belong to the Windows persistence adapter and are scheduled for a
 later phase; Phase 1 defines the platform-independent documents and validation rules only.

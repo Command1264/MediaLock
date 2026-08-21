@@ -133,8 +133,9 @@ explicit; retries are bounded and observable.
 
 The Phase 1 router owns a single-reader intent queue. Submission order is preserved across callers, queued
 cancellation completes promptly without terminating the queue, and disposal cancels in-flight work before draining
-the closed queue. Recovery deadlines carry the state revision that scheduled them, so a stale timeout cannot
-override a target that has already recovered.
+the closed queue. Catalog intents carry an immutable array and identical refreshes are idempotent. A Recovery epoch
+stays stable across unrelated refreshes but is cleared after recovery, so the active deadline remains bounded while
+a stale timeout cannot override a target that has already recovered.
 
 ## 8. Persistence and diagnostics
 

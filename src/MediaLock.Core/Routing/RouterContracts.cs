@@ -32,12 +32,14 @@ public enum FallbackPolicy
     Wait,
     SameApplication,
     WindowsCurrentSession,
+    SameApplicationThenWindowsCurrentSession,
     DisableRouting,
 }
 
 public sealed record RouterOptions(FallbackPolicy FallbackPolicy)
 {
-    public static RouterOptions Default { get; } = new(FallbackPolicy.Wait);
+    public static RouterOptions Default { get; } = new(
+        FallbackPolicy.SameApplicationThenWindowsCurrentSession);
 }
 
 public enum RouteReason
@@ -62,7 +64,8 @@ public sealed record RouteDecision(
     RouteReason Reason,
     MediaCommand? Command = null,
     SessionKey? Target = null,
-    MediaControlResult? ControlResult = null)
+    MediaControlResult? ControlResult = null,
+    string? Error = null)
 {
     public static RouteDecision StateUpdated { get; } = new(
         RouteDecisionKind.None,
@@ -76,12 +79,14 @@ public sealed record RouterState(
     SessionKey? WindowsCurrentSession,
     LockedTarget? LockedTarget,
     FallbackPolicy? ActiveFallback,
+    long? RecoveryEpoch,
     long Revision)
 {
     public static RouterState Initial { get; } = new(
         RoutingMode.WindowsAuto,
         RouterStatus.Ready,
         [],
+        null,
         null,
         null,
         null,
@@ -108,7 +113,7 @@ public abstract record RouterIntent
     }
 
     public sealed record CatalogUpdated(
-        IReadOnlyList<MediaSessionSnapshot> Sessions,
+        ImmutableArray<MediaSessionSnapshot> Sessions,
         SessionKey? WindowsCurrentSession) : RouterIntent;
 
     public sealed record Route(MediaCommand Command) : RouterIntent;
@@ -117,7 +122,7 @@ public abstract record RouterIntent
 
     public sealed record LockApplication(string SourceAppUserModelId) : RouterIntent;
 
-    public sealed record RecoveryTimedOut(long RecoveryRevision) : RouterIntent;
+    public sealed record RecoveryTimedOut(long RecoveryEpoch) : RouterIntent;
 
     public sealed record UseWindowsAuto : RouterIntent;
 }

@@ -109,7 +109,7 @@ public sealed class MediaRouter : IMediaRouter
             RouterIntent.CatalogUpdated catalog => UpdateCatalog(catalog),
             RouterIntent.LockSession lockSession => LockSession(lockSession.Session),
             RouterIntent.LockApplication lockApplication => LockApplication(lockApplication.SourceAppUserModelId),
-            RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryRevision),
+            RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryEpoch),
             RouterIntent.UseWindowsAuto => UseWindowsAuto(),
             RouterIntent.Route route => await RouteAsync(route.Command, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
@@ -124,24 +124,37 @@ public sealed class MediaRouter : IMediaRouter
             Status = RouterStatus.Ready,
             LockedTarget = null,
             ActiveFallback = null,
+            RecoveryEpoch = null,
             Revision = state.Revision + 1,
         };
 
         return new RouterResult(state, RouteDecision.StateUpdated);
     }
 
-    private RouterResult ApplyRecoveryTimeout(long recoveryRevision)
+    private RouterResult ApplyRecoveryTimeout(long recoveryEpoch)
     {
-        if (state.Status != RouterStatus.Recovering || state.Revision != recoveryRevision)
+        if (state.Status != RouterStatus.Recovering || state.RecoveryEpoch != recoveryEpoch)
         {
             return new RouterResult(state, RouteDecision.StateUpdated);
         }
 
-        var (status, target) = options.FallbackPolicy switch
+        var (status, target, activeFallback) = options.FallbackPolicy switch
         {
             FallbackPolicy.SameApplication => ResolveSameApplicationFallback(),
-            FallbackPolicy.WindowsCurrentSession => (RouterStatus.Fallback, state.LockedTarget),
-            FallbackPolicy.Wait or FallbackPolicy.DisableRouting => (RouterStatus.Unavailable, state.LockedTarget),
+            FallbackPolicy.WindowsCurrentSession => (
+                RouterStatus.Fallback,
+                state.LockedTarget,
+                FallbackPolicy.WindowsCurrentSession),
+            FallbackPolicy.SameApplicationThenWindowsCurrentSession =>
+                ResolveDefaultFallback(),
+            FallbackPolicy.Wait => (
+                RouterStatus.Unavailable,
+                state.LockedTarget,
+                FallbackPolicy.Wait),
+            FallbackPolicy.DisableRouting => (
+                RouterStatus.Unavailable,
+                state.LockedTarget,
+                FallbackPolicy.DisableRouting),
             _ => throw new ArgumentOutOfRangeException(nameof(options.FallbackPolicy)),
         };
 
@@ -149,40 +162,63 @@ public sealed class MediaRouter : IMediaRouter
         {
             Status = status,
             LockedTarget = target,
-            ActiveFallback = options.FallbackPolicy,
+            ActiveFallback = activeFallback,
+            RecoveryEpoch = null,
             Revision = state.Revision + 1,
         };
 
         return new RouterResult(state, RouteDecision.StateUpdated);
     }
 
-    private (RouterStatus Status, LockedTarget? Target) ResolveSameApplicationFallback()
+    private (RouterStatus Status, LockedTarget? Target, FallbackPolicy ActiveFallback)
+        ResolveDefaultFallback()
+    {
+        var sameApplication = ResolveSameApplicationFallback();
+        return sameApplication.Status == RouterStatus.Fallback
+            ? sameApplication
+            : (
+                RouterStatus.Fallback,
+                state.LockedTarget,
+                FallbackPolicy.WindowsCurrentSession);
+    }
+
+    private (RouterStatus Status, LockedTarget? Target, FallbackPolicy ActiveFallback)
+        ResolveSameApplicationFallback()
     {
         if (state.LockedTarget is null)
         {
-            return (RouterStatus.Unavailable, null);
+            return (RouterStatus.Unavailable, null, FallbackPolicy.SameApplication);
         }
 
         var candidate = SelectApplicationCandidate(
             state.Sessions,
-            state.LockedTarget.Fingerprint.SourceAppUserModelId);
+            state.LockedTarget.Fingerprint.Descriptor.SourceAppUserModelId);
         return candidate is null
-            ? (RouterStatus.Unavailable, state.LockedTarget)
-            : (RouterStatus.Fallback, state.LockedTarget with { ResolvedSession = candidate.Key });
+            ? (RouterStatus.Unavailable, state.LockedTarget, FallbackPolicy.SameApplication)
+            : (
+                RouterStatus.Fallback,
+                state.LockedTarget with { ResolvedSession = candidate.Key },
+                FallbackPolicy.SameApplication);
     }
 
     private RouterResult LockApplication(string sourceAppUserModelId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceAppUserModelId);
 
-        var fingerprint = new SessionFingerprint(sourceAppUserModelId, null);
         var candidate = SelectApplicationCandidate(state.Sessions, sourceAppUserModelId);
+        var fingerprint = new SessionFingerprint(
+            new SessionDescriptor(sourceAppUserModelId, null),
+            candidate?.PlaybackStatus ?? PlaybackStatus.Unknown,
+            candidate?.ObservedAt ?? DateTimeOffset.MinValue,
+            candidate?.Metadata?.Title,
+            candidate?.Metadata?.Artist);
         state = state with
         {
             Mode = RoutingMode.AppLock,
             Status = candidate is null ? RouterStatus.Recovering : RouterStatus.Locked,
             LockedTarget = new LockedTarget(fingerprint, candidate?.Key),
             ActiveFallback = null,
+            RecoveryEpoch = candidate is null ? state.Revision + 1 : null,
             Revision = state.Revision + 1,
         };
 
@@ -203,6 +239,7 @@ public sealed class MediaRouter : IMediaRouter
             Status = RouterStatus.Locked,
             LockedTarget = new LockedTarget(SessionFingerprint.From(session), session.Key),
             ActiveFallback = null,
+            RecoveryEpoch = null,
             Revision = state.Revision + 1,
         };
 
@@ -211,8 +248,25 @@ public sealed class MediaRouter : IMediaRouter
 
     private RouterResult UpdateCatalog(RouterIntent.CatalogUpdated catalog)
     {
-        var sessions = catalog.Sessions.ToImmutableArray();
+        if (catalog.Sessions.IsDefault)
+        {
+            throw new ArgumentException("Catalog Sessions must be an initialized immutable array.", nameof(catalog));
+        }
+
+        if (state.WindowsCurrentSession == catalog.WindowsCurrentSession &&
+            state.Sessions.SequenceEqual(catalog.Sessions))
+        {
+            return new RouterResult(state, RouteDecision.StateUpdated);
+        }
+
+        var sessions = catalog.Sessions;
         var (status, lockedTarget, activeFallback) = ResolveLockedTarget(sessions);
+        var nextRevision = state.Revision + 1;
+        long? recoveryEpoch = status == RouterStatus.Recovering
+            ? state.Status == RouterStatus.Recovering
+                ? state.RecoveryEpoch ?? nextRevision
+                : nextRevision
+            : null;
         state = state with
         {
             Sessions = sessions,
@@ -220,7 +274,8 @@ public sealed class MediaRouter : IMediaRouter
             Status = status,
             LockedTarget = lockedTarget,
             ActiveFallback = activeFallback,
-            Revision = state.Revision + 1,
+            RecoveryEpoch = recoveryEpoch,
+            Revision = nextRevision,
         };
 
         return new RouterResult(state, RouteDecision.StateUpdated);
@@ -239,10 +294,16 @@ public sealed class MediaRouter : IMediaRouter
         {
             var appCandidate = SelectApplicationCandidate(
                 sessions,
-                lockedTarget.Fingerprint.SourceAppUserModelId);
-            return appCandidate is null
-                ? (RouterStatus.Recovering, lockedTarget with { ResolvedSession = null }, null)
-                : (RouterStatus.Locked, lockedTarget with { ResolvedSession = appCandidate.Key }, null);
+                lockedTarget.Fingerprint.Descriptor.SourceAppUserModelId);
+            if (appCandidate is not null)
+            {
+                return (RouterStatus.Locked, lockedTarget with { ResolvedSession = appCandidate.Key }, null);
+            }
+
+            return state.Status is RouterStatus.Fallback or RouterStatus.Unavailable &&
+                state.ActiveFallback is not null
+                    ? (state.Status, lockedTarget with { ResolvedSession = null }, state.ActiveFallback)
+                    : (RouterStatus.Recovering, lockedTarget with { ResolvedSession = null }, null);
         }
 
         if (state.Mode != RoutingMode.SessionLock)
@@ -250,16 +311,23 @@ public sealed class MediaRouter : IMediaRouter
             return (state.Status, state.LockedTarget, state.ActiveFallback);
         }
 
-        var exactCandidates = sessions
-            .Where(session => Matches(lockedTarget.Fingerprint, session))
+        var rankedCandidates = sessions
+            .Select(session => new
+            {
+                Session = session,
+                Score = lockedTarget.Fingerprint.Score(session),
+            })
+            .Where(candidate => candidate.Score is not null)
+            .OrderByDescending(candidate => candidate.Score)
             .Take(2)
             .ToArray();
 
-        if (exactCandidates.Length == 1)
+        if (rankedCandidates.Length >= 1 &&
+            (rankedCandidates.Length == 1 || rankedCandidates[0].Score > rankedCandidates[1].Score))
         {
             return (
                 RouterStatus.Locked,
-                lockedTarget with { ResolvedSession = exactCandidates[0].Key },
+                lockedTarget with { ResolvedSession = rankedCandidates[0].Session.Key },
                 null);
         }
 
@@ -274,7 +342,7 @@ public sealed class MediaRouter : IMediaRouter
         {
             var fallbackCandidate = SelectApplicationCandidate(
                 sessions,
-                lockedTarget.Fingerprint.SourceAppUserModelId);
+                lockedTarget.Fingerprint.Descriptor.SourceAppUserModelId);
             return fallbackCandidate is null
                 ? (RouterStatus.Unavailable, lockedTarget with { ResolvedSession = null }, state.ActiveFallback)
                 : (
@@ -285,7 +353,7 @@ public sealed class MediaRouter : IMediaRouter
 
         if (lockedTarget.ResolvedSession is { } resolved &&
             sessions.Any(session =>
-                session.Key == resolved && Matches(lockedTarget.Fingerprint, session)))
+                session.Key == resolved && lockedTarget.Fingerprint.CanRepresent(session)))
         {
             return (RouterStatus.Locked, lockedTarget, null);
         }
@@ -304,19 +372,6 @@ public sealed class MediaRouter : IMediaRouter
         .ThenByDescending(session => session.ObservedAt)
         .ThenBy(session => session.Key.Value, StringComparer.Ordinal)
         .FirstOrDefault();
-
-    private static bool Matches(
-        SessionFingerprint fingerprint,
-        MediaSessionSnapshot candidate) =>
-        string.Equals(
-            fingerprint.SourceAppUserModelId,
-            candidate.SourceAppUserModelId,
-            StringComparison.Ordinal) &&
-        (fingerprint.SessionInstanceHint is null ||
-            string.Equals(
-                fingerprint.SessionInstanceHint,
-                candidate.SessionInstanceHint,
-                StringComparison.Ordinal));
 
     private async ValueTask<RouterResult> RouteAsync(
         MediaCommand command,
@@ -360,7 +415,27 @@ public sealed class MediaRouter : IMediaRouter
             return Skipped(command, RouteReason.UnsupportedCommand, target.Key);
         }
 
-        var controlResult = await controller.TryExecuteAsync(target.Key, command, cancellationToken);
+        MediaControlResult controlResult;
+        try
+        {
+            controlResult = await controller.TryExecuteAsync(target.Key, command, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return new RouterResult(
+                state,
+                new RouteDecision(
+                    RouteDecisionKind.Failed,
+                    RouteReason.ControlFailed,
+                    command,
+                    target.Key,
+                    Error: exception.Message));
+        }
+
         var successfulReason = state.Mode switch
         {
             _ when state.ActiveFallback == FallbackPolicy.WindowsCurrentSession =>
@@ -371,19 +446,11 @@ public sealed class MediaRouter : IMediaRouter
             RoutingMode.AppLock => RouteReason.LockedApplication,
             _ => RouteReason.WindowsCurrentSession,
         };
-        var reason = controlResult switch
+        var (kind, reason) = controlResult switch
         {
-            MediaControlResult.Succeeded => successfulReason,
-            MediaControlResult.Rejected => RouteReason.ControlRejected,
-            MediaControlResult.Failed => RouteReason.ControlFailed,
-            _ => throw new ArgumentOutOfRangeException(nameof(controlResult)),
-        };
-
-        var kind = controlResult switch
-        {
-            MediaControlResult.Succeeded => RouteDecisionKind.Routed,
-            MediaControlResult.Rejected => RouteDecisionKind.Skipped,
-            MediaControlResult.Failed => RouteDecisionKind.Failed,
+            MediaControlResult.Succeeded => (RouteDecisionKind.Routed, successfulReason),
+            MediaControlResult.Rejected => (RouteDecisionKind.Skipped, RouteReason.ControlRejected),
+            MediaControlResult.Failed => (RouteDecisionKind.Failed, RouteReason.ControlFailed),
             _ => throw new ArgumentOutOfRangeException(nameof(controlResult)),
         };
 

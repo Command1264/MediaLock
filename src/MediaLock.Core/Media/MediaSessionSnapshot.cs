@@ -24,7 +24,16 @@ public sealed record MediaSessionSnapshot(
     DateTimeOffset ObservedAt,
     string? SessionInstanceHint = null,
     MediaMetadata? Metadata = null,
-    MediaTimeline? Timeline = null);
+    MediaTimeline? Timeline = null)
+{
+    public SessionDescriptor Descriptor => new(
+        SourceAppUserModelId,
+        SessionInstanceHint);
+}
+
+public sealed record SessionDescriptor(
+    string SourceAppUserModelId,
+    string? SessionInstanceHint);
 
 public sealed record MediaMetadata(
     string? Title,
@@ -39,10 +48,64 @@ public sealed record MediaTimeline(
     DateTimeOffset LastUpdatedAt);
 
 public sealed record SessionFingerprint(
-    string SourceAppUserModelId,
-    string? SessionInstanceHint)
+    SessionDescriptor Descriptor,
+    PlaybackStatus PlaybackStatus,
+    DateTimeOffset ObservedAt,
+    string? Title,
+    string? Artist)
 {
     public static SessionFingerprint From(MediaSessionSnapshot session) => new(
-        session.SourceAppUserModelId,
-        session.SessionInstanceHint);
+        session.Descriptor,
+        session.PlaybackStatus,
+        session.ObservedAt,
+        session.Metadata?.Title,
+        session.Metadata?.Artist);
+
+    internal long? Score(MediaSessionSnapshot candidate)
+    {
+        if (!CanRepresent(candidate))
+        {
+            return null;
+        }
+
+        var score = Descriptor.SessionInstanceHint is null ? 0L : 1_000_000L;
+        if (!string.IsNullOrEmpty(Title) &&
+            string.Equals(Title, candidate.Metadata?.Title, StringComparison.Ordinal))
+        {
+            score += 10_000;
+        }
+
+        if (!string.IsNullOrEmpty(Artist) &&
+            string.Equals(Artist, candidate.Metadata?.Artist, StringComparison.Ordinal))
+        {
+            score += 5_000;
+        }
+
+        if (PlaybackStatus == candidate.PlaybackStatus)
+        {
+            score += 1_000;
+        }
+
+        var observationGap = (candidate.ObservedAt - ObservedAt).Duration();
+        score += observationGap <= TimeSpan.FromMinutes(1)
+            ? 100
+            : observationGap <= TimeSpan.FromMinutes(5)
+                ? 50
+                : observationGap <= TimeSpan.FromMinutes(15)
+                    ? 10
+                    : 0;
+
+        return score;
+    }
+
+    internal bool CanRepresent(MediaSessionSnapshot candidate) =>
+        string.Equals(
+            Descriptor.SourceAppUserModelId,
+            candidate.SourceAppUserModelId,
+            StringComparison.Ordinal) &&
+        (Descriptor.SessionInstanceHint is null ||
+            string.Equals(
+                Descriptor.SessionInstanceHint,
+                candidate.SessionInstanceHint,
+                StringComparison.Ordinal));
 }

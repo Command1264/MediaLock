@@ -37,4 +37,38 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal("browser", state.LockedTarget!.SourceAppUserModelId);
         Assert.Equal("pwa", state.LockedTarget.SessionInstanceHint);
     }
+
+    [Fact]
+    public void InvalidRuntimeStateReturnsActionableValidationIssues()
+    {
+        var state = new RuntimeStateDocument(
+            SchemaVersion: 99,
+            RoutingMode.WindowsAuto,
+            new PersistedLockedTarget(" ", " "));
+
+        var issues = state.Validate();
+
+        Assert.Equal(4, issues.Length);
+        Assert.Contains(issues, issue => issue.Path == "schemaVersion");
+        Assert.Contains(issues, issue =>
+            issue.Path == "lockedTarget" &&
+            issue.Message == "Windows Auto runtime state must not contain a Locked Target.");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.sourceAppUserModelId");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.sessionInstanceHint");
+    }
+
+    [Fact]
+    public void MissingRecoverySettingsReturnActionableValidationIssue()
+    {
+        var settings = new MediaLockSettings(
+            MediaLockSettings.CurrentSchemaVersion,
+            RoutingMode.WindowsAuto,
+            Recovery: null);
+
+        var issues = settings.Validate();
+
+        var issue = Assert.Single(issues);
+        Assert.Equal("recovery", issue.Path);
+        Assert.Equal("Recovery settings are required.", issue.Message);
+    }
 }

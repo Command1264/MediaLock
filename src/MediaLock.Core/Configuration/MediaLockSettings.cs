@@ -10,14 +10,16 @@ public sealed record RecoverySettings(
 public sealed record MediaLockSettings(
     int SchemaVersion,
     RoutingMode DefaultRoutingMode,
-    RecoverySettings Recovery)
+    RecoverySettings? Recovery)
 {
     public const int CurrentSchemaVersion = 1;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
         RoutingMode.WindowsAuto,
-        new RecoverySettings(TimeSpan.FromSeconds(15), FallbackPolicy.Wait));
+        new RecoverySettings(
+            TimeSpan.FromSeconds(15),
+            FallbackPolicy.SameApplicationThenWindowsCurrentSession));
 
     public ImmutableArray<ConfigurationIssue> Validate()
     {
@@ -29,11 +31,27 @@ public sealed record MediaLockSettings(
                 $"Expected schema version {CurrentSchemaVersion}, but found {SchemaVersion}."));
         }
 
-        if (Recovery.Timeout < TimeSpan.Zero || Recovery.Timeout > TimeSpan.FromMinutes(5))
+        if (Recovery is null)
         {
             issues.Add(new ConfigurationIssue(
-                "recovery.timeout",
-                "Recovery timeout must be between 0 seconds and 5 minutes."));
+                "recovery",
+                "Recovery settings are required."));
+        }
+        else
+        {
+            if (Recovery.Timeout < TimeSpan.Zero || Recovery.Timeout > TimeSpan.FromMinutes(5))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "recovery.timeout",
+                    "Recovery timeout must be between 0 seconds and 5 minutes."));
+            }
+
+            if (!Enum.IsDefined(Recovery.FallbackPolicy))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "recovery.fallbackPolicy",
+                    $"Unknown fallback policy value {(int)Recovery.FallbackPolicy}."));
+            }
         }
 
         if (!Enum.IsDefined(DefaultRoutingMode))
@@ -41,13 +59,6 @@ public sealed record MediaLockSettings(
             issues.Add(new ConfigurationIssue(
                 "defaultRoutingMode",
                 $"Unknown routing mode value {(int)DefaultRoutingMode}."));
-        }
-
-        if (!Enum.IsDefined(Recovery.FallbackPolicy))
-        {
-            issues.Add(new ConfigurationIssue(
-                "recovery.fallbackPolicy",
-                $"Unknown fallback policy value {(int)Recovery.FallbackPolicy}."));
         }
 
         return issues.ToImmutable();
