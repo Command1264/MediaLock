@@ -10,7 +10,9 @@ without duplicate Windows behavior.
 
 Exit criteria:
 
-- Session enumeration and event refresh work for at least Brave/YouTube Music and Spotify Desktop.
+- Session enumeration and event refresh work for Brave/YouTube Music and at least one second named, independent
+  GSMTC source; the evidence records the exact application and version. Spotify Desktop remains part of the MVP
+  compatibility matrix, but is not a unique Phase 0 feasibility gate.
 - Manual command dispatch targets the selected Session.
 - At least one input backend has documented support boundaries and repeatable evidence for consume behavior.
 - Ordinary-user privilege behavior is known.

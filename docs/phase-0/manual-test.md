@@ -9,6 +9,7 @@
 | 權限（一般／系統管理員） | 一般使用者，Medium integrity（S-1-16-8192） |
 | 鍵盤／媒體鍵來源 | ASUS 華碩 ROG STRIX FLARE 機械式鍵盤的實體媒體鍵 |
 | Brave 與網站版本 | Brave 151.1.93.137；YouTube Music PWA 未公開穩定版本號，以測試日期 2026-08-22 識別部署版本 |
+| Chrome 與網站版本 | Chrome 151.0.7922.140（正式版本，64 位元，cohort: Control）；YouTube，以測試日期 2026-08-22 識別部署版本 |
 | Spotify 版本 | 待測 |
 
 ## 2026-08-21 本機 smoke test
@@ -100,10 +101,30 @@ intent queue 與 press-cycle consume 決策後，必須依下方回歸流程重�
   repository 保存已移除媒體 metadata 的 [redacted event log](evidence/2026-08-22-hardening-redacted.log)，
   並保留本文件中的環境、步驟、預期與實際結果。
 
+## 2026-08-22 Chrome 第二獨立來源驗證
+
+- 同時列出普通 Brave YouTube、Brave YouTube Music PWA 與 Chrome YouTube 共 3 個 GSMTC Session；
+  Chrome 網頁 UI 的播放／暫停會觸發 Probe 的 playback changed event。
+- 選取 Chrome 後關閉分頁，Locked Target 依序進入 Recovering 與 Unavailable；重開 Chrome YouTube
+  後自動 Recovery 並重新選取。過程沒有 queue error 或程式崩潰。
+- 最小重測依序執行 `toggle`（Paused → Playing）、`pause`（Playing → Paused）、`play`
+  （Paused → Playing）及 `toggle`（Playing → Paused）；4/4 route accepted，且每次後續 `status` 與
+  playback changed event 都符合實際狀態。
+- 較早的一輪觀察中，Chrome 的 6 次 `toggle` 都回報 accepted，但只有 2 次在一秒內出現 playback
+  status change；其餘 4 次沒有可觀察的實際動作。後續最小重測無法重現，explicit `play`／`pause`
+  亦正常，因此目前記為 Chrome／YouTube 的間歇性相容性觀察，而非已確認的 Probe 缺陷。
+- 不在 accepted 後自動補送 explicit `pause`／`play`：若原始 toggle 僅延遲生效，補送會造成雙重動作。
+- 回到 Brave YouTube Music 後，`toggle` 2/2 accepted 且實際狀態逐次切換；沒有 queue error 或崩潰。
+- 已保存移除媒體 title／artist 的
+  [Chrome redacted event log](evidence/2026-08-22-chrome-redacted.log)。此驗證證明第二個具名獨立
+  GSMTC 來源的 enumeration、event refresh、manual dispatch 與 Session recovery；未測試 Chrome 的
+  實體鍵 capture／consume。
+
 ## 基本 GSMTC
 
 1. 以一般使用者權限執行探針。
-2. 在 Brave 開啟 YouTube Music 並播放；另開 Spotify 並播放後暫停其中一方。
+2. 在 Brave 開啟 YouTube Music 並播放；另開一個具名獨立 GSMTC 來源（本次使用 Chrome YouTube），
+   並播放後暫停其中一方。
 3. 執行 `refresh`，確認兩個來源及 title、artist、status、timeline、controls 可辨識。
 4. 分別 `select` 每個 Session，執行 `play`、`pause`、`toggle`、`next`、`previous`、`stop`。
 5. 記錄 `accepted`／`rejected` 與實際 App 行為是否一致。
@@ -143,6 +164,9 @@ intent queue 與 press-cycle consume 決策後，必須依下方回歸流程重�
   hook 與實體路由正常。
 - 通過：hardening 後睡眠／喚醒明確記錄一次 `Reacquiring GSMTC manager after system resume.`；
   Locked Target 最後成功 reselected，喚醒後實體 Play/Pause 只產生一次 consumed 與 accepted route。
+- 通過：Chrome 151 YouTube 可與 Brave YouTube Music 同時列出、更新 playback event、執行 manual
+  dispatch，並在分頁關閉／重開後完成 Recovering → Unavailable → reselected；較早的 toggle
+  accepted-without-observed-action 保留為目前不可穩定重現的相容性觀察。
 - 執行 `hook off` 與正常結束程式，確認媒體鍵恢復 Windows 原生行為。
 
 ## 通過門檻與結論
@@ -151,7 +175,9 @@ Phase 0 只有在支援的控制 10/10 次皆只影響選定 Session、沒有可
 focus／解鎖／睡眠恢復結果可接受時，才能判定此 backend 適合進入 Phase 1。任何失敗都要附上可重現
 步驟與 log，再決定修正、加入 recovery，或更換 input backend。
 
-**目前結論：YouTube Music PWA 的 capture、consume、route、pass-through、foreground focus、快速
+**目前結論：Chrome 151 YouTube 已補足第二個具名獨立 GSMTC 來源的 enumeration、event refresh、
+manual dispatch 與 Session recovery 證據；YouTube Music PWA 的 capture、consume、route、
+pass-through、foreground focus、快速
 連按、短暫 Session Recovery、Stop 11 次、實體 auto-repeat、Windows 鎖定／解鎖，以及 hardening 後
 睡眠／喚醒均已通過。自動測試亦涵蓋 press-cycle、事件序列化及 manager reacquisition。因此可判定
 `WH_KEYBOARD_LL` backend 在本機 Windows 11 build 26200、ASUS ROG STRIX FLARE、Brave＋YouTube
