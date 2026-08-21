@@ -1,4 +1,5 @@
 using MediaLock.Core.Configuration;
+using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Core.Tests;
@@ -27,15 +28,26 @@ public sealed class ConfigurationSchemaTests
     }
 
     [Fact]
-    public void RuntimeStateSchemaStoresDescriptorInsteadOfLiveSessionKey()
+    public void RuntimeStateSchemaStoresFingerprintInsteadOfLiveSessionKey()
     {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
         var state = new RuntimeStateDocument(
             RuntimeStateDocument.CurrentSchemaVersion,
             RoutingMode.SessionLock,
-            new PersistedLockedTarget("browser", "pwa"));
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "browser",
+                "pwa",
+                PlaybackStatus.Playing,
+                observedAt,
+                "title",
+                "artist")));
 
-        Assert.Equal("browser", state.LockedTarget!.SourceAppUserModelId);
-        Assert.Equal("pwa", state.LockedTarget.SessionInstanceHint);
+        Assert.Equal("browser", state.LockedTarget!.Fingerprint.SourceAppUserModelId);
+        Assert.Equal("pwa", state.LockedTarget.Fingerprint.SessionInstanceHint);
+        Assert.Equal(PlaybackStatus.Playing, state.LockedTarget.Fingerprint.PlaybackStatus);
+        Assert.Equal(observedAt, state.LockedTarget.Fingerprint.ObservedAt);
+        Assert.Equal("title", state.LockedTarget.Fingerprint.Title);
+        Assert.Equal("artist", state.LockedTarget.Fingerprint.Artist);
     }
 
     [Fact]
@@ -44,17 +56,38 @@ public sealed class ConfigurationSchemaTests
         var state = new RuntimeStateDocument(
             SchemaVersion: 99,
             RoutingMode.WindowsAuto,
-            new PersistedLockedTarget(" ", " "));
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                " ",
+                " ",
+                (PlaybackStatus)99,
+                DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+                null,
+                null)));
 
         var issues = state.Validate();
 
-        Assert.Equal(4, issues.Length);
+        Assert.Equal(5, issues.Length);
         Assert.Contains(issues, issue => issue.Path == "schemaVersion");
         Assert.Contains(issues, issue =>
             issue.Path == "lockedTarget" &&
             issue.Message == "Windows Auto runtime state must not contain a Locked Target.");
-        Assert.Contains(issues, issue => issue.Path == "lockedTarget.sourceAppUserModelId");
-        Assert.Contains(issues, issue => issue.Path == "lockedTarget.sessionInstanceHint");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sourceAppUserModelId");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.sessionInstanceHint");
+        Assert.Contains(issues, issue => issue.Path == "lockedTarget.fingerprint.playbackStatus");
+    }
+
+    [Fact]
+    public void MissingPersistedFingerprintReturnsActionableValidationIssue()
+    {
+        var state = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            new PersistedLockedTarget(null!));
+
+        var issue = Assert.Single(state.Validate());
+
+        Assert.Equal("lockedTarget.fingerprint", issue.Path);
+        Assert.Equal("Locked Target fingerprint is required.", issue.Message);
     }
 
     [Fact]

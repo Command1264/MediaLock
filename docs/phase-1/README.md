@@ -29,6 +29,9 @@ has checked routing state and command capability.
 - A missing Locked Target enters Recovering. A unique Fingerprint successor restores Session Lock.
 - A Recovery epoch stays stable across unrelated catalog refreshes. Its timeout remains effective until recovery or
   policy resolution clears the epoch; later stale timeout intents are ignored.
+- When a result first enters Recovering, the caller schedules exactly one `RecoveryTimedOut(epoch)` intent after the
+  configured timeout. Catalog refreshes do not restart that timer; leaving Recovering cancels the caller's pending
+  timer, while a stale timeout is safe because Core ignores epochs that are no longer active.
 - Fallback Policy values are Wait, Same Application, Windows Current Session, Same Application then Windows Current,
   and Disable Routing. The product default waits 15 seconds, tries Same Application, then uses Windows Current;
   every applied outcome has a distinct observable status or route reason.
@@ -44,8 +47,9 @@ that is still in flight.
 
 `MediaLockSettings` and `RuntimeStateDocument` begin at schema version 1. Both documents return path-specific,
 actionable validation issues for unsupported versions, invalid enum values, missing sections and inconsistent
-Locked Target state. Runtime state stores only a persisted Locked Target descriptor (`SourceAppUserModelId` plus
-an optional stable instance hint), never a live Session key or GSMTC object.
+Locked Target state. Runtime state stores the complete persisted Fingerprint inputs used for recovery confidence:
+source application ID, optional stable instance hint, playback status, observation timestamp, title and artist. It
+never stores a live Session key or GSMTC object.
 
 JSON serialization and atomic file replacement belong to the Windows persistence adapter and are scheduled for a
 later phase; Phase 1 defines the platform-independent documents and validation rules only.

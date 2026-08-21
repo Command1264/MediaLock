@@ -15,6 +15,7 @@ public sealed class MediaRouter : IMediaRouter
 
     public MediaRouter(IMediaController controller, RouterOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(controller);
         this.controller = controller;
         this.options = options ?? RouterOptions.Default;
         if (!Enum.IsDefined(this.options.FallbackPolicy))
@@ -248,10 +249,7 @@ public sealed class MediaRouter : IMediaRouter
 
     private RouterResult UpdateCatalog(RouterIntent.CatalogUpdated catalog)
     {
-        if (catalog.Sessions.IsDefault)
-        {
-            throw new ArgumentException("Catalog Sessions must be an initialized immutable array.", nameof(catalog));
-        }
+        ValidateCatalog(catalog);
 
         if (state.WindowsCurrentSession == catalog.WindowsCurrentSession &&
             state.Sessions.SequenceEqual(catalog.Sessions))
@@ -279,6 +277,77 @@ public sealed class MediaRouter : IMediaRouter
         };
 
         return new RouterResult(state, RouteDecision.StateUpdated);
+    }
+
+    private static void ValidateCatalog(RouterIntent.CatalogUpdated catalog)
+    {
+        if (catalog.Sessions.IsDefault)
+        {
+            throw new ArgumentException(
+                "Catalog Sessions must be an initialized immutable array.",
+                nameof(catalog));
+        }
+
+        var keys = new HashSet<SessionKey>();
+        foreach (var session in catalog.Sessions)
+        {
+            if (session is null)
+            {
+                throw new ArgumentException(
+                    "Catalog Sessions must not contain a null Session.",
+                    nameof(catalog));
+            }
+
+            if (string.IsNullOrWhiteSpace(session.Key.Value))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session key must be non-blank.",
+                    nameof(catalog));
+            }
+
+            if (string.IsNullOrWhiteSpace(session.SourceAppUserModelId))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session source application ID must be non-blank.",
+                    nameof(catalog));
+            }
+
+            if (session.SessionInstanceHint is not null &&
+                string.IsNullOrWhiteSpace(session.SessionInstanceHint))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session instance hint must be null or non-blank.",
+                    nameof(catalog));
+            }
+
+            if (!Enum.IsDefined(session.PlaybackStatus))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session playback status must be defined.",
+                    nameof(catalog));
+            }
+
+            if ((session.Capabilities & ~MediaCommandCapabilities.All) != 0)
+            {
+                throw new ArgumentException(
+                    "Every catalog Session capability value must contain only known flags.",
+                    nameof(catalog));
+            }
+
+            if (!keys.Add(session.Key))
+            {
+                throw new ArgumentException(
+                    $"Catalog Session key '{session.Key}' is duplicated.",
+                    nameof(catalog));
+            }
+        }
+
+        if (catalog.WindowsCurrentSession is { } current && !keys.Contains(current))
+        {
+            throw new ArgumentException(
+                "Windows Current Session must identify a Session in the catalog.",
+                nameof(catalog));
+        }
     }
 
     private (RouterStatus Status, LockedTarget? Target, FallbackPolicy? ActiveFallback) ResolveLockedTarget(
@@ -317,13 +386,14 @@ public sealed class MediaRouter : IMediaRouter
                 Session = session,
                 Score = lockedTarget.Fingerprint.Score(session),
             })
-            .Where(candidate => candidate.Score is not null)
+            .Where(candidate => candidate.Score is { IsAcceptable: true })
             .OrderByDescending(candidate => candidate.Score)
             .Take(2)
             .ToArray();
 
         if (rankedCandidates.Length >= 1 &&
-            (rankedCandidates.Length == 1 || rankedCandidates[0].Score > rankedCandidates[1].Score))
+            (rankedCandidates.Length == 1 ||
+                rankedCandidates[0].Score!.Value.CompareTo(rankedCandidates[1].Score!.Value) > 0))
         {
             return (
                 RouterStatus.Locked,

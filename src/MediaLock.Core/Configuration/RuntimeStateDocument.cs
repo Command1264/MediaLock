@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Core.Configuration;
@@ -41,19 +42,34 @@ public sealed record RuntimeStateDocument(
 
         if (LockedTarget is not null)
         {
-            if (string.IsNullOrWhiteSpace(LockedTarget.SourceAppUserModelId))
+            if (LockedTarget.Fingerprint is null)
             {
                 issues.Add(new ConfigurationIssue(
-                    "lockedTarget.sourceAppUserModelId",
+                    "lockedTarget.fingerprint",
+                    "Locked Target fingerprint is required."));
+                return issues.ToImmutable();
+            }
+
+            if (string.IsNullOrWhiteSpace(LockedTarget.Fingerprint.SourceAppUserModelId))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "lockedTarget.fingerprint.sourceAppUserModelId",
                     "Locked Target source application ID must not be blank."));
             }
 
-            if (LockedTarget.SessionInstanceHint is not null &&
-                string.IsNullOrWhiteSpace(LockedTarget.SessionInstanceHint))
+            if (LockedTarget.Fingerprint.SessionInstanceHint is not null &&
+                string.IsNullOrWhiteSpace(LockedTarget.Fingerprint.SessionInstanceHint))
             {
                 issues.Add(new ConfigurationIssue(
-                    "lockedTarget.sessionInstanceHint",
+                    "lockedTarget.fingerprint.sessionInstanceHint",
                     "Locked Target Session instance hint must be null or non-blank."));
+            }
+
+            if (!Enum.IsDefined(LockedTarget.Fingerprint.PlaybackStatus))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "lockedTarget.fingerprint.playbackStatus",
+                    $"Unknown playback status value {(int)LockedTarget.Fingerprint.PlaybackStatus}."));
             }
         }
 
@@ -61,6 +77,12 @@ public sealed record RuntimeStateDocument(
     }
 }
 
-public sealed record PersistedLockedTarget(
+public sealed record PersistedLockedTarget(PersistedSessionFingerprint Fingerprint);
+
+public sealed record PersistedSessionFingerprint(
     string SourceAppUserModelId,
-    string? SessionInstanceHint);
+    string? SessionInstanceHint,
+    PlaybackStatus PlaybackStatus,
+    DateTimeOffset ObservedAt,
+    string? Title,
+    string? Artist);

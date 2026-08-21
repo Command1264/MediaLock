@@ -61,41 +61,42 @@ public sealed record SessionFingerprint(
         session.Metadata?.Title,
         session.Metadata?.Artist);
 
-    internal long? Score(MediaSessionSnapshot candidate)
+    internal SessionMatchScore? Score(MediaSessionSnapshot candidate)
     {
         if (!CanRepresent(candidate))
         {
             return null;
         }
 
-        var score = Descriptor.SessionInstanceHint is null ? 0L : 1_000_000L;
-        if (!string.IsNullOrEmpty(Title) &&
-            string.Equals(Title, candidate.Metadata?.Title, StringComparison.Ordinal))
-        {
-            score += 10_000;
-        }
-
-        if (!string.IsNullOrEmpty(Artist) &&
-            string.Equals(Artist, candidate.Metadata?.Artist, StringComparison.Ordinal))
-        {
-            score += 5_000;
-        }
-
-        if (PlaybackStatus == candidate.PlaybackStatus)
-        {
-            score += 1_000;
-        }
-
         var observationGap = (candidate.ObservedAt - ObservedAt).Duration();
-        score += observationGap <= TimeSpan.FromMinutes(1)
-            ? 100
+        var proximity = observationGap <= TimeSpan.FromMinutes(1)
+            ? ObservationProximity.WithinOneMinute
             : observationGap <= TimeSpan.FromMinutes(5)
-                ? 50
+                ? ObservationProximity.WithinFiveMinutes
                 : observationGap <= TimeSpan.FromMinutes(15)
-                    ? 10
-                    : 0;
+                    ? ObservationProximity.WithinFifteenMinutes
+                    : ObservationProximity.Distant;
+        var titleMatches = !string.IsNullOrEmpty(Title) &&
+            string.Equals(Title, candidate.Metadata?.Title, StringComparison.Ordinal);
+        var artistMatches = !string.IsNullOrEmpty(Artist) &&
+            string.Equals(Artist, candidate.Metadata?.Artist, StringComparison.Ordinal);
+        var hasMetadataEvidence = !string.IsNullOrEmpty(Title) || !string.IsNullOrEmpty(Artist);
+        var allAvailableMetadataMatches =
+            (string.IsNullOrEmpty(Title) || titleMatches) &&
+            (string.IsNullOrEmpty(Artist) || artistMatches);
+        var confidence = Descriptor.SessionInstanceHint is not null
+            ? SessionMatchConfidence.StableDescriptor
+            : hasMetadataEvidence &&
+                allAvailableMetadataMatches &&
+                proximity != ObservationProximity.Distant
+                ? SessionMatchConfidence.ObservedCharacteristics
+                : SessionMatchConfidence.Unacceptable;
 
-        return score;
+        return new SessionMatchScore(
+            confidence,
+            Convert.ToInt32(titleMatches) + Convert.ToInt32(artistMatches),
+            PlaybackStatus == candidate.PlaybackStatus,
+            proximity);
     }
 
     internal bool CanRepresent(MediaSessionSnapshot candidate) =>
@@ -108,4 +109,48 @@ public sealed record SessionFingerprint(
                 Descriptor.SessionInstanceHint,
                 candidate.SessionInstanceHint,
                 StringComparison.Ordinal));
+}
+
+internal enum SessionMatchConfidence
+{
+    Unacceptable,
+    ObservedCharacteristics,
+    StableDescriptor,
+}
+
+internal enum ObservationProximity
+{
+    Distant,
+    WithinFifteenMinutes,
+    WithinFiveMinutes,
+    WithinOneMinute,
+}
+
+internal readonly record struct SessionMatchScore(
+    SessionMatchConfidence Confidence,
+    int MetadataMatches,
+    bool PlaybackStatusMatches,
+    ObservationProximity ObservationProximity) : IComparable<SessionMatchScore>
+{
+    public bool IsAcceptable => Confidence != SessionMatchConfidence.Unacceptable;
+
+    public int CompareTo(SessionMatchScore other)
+    {
+        var comparison = Confidence.CompareTo(other.Confidence);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = MetadataMatches.CompareTo(other.MetadataMatches);
+        if (comparison != 0)
+        {
+            return comparison;
+        }
+
+        comparison = PlaybackStatusMatches.CompareTo(other.PlaybackStatusMatches);
+        return comparison != 0
+            ? comparison
+            : ObservationProximity.CompareTo(other.ObservationProximity);
+    }
 }

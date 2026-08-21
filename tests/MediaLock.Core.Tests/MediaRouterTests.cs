@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 
@@ -311,6 +312,79 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public void NullControllerIsRejectedAtComposition()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new MediaRouter(null!));
+
+        Assert.Equal("controller", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task CatalogRejectsNullSessionEntry()
+    {
+        await using var router = new MediaRouter(
+            new RecordingMediaController(MediaControlResult.Succeeded));
+        var sessions = ImmutableArray<MediaSessionSnapshot>.Empty.Add(null!);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            router.DispatchAsync(
+                new RouterIntent.CatalogUpdated(sessions, null),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("catalog", exception.ParamName);
+        Assert.Contains("null Session", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CatalogRejectsBlankSessionIdentity()
+    {
+        await using var router = new MediaRouter(
+            new RecordingMediaController(MediaControlResult.Succeeded));
+        var invalid = Session("duplicate", " ");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            router.DispatchAsync(
+                new RouterIntent.CatalogUpdated([invalid], invalid.Key),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("catalog", exception.ParamName);
+        Assert.Contains("source application ID", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CatalogRejectsDuplicateSessionKey()
+    {
+        await using var router = new MediaRouter(
+            new RecordingMediaController(MediaControlResult.Succeeded));
+        var first = Session("duplicate", "browser");
+        var second = Session("duplicate", "music");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            router.DispatchAsync(
+                new RouterIntent.CatalogUpdated([first, second], first.Key),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("catalog", exception.ParamName);
+        Assert.Contains("duplicated", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CatalogRejectsWindowsCurrentSessionOutsideCatalog()
+    {
+        await using var router = new MediaRouter(
+            new RecordingMediaController(MediaControlResult.Succeeded));
+        var session = Session("known", "browser");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            router.DispatchAsync(
+                new RouterIntent.CatalogUpdated([session], new SessionKey("missing")),
+                CancellationToken.None).AsTask());
+
+        Assert.Equal("catalog", exception.ParamName);
+        Assert.Contains("Windows Current Session", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReusedSessionKeyDoesNotBypassFingerprintMatching()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);
@@ -501,6 +575,29 @@ public sealed class MediaRouterTests
 
         Assert.Equal(RouterStatus.Locked, recovered.State.Status);
         Assert.Equal(likely.Key, recovered.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
+    public async Task SameSourceWithoutAcceptableConfidenceWaitsForFallback()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var original = Session("original", "browser");
+        var unrelatedSameSource = Session(
+            "other-tab",
+            "browser",
+            observedAt: original.ObservedAt.AddHours(1));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([original], original.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.LockSession(original.Key), CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([unrelatedSameSource], unrelatedSameSource.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Recovering, result.State.Status);
+        Assert.Null(result.State.LockedTarget!.ResolvedSession);
     }
 
     [Fact]
