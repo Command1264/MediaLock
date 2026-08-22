@@ -68,7 +68,7 @@
                                Margin="0,12,0,0"
                                Foreground="#FF666666"
                                TextWrapping="Wrap"
-                               Text="Routing and Recovery changes apply after Media Lock restarts. Restoring a saved Session Lock begins in Phase 4." />
+                               Text="Changes apply after Media Lock restarts. A saved Session Lock restores only when one unambiguous target matches; otherwise Windows Auto remains active." />
                 </Grid>
             </GroupBox>
         </StackPanel>

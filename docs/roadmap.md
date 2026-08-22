@@ -54,13 +54,17 @@ Exit criteria:
 - Tray state reflects Windows Auto, Locked and Recovering.
 - Startup integration is reversible and does not require elevation.
 
-Implementation note: Phase 3 persists runtime state for later recovery, but intentionally does not restore a prior
-Session Lock. Crash recovery and suspend/resume manager reacquisition remain Phase 4 exit criteria.
+Implementation note: Phase 3 persists runtime state for later recovery. Phase 4 consumes that state only when the
+configured default is Session Lock and the persisted target has one unambiguous acceptable successor.
 
 ## Phase 4 — Recovery hardening
 
 Implement Session loss detection, matching, configurable timeout/fallback, crash recovery and suspend/resume
 reacquisition.
+
+Implementation note: suspend releases the old manager and subscriptions. Resume publishes Reacquiring, makes at
+most three bounded acquisition attempts, and remains observably Unavailable if all attempts fail; a later resume
+can retry without restarting the catalog stream.
 
 Exit criteria:
 

@@ -99,7 +99,8 @@ public sealed record SessionFingerprint(
             PlaybackType == MediaPlaybackType.Unknown ||
             candidate.PlaybackType == MediaPlaybackType.Unknown ||
             PlaybackType == candidate.PlaybackType;
-        var confidence = Descriptor.SessionInstanceHint is not null
+        var confidence = Descriptor.SessionInstanceHint is not null &&
+            proximity != ObservationProximity.Distant
             ? SessionMatchConfidence.StableDescriptor
             : playbackTypeIsCompatible &&
                 hasMetadataEvidence &&

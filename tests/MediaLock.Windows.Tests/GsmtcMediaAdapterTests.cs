@@ -1,4 +1,5 @@
 using MediaLock.Core.Media;
+using MediaLock.Core.Lifecycle;
 using MediaLock.Windows.Gsmtc;
 using Xunit;
 
@@ -6,6 +7,138 @@ namespace MediaLock.Windows.Tests;
 
 public sealed class GsmtcMediaAdapterTests
 {
+    [Fact]
+    public async Task ResumeReleasesOldManagerAndPublishesReacquiredCatalog()
+    {
+        var oldSession = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var newSession = new FakeSession("Chrome", MediaControlResult.Succeeded);
+        var oldManager = new FakeManager(oldSession);
+        var newManager = new FakeManager(newSession);
+        var lifecycle = new FakeSystemLifecycle();
+        await using var adapter = new GsmtcMediaAdapter(
+            new QueueManagerFactory(oldManager, newManager),
+            TimeProvider.System,
+            lifecycle);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+
+        lifecycle.Suspend();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Suspended, snapshots.Current.Status);
+        Assert.Empty(snapshots.Current.Sessions);
+        Assert.True(oldManager.Disposed);
+
+        lifecycle.Resume();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Reacquiring, snapshots.Current.Status);
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Available, snapshots.Current.Status);
+        Assert.Equal("Chrome", Assert.Single(snapshots.Current.Sessions).SourceAppUserModelId);
+        Assert.Equal(0, oldManager.SubscriberCount);
+        Assert.Equal(1, newManager.SubscriberCount);
+    }
+
+    [Fact]
+    public async Task FailedResumeUsesThreeAttemptsAndASecondResumeCanRecover()
+    {
+        var initialManager = new FakeManager(
+            new FakeSession("Brave", MediaControlResult.Succeeded));
+        var recoveredManager = new FakeManager(
+            new FakeSession("Chrome", MediaControlResult.Succeeded));
+        var factory = new ResumeRetryManagerFactory(initialManager, recoveredManager);
+        var lifecycle = new FakeSystemLifecycle();
+        await using var adapter = new GsmtcMediaAdapter(
+            factory,
+            TimeProvider.System,
+            lifecycle,
+            [TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+
+        lifecycle.Resume();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Reacquiring, snapshots.Current.Status);
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Unavailable, snapshots.Current.Status);
+        Assert.Contains("3 attempts", snapshots.Current.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(4, factory.CallCount);
+
+        lifecycle.Resume();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Reacquiring, snapshots.Current.Status);
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Available, snapshots.Current.Status);
+        Assert.Equal("Chrome", Assert.Single(snapshots.Current.Sessions).SourceAppUserModelId);
+        Assert.Equal(5, factory.CallCount);
+    }
+
+    [Fact]
+    public async Task RefreshFailureReleasesOldManagerAndReacquiresWithoutEndingTheStream()
+    {
+        var oldSession = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var newSession = new FakeSession("Chrome", MediaControlResult.Succeeded);
+        var oldManager = new FakeManager(oldSession);
+        var newManager = new FakeManager(newSession);
+        await using var adapter = new GsmtcMediaAdapter(
+            new QueueManagerFactory(oldManager, newManager),
+            TimeProvider.System,
+            systemLifecycle: null,
+            [TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+
+        oldSession.FailNextRead();
+        oldSession.RaiseChanged();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Unavailable, snapshots.Current.Status);
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Reacquiring, snapshots.Current.Status);
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Available, snapshots.Current.Status);
+        Assert.Equal("Chrome", Assert.Single(snapshots.Current.Sessions).SourceAppUserModelId);
+        Assert.True(oldManager.Disposed);
+        Assert.Equal(0, oldManager.SubscriberCount);
+    }
+
+    [Fact]
+    public async Task RefreshFailureQueuedAfterSuspendDoesNotReacquireWhileSuspended()
+    {
+        var oldSession = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var oldManager = new FakeManager(oldSession);
+        var factory = new QueueManagerFactory(
+            oldManager,
+            new FakeManager(new FakeSession("Chrome", MediaControlResult.Succeeded)));
+        var lifecycle = new FakeSystemLifecycle();
+        await using var adapter = new GsmtcMediaAdapter(
+            factory,
+            TimeProvider.System,
+            lifecycle,
+            [TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+        oldSession.BlockNextRead(failAfterRelease: true);
+        oldSession.RaiseChanged();
+        await oldSession.BlockedReadStarted.WaitAsync(cancellation.Token);
+
+        lifecycle.Suspend();
+        oldSession.ReleaseBlockedRead();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Suspended, snapshots.Current.Status);
+        await Task.Delay(100, cancellation.Token);
+        Assert.Equal(1, factory.CallCount);
+        Assert.True(oldManager.Disposed);
+    }
+
     [Fact]
     public async Task InitialCatalogAndControlUseTheSameEphemeralSessionKey()
     {
@@ -131,19 +264,78 @@ public sealed class GsmtcMediaAdapterTests
             ValueTask.FromResult(manager);
     }
 
+    private sealed class QueueManagerFactory(params IGsmtcSessionManager[] managers)
+        : IGsmtcSessionManagerFactory
+    {
+        private readonly Queue<IGsmtcSessionManager> remaining = new(managers);
+
+        public int CallCount { get; private set; }
+
+        public ValueTask<IGsmtcSessionManager> CreateAsync(CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return ValueTask.FromResult(remaining.Dequeue());
+        }
+    }
+
+    private sealed class ResumeRetryManagerFactory(
+        IGsmtcSessionManager initial,
+        IGsmtcSessionManager recovered) : IGsmtcSessionManagerFactory
+    {
+        public int CallCount { get; private set; }
+
+        public ValueTask<IGsmtcSessionManager> CreateAsync(CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return CallCount switch
+            {
+                1 => ValueTask.FromResult(initial),
+                2 or 3 or 4 => ValueTask.FromException<IGsmtcSessionManager>(
+                    new InvalidOperationException("manager unavailable")),
+                5 => ValueTask.FromResult(recovered),
+                _ => throw new InvalidOperationException("Unexpected manager acquisition."),
+            };
+        }
+    }
+
+    private sealed class FakeSystemLifecycle : ISystemLifecycle
+    {
+        public event Action? Suspending;
+
+        public event Action? Resumed;
+
+        public void Suspend() => Suspending?.Invoke();
+
+        public void Resume() => Resumed?.Invoke();
+    }
+
     private sealed class FakeManager(
         IGsmtcSession session,
         IGsmtcSession? currentSession = null) : IGsmtcSessionManager
     {
-        public event EventHandler? SessionsChanged;
+        private EventHandler? sessionsChanged;
+
+        public event EventHandler? SessionsChanged
+        {
+            add => sessionsChanged += value;
+            remove => sessionsChanged -= value;
+        }
+
+        public bool Disposed { get; private set; }
+
+        public int SubscriberCount => sessionsChanged?.GetInvocationList().Length ?? 0;
 
         public IReadOnlyList<IGsmtcSession> GetSessions() => [session];
 
         public IGsmtcSession? GetCurrentSession() => currentSession ?? session;
 
-        public void RaiseSessionsChanged() => SessionsChanged?.Invoke(this, EventArgs.Empty);
+        public void RaiseSessionsChanged() => sessionsChanged?.Invoke(this, EventArgs.Empty);
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class FakeSession(
@@ -152,6 +344,8 @@ public sealed class GsmtcMediaAdapterTests
     {
         private TaskCompletionSource? blockedReadStarted;
         private TaskCompletionSource? releaseBlockedRead;
+        private bool failNextRead;
+        private bool failAfterBlockedRead;
 
         public event EventHandler? Changed;
 
@@ -171,12 +365,23 @@ public sealed class GsmtcMediaAdapterTests
             CancellationToken cancellationToken)
         {
             ReadCount++;
+            if (failNextRead)
+            {
+                failNextRead = false;
+                throw new InvalidOperationException("session read failed");
+            }
+
             if (releaseBlockedRead is not null)
             {
                 blockedReadStarted!.TrySetResult();
                 await releaseBlockedRead.Task.WaitAsync(cancellationToken);
                 releaseBlockedRead = null;
                 blockedReadStarted = null;
+                if (failAfterBlockedRead)
+                {
+                    failAfterBlockedRead = false;
+                    throw new InvalidOperationException("blocked session read failed");
+                }
             }
 
             return new MediaSessionSnapshot(
@@ -197,14 +402,17 @@ public sealed class GsmtcMediaAdapterTests
 
         public void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
-        public void BlockNextRead()
+        public void BlockNextRead(bool failAfterRelease = false)
         {
             blockedReadStarted = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             releaseBlockedRead = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
+            failAfterBlockedRead = failAfterRelease;
         }
 
         public void ReleaseBlockedRead() => releaseBlockedRead!.TrySetResult();
+
+        public void FailNextRead() => failNextRead = true;
     }
 }

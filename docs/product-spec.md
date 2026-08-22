@@ -104,12 +104,16 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
+At startup, Default Windows Auto ignores any previously saved lock. Default Session Lock restores only a valid
+persisted Session Lock whose fingerprint has one acceptable, unambiguous catalog successor. Missing, corrupt,
+expired or ambiguous state remains safely unbound and observable rather than selecting a guess.
+
 ## 8. UI and tray behavior
 
 The main window shows the current target, routing status, media controls, discovered Sessions and lock actions.
 Closing the window hides it when close-to-tray is enabled; only an explicit Exit command terminates the process.
-Tray state distinguishes Windows Auto, Locked and Recovering, and provides essential controls without opening the
-window.
+Tray state distinguishes Windows Auto, Locked, Recovering, Suspended, Reacquiring and Unavailable, and provides
+essential controls without opening the window.
 
 ## 9. Non-functional requirements
 

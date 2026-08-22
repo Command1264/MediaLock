@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using MediaLock.Core.Lifecycle;
 using MediaLock.Core.Media;
 
 namespace MediaLock.Windows.Gsmtc;
@@ -9,6 +10,8 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
 {
     private readonly IGsmtcSessionManagerFactory managerFactory;
     private readonly TimeProvider timeProvider;
+    private readonly ISystemLifecycle? systemLifecycle;
+    private readonly IReadOnlyList<TimeSpan> reacquisitionDelays;
     private readonly Channel<MediaSessionCatalogSnapshot> snapshots =
         Channel.CreateUnbounded<MediaSessionCatalogSnapshot>(new UnboundedChannelOptions
         {
@@ -24,6 +27,13 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
             AllowSynchronousContinuations = false,
             FullMode = BoundedChannelFullMode.DropWrite,
         });
+    private readonly Channel<AdapterTransition> lifecycleTransitions =
+        Channel.CreateUnbounded<AdapterTransition>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+        });
     private readonly SemaphoreSlim refreshGate = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private readonly Lock sessionsSync = new();
@@ -32,21 +42,42 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private readonly Dictionary<SessionKey, IGsmtcSession> liveSessions = [];
     private IGsmtcSessionManager? manager;
     private Task? refreshWorker;
+    private Task? lifecycleWorker;
     private long nextKey;
     private int watching;
     private bool disposed;
 
     public GsmtcMediaAdapter()
-        : this(new GsmtcSessionManagerFactory(), TimeProvider.System)
+        : this(new GsmtcSessionManagerFactory(), TimeProvider.System, systemLifecycle: null)
+    {
+    }
+
+    public GsmtcMediaAdapter(ISystemLifecycle systemLifecycle)
+        : this(
+            new GsmtcSessionManagerFactory(),
+            TimeProvider.System,
+            systemLifecycle ?? throw new ArgumentNullException(nameof(systemLifecycle)))
     {
     }
 
     internal GsmtcMediaAdapter(
         IGsmtcSessionManagerFactory managerFactory,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ISystemLifecycle? systemLifecycle = null,
+        IReadOnlyList<TimeSpan>? reacquisitionDelays = null)
     {
         this.managerFactory = managerFactory;
         this.timeProvider = timeProvider;
+        this.systemLifecycle = systemLifecycle;
+        this.reacquisitionDelays = reacquisitionDelays ??
+            [TimeSpan.Zero, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2)];
+        if (this.reacquisitionDelays.Count != 3 ||
+            this.reacquisitionDelays.Any(delay => delay < TimeSpan.Zero))
+        {
+            throw new ArgumentException(
+                "GSMTC reacquisition requires exactly three non-negative attempt delays.",
+                nameof(reacquisitionDelays));
+        }
     }
 
     public async IAsyncEnumerable<MediaSessionCatalogSnapshot> WatchAsync(
@@ -61,9 +92,14 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             lifetime.Token);
-        manager = await managerFactory.CreateAsync(startupCancellation.Token);
-        manager.SessionsChanged += OnSessionsChanged;
-        await RefreshAsync(startupCancellation.Token);
+        lifecycleWorker = ProcessLifecycleTransitionsAsync();
+        if (systemLifecycle is not null)
+        {
+            systemLifecycle.Suspending += OnSuspending;
+            systemLifecycle.Resumed += OnResumed;
+        }
+
+        await AcquireManagerAndPublishAsync(startupCancellation.Token);
         refreshWorker = ProcessRefreshRequestsAsync();
 
         await foreach (var snapshot in snapshots.Reader.ReadAllAsync(cancellationToken))
@@ -96,38 +132,30 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         }
 
         disposed = true;
+        if (systemLifecycle is not null)
+        {
+            systemLifecycle.Suspending -= OnSuspending;
+            systemLifecycle.Resumed -= OnResumed;
+        }
+
         await lifetime.CancelAsync();
         refreshRequests.Writer.TryComplete();
+        lifecycleTransitions.Writer.TryComplete();
         snapshots.Writer.TryComplete();
         if (refreshWorker is not null)
         {
             await refreshWorker;
         }
 
+        if (lifecycleWorker is not null)
+        {
+            await lifecycleWorker;
+        }
+
         await refreshGate.WaitAsync();
         try
         {
-            if (manager is not null)
-            {
-                manager.SessionsChanged -= OnSessionsChanged;
-            }
-
-            lock (sessionsSync)
-            {
-                foreach (var session in keys.Keys)
-                {
-                    session.Changed -= OnSessionChanged;
-                }
-
-                keys.Clear();
-                liveSessions.Clear();
-            }
-
-            if (manager is not null)
-            {
-                await manager.DisposeAsync();
-                manager = null;
-            }
+            await ReleaseManagerAsync();
         }
         finally
         {
@@ -142,22 +170,7 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         await refreshGate.WaitAsync(cancellationToken);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
-            var currentManager = manager ?? throw new InvalidOperationException("GSMTC manager is not initialized.");
-            var sessions = currentManager.GetSessions();
-            ReconcileSessions(sessions);
-            var observedAt = timeProvider.GetUtcNow();
-            var builder = ImmutableArray.CreateBuilder<MediaSessionSnapshot>(sessions.Count);
-            foreach (var session in sessions)
-            {
-                builder.Add(await session.ReadAsync(GetKey(session), observedAt, cancellationToken));
-            }
-
-            var current = currentManager.GetCurrentSession();
-            var currentKey = ResolveCurrentSessionKey(current, sessions);
-            await snapshots.Writer.WriteAsync(
-                new MediaSessionCatalogSnapshot(builder.MoveToImmutable(), currentKey),
-                cancellationToken);
+            await PublishCurrentCatalogAsync(cancellationToken);
         }
         finally
         {
@@ -231,6 +244,14 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
 
     private void OnSessionChanged(object? sender, EventArgs args) => QueueRefresh();
 
+    private void OnSuspending() =>
+        lifecycleTransitions.Writer.TryWrite(new AdapterTransition(
+            AdapterTransitionKind.Suspend));
+
+    private void OnResumed() =>
+        lifecycleTransitions.Writer.TryWrite(new AdapterTransition(
+            AdapterTransitionKind.Resume));
+
     private void QueueRefresh()
     {
         if (!disposed)
@@ -254,11 +275,238 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
             {
                 return;
             }
+            catch (InvalidOperationException) when (manager is null)
+            {
+                // A refresh queued immediately before suspend is obsolete once its manager is released.
+            }
             catch (Exception exception)
             {
-                snapshots.Writer.TryComplete(exception);
-                return;
+                lifecycleTransitions.Writer.TryWrite(new AdapterTransition(
+                    AdapterTransitionKind.AdapterFailure,
+                    exception));
             }
         }
+    }
+
+    private async Task RecoverFromAdapterFailureAsync(
+        Exception refreshFailure,
+        CancellationToken cancellationToken)
+    {
+        Exception? releaseFailure = null;
+        await refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            try
+            {
+                await ReleaseManagerAsync();
+            }
+            catch (Exception exception)
+            {
+                releaseFailure = exception;
+            }
+
+            var message = releaseFailure is null
+                ? $"GSMTC catalog refresh failed: {refreshFailure.Message}"
+                : $"GSMTC catalog refresh failed: {refreshFailure.Message} Manager release also failed: {releaseFailure.Message}";
+            await PublishStatusAsync(
+                MediaSessionCatalogStatus.Unavailable,
+                message,
+                cancellationToken);
+        }
+        finally
+        {
+            refreshGate.Release();
+        }
+
+        await ResumeAsync(cancellationToken);
+    }
+
+    private async Task ProcessLifecycleTransitionsAsync()
+    {
+        var suspended = false;
+        try
+        {
+            await foreach (var transition in lifecycleTransitions.Reader.ReadAllAsync(lifetime.Token))
+            {
+                try
+                {
+                    switch (transition.Kind)
+                    {
+                        case AdapterTransitionKind.Suspend:
+                            suspended = true;
+                            await SuspendAsync(lifetime.Token);
+                            break;
+                        case AdapterTransitionKind.Resume:
+                            suspended = false;
+                            await ResumeAsync(lifetime.Token);
+                            break;
+                        case AdapterTransitionKind.AdapterFailure when !suspended:
+                            await RecoverFromAdapterFailureAsync(
+                                transition.Failure ?? new InvalidOperationException(
+                                    "GSMTC adapter failed without an error."),
+                                lifetime.Token);
+                            break;
+                        case AdapterTransitionKind.AdapterFailure:
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(transition));
+                    }
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    await PublishStatusAsync(
+                        MediaSessionCatalogStatus.Unavailable,
+                        $"GSMTC lifecycle transition failed: {exception.Message}",
+                        lifetime.Token);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task SuspendAsync(CancellationToken cancellationToken)
+    {
+        await refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ReleaseManagerAsync();
+            await PublishStatusAsync(
+                MediaSessionCatalogStatus.Suspended,
+                "GSMTC is suspended while Windows sleeps.",
+                cancellationToken);
+        }
+        finally
+        {
+            refreshGate.Release();
+        }
+    }
+
+    private async Task ResumeAsync(CancellationToken cancellationToken)
+    {
+        await PublishStatusAsync(
+            MediaSessionCatalogStatus.Reacquiring,
+            "Reacquiring GSMTC after Windows resumed.",
+            cancellationToken);
+        Exception? lastFailure = null;
+        foreach (var delay in reacquisitionDelays)
+        {
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, timeProvider, cancellationToken);
+            }
+
+            try
+            {
+                await AcquireManagerAndPublishAsync(cancellationToken);
+                return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                lastFailure = exception;
+            }
+        }
+
+        await PublishStatusAsync(
+            MediaSessionCatalogStatus.Unavailable,
+            $"GSMTC could not be reacquired after 3 attempts: {lastFailure?.Message}",
+            cancellationToken);
+    }
+
+    private async Task AcquireManagerAndPublishAsync(CancellationToken cancellationToken)
+    {
+        await refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ReleaseManagerAsync();
+            try
+            {
+                manager = await managerFactory.CreateAsync(cancellationToken);
+                manager.SessionsChanged += OnSessionsChanged;
+                await PublishCurrentCatalogAsync(cancellationToken);
+            }
+            catch
+            {
+                await ReleaseManagerAsync();
+                throw;
+            }
+        }
+        finally
+        {
+            refreshGate.Release();
+        }
+    }
+
+    private async Task PublishCurrentCatalogAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        var currentManager = manager ?? throw new InvalidOperationException("GSMTC manager is not initialized.");
+        var sessions = currentManager.GetSessions();
+        ReconcileSessions(sessions);
+        var observedAt = timeProvider.GetUtcNow();
+        var builder = ImmutableArray.CreateBuilder<MediaSessionSnapshot>(sessions.Count);
+        foreach (var session in sessions)
+        {
+            builder.Add(await session.ReadAsync(GetKey(session), observedAt, cancellationToken));
+        }
+
+        var current = currentManager.GetCurrentSession();
+        var currentKey = ResolveCurrentSessionKey(current, sessions);
+        await snapshots.Writer.WriteAsync(
+            new MediaSessionCatalogSnapshot(builder.MoveToImmutable(), currentKey),
+            cancellationToken);
+    }
+
+    private ValueTask PublishStatusAsync(
+        MediaSessionCatalogStatus status,
+        string message,
+        CancellationToken cancellationToken) => snapshots.Writer.WriteAsync(
+            new MediaSessionCatalogSnapshot([], null, status, message),
+            cancellationToken);
+
+    private async ValueTask ReleaseManagerAsync()
+    {
+        var managerToDispose = manager;
+        manager = null;
+        if (managerToDispose is not null)
+        {
+            managerToDispose.SessionsChanged -= OnSessionsChanged;
+        }
+
+        lock (sessionsSync)
+        {
+            foreach (var session in keys.Keys)
+            {
+                session.Changed -= OnSessionChanged;
+            }
+
+            keys.Clear();
+            liveSessions.Clear();
+        }
+
+        if (managerToDispose is not null)
+        {
+            await managerToDispose.DisposeAsync();
+        }
+    }
+
+    private sealed record AdapterTransition(
+        AdapterTransitionKind Kind,
+        Exception? Failure = null);
+
+    private enum AdapterTransitionKind
+    {
+        Suspend,
+        Resume,
+        AdapterFailure,
     }
 }

@@ -26,7 +26,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         ArgumentNullException.ThrowIfNull(exit);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
-        statusText = Describe(application.State.Router);
+        statusText = Describe(application.State);
         ShowCommand = new AsyncCommand(_ =>
         {
             show();
@@ -127,7 +127,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         object? sender,
         MediaLockApplicationStateChangedEventArgs args)
     {
-        var next = Describe(args.State.Router);
+        var next = Describe(args.State);
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {
@@ -138,7 +138,15 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         StatusText = next;
     }
 
-    private static string Describe(RouterState state) => state.Status switch
+    private static string Describe(MediaLockApplicationState state) => state.CatalogStatus switch
+    {
+        MediaSessionCatalogStatus.Suspended => "Suspended",
+        MediaSessionCatalogStatus.Reacquiring => "Reacquiring",
+        MediaSessionCatalogStatus.Unavailable => "Unavailable",
+        _ => DescribeRouter(state.Router),
+    };
+
+    private static string DescribeRouter(RouterState state) => state.Status switch
     {
         RouterStatus.Recovering => "Recovering",
         RouterStatus.Locked => "Locked",

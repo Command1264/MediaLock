@@ -134,6 +134,11 @@ On suspend/resume or adapter failure:
 3. Reacquire the manager and publish a full snapshot.
 4. Submit recovery evaluation to the serialized router queue.
 
+The adapter publishes `Suspended`, `Reacquiring`, `Available` and `Unavailable` catalog states. Resume performs at
+most three attempts with bounded delays (immediate, 500 ms and 2 s). Each attempt releases partial manager state
+before retrying. Exhaustion does not terminate the catalog stream, so a later resume can reacquire. Application state
+and privacy-safe `catalog.status` diagnostics project these outcomes without retaining title or artist.
+
 ## 7. Concurrency
 
 All router intents are serialized through one application-owned queue or dispatcher. Platform callbacks perform
@@ -173,12 +178,12 @@ user disclosure and bounded retention.
 Phase 3 stores schema-versioned `settings.json` and `state.json` beneath `%LocalAppData%\MediaLock\` with sibling
 temporary files and replace-on-success writes. A corrupt settings file produces safe defaults and remains untouched;
 if the user later saves replacement settings, the original is first copied to `settings.corrupt.<timestamp>.json`.
-Runtime state is saved after serialized router transitions, but automatic restoration of a persisted lock remains a
-Phase 4 responsibility. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist unless a
-future explicitly disclosed diagnostic mode supplies them.
+Runtime state is saved after serialized router transitions. Startup restores a persisted Session Lock only when the
+saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate; Windows Auto
+never restores the saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
+unless a future explicitly disclosed diagnostic mode supplies them.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Saved changes
-take effect on the next process start; applying a non-WindowsAuto default that requires a persisted target remains
-part of Phase 4 crash recovery.
+take effect on the next process start.
 
 ## 9. Composition
 
