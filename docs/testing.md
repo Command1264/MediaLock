@@ -61,6 +61,12 @@ mode explicitly; tray Windows Auto remains a current-run action.
 Application regression coverage also keeps runtime autosave suppressed after that tray override across later media
 commands, and restores the prior runtime document if the startup-settings commit fails.
 
+Phase 6 tests packaging at the release-command seam. `tests/packaging/Publish-ReleaseCandidate.Tests.ps1` invokes
+the public publish script against an isolated temporary output, verifies the versioned ZIP/manifest/checksum set,
+recomputes SHA-256 independently, expands the archive and requires exactly one correctly versioned
+`MediaLock.exe`. Test artifacts must opt into dirty-source publication and disclose that state in their manifest;
+formal candidates reject dirty worktrees.
+
 ### Integration tests
 
 Cover:
@@ -176,6 +182,19 @@ Once projects exist, the standard verification pipeline should include formattin
 static analysis, unit/integration tests, Release build and publish inspection. The self-contained single-file output
 must be exercised on a clean supported Windows machine, including cold start, tray icon/resources, settings writes,
 logs, startup registration and uninstall/cleanup instructions.
+
+Run the repeatable local Phase 6 gate from the repository root:
+
+```powershell
+dotnet format MediaLock.sln --verify-no-changes --no-restore
+dotnet test MediaLock.sln --configuration Release --no-restore
+dotnet build MediaLock.sln --configuration Release --no-restore
+& .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
+```
+
+After committing the reviewed source, produce the provenance-clean candidate with
+`eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
+not assumed by this gate.
 
 ## 7. Manual evidence
 

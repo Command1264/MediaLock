@@ -50,6 +50,18 @@ Session 的來源應用程式，並在該應用程式的候選 Sessions 間依�
 - Win32 input backend、system tray 與 startup integration 經由 adapters 隔離。
 - `win-x64` self-contained single-file 為預定發布候選；須以實際相容性測試確認。
 
+## 建立 Release Candidate
+
+Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manifest 與 SHA-256：
+
+```powershell
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.1
+```
+
+輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。目前候選僅支援 `win-x64`、未經
+code signing，且在完成乾淨 Windows 環境 smoke test 前不得描述為 portable release。完整驗證與回復
+流程見 [Release candidate runbook](docs/release-candidate.md)。
+
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
 並在 .NET 10 持續獲得更新。
 

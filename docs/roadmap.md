@@ -89,7 +89,18 @@ Exit criteria:
 - Browser integration is optional and cannot weaken GSMTC-only operation.
 - Version scope is reflected in product and testing documentation.
 
-## Release candidate
+## Phase 6 — Release candidate
 
 Produce a `win-x64` self-contained single-file candidate only after the MVP success criteria pass. Validate it on a
 clean supported Windows environment before describing the package as portable.
+
+Exit criteria:
+
+- One reviewed local command produces a versioned ZIP, manifest and SHA-256 checksum from a clean Git commit.
+- The ZIP contains exactly one self-contained `MediaLock.exe`; trimming remains disabled unless separately proven
+  safe for WPF and the Windows adapters.
+- Release metadata records the source commit, .NET SDK, RID, version, signing state and archive digest.
+- Cold start, tray resources, Settings, single-instance activation, startup registration, explicit Exit and user-file
+  writes pass from the packaged executable.
+- A clean supported Windows environment passes the documented smoke test before the artifact is called portable.
+- Unsigned candidates remain clearly labeled; tag, GitHub Release and public distribution require separate approval.
