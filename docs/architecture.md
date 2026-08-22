@@ -184,8 +184,16 @@ application identity through the same router interface as an interactive App Loc
 the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
 Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
 unless a future explicitly disclosed diagnostic mode supplies them.
-Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Saved changes
-take effect on the next process start.
+Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
+fallback and Priority Rule edits take effect on the next process start. A successful explicit main-window Routing
+Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
+corresponding startup setting last inside the same serialized application dispatch. A failed transition or target
+save leaves the prior startup setting intact; a settings save failure keeps the current-run transition observable,
+restores the previously persisted runtime document, retains the prior startup setting and reports an actionable
+error. Tray Windows Auto is a process-lifetime override: runtime-state autosaves remain suppressed until a durable
+main-window mode choice resumes them, so later commands and catalog updates cannot erase the saved lock target.
+Settings projects that startup mode as read-only state instead of exposing a second mode selector; a mode-only state
+update preserves any unsaved Settings edits.
 
 Phase 5B stores ordered `PriorityRule` values in settings schema v3. The router owns rule evaluation behind
 `IMediaRouter.DispatchAsync`: it skips disabled rules, selects the first source application with a current Session,

@@ -25,20 +25,21 @@ dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Rele
 ```
 
 關閉視窗預設只會隱藏至 Windows 通知區域；從托盤選單按 `Exit` 才會結束程式。設定頁可切換
-close-to-tray 與目前使用者的 Windows 登入啟動，也可保存預設 routing mode、Recovery timeout 與
-Fallback Policy。設定可由主視窗右上角或托盤選單開啟為獨立視窗；短淡入／隱藏動畫會遵循
+close-to-tray 與目前使用者的 Windows 登入啟動，也可設定 Recovery timeout、Fallback Policy 與
+Priority Rules。設定可由主視窗右上角或托盤選單開啟為獨立視窗；短淡入／隱藏動畫會遵循
 Windows 的用戶端動畫設定。`Save settings` 成功後會關閉設定視窗；儲存失敗則保留視窗與錯誤訊息。
 使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
 有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。
 
-Recovery timeout、Fallback Policy、Priority Rules 與 Default routing mode 會在下次啟動時套用。Priority
+主視窗最後一次成功選擇的 Routing Mode 會成為下次啟動模式，Settings 以唯讀摘要顯示該值。
+Recovery timeout、Fallback Policy 與 Priority Rules 會在下次啟動時套用。Priority
 Rules 依設定順序選擇第一個目前可用且已啟用的來源應用程式，沒有匹配時使用 Windows Current Session；
 同一來源內沿用 App Lock 的確定性候選政策。App Lock 可從主視窗選取
 Session 的來源應用程式，並在該應用程式的候選 Sessions 間依確定性政策切換；它不辨識瀏覽器 URL 或
-保證單一 Session 連續性。Default App Lock 會從有效的 `state.json` 恢復保存的來源應用程式。
-Default Session Lock
+保證單一 Session 連續性。啟動模式為 App Lock 時，會從有效的 `state.json` 恢復保存的來源應用程式。
+啟動模式為 Session Lock 時，
 只在 `state.json` 含有有效的 Session Fingerprint，且目前 catalog 有唯一可接受候選時恢復；缺少、
-損毀、過期或模糊的候選都不會被靜默鎖定。Default Windows Auto 一律忽略先前保存的鎖定。
+損毀、過期或模糊的候選都不會被靜默鎖定。啟動模式為 Windows Auto 時一律忽略先前保存的鎖定。
 
 ## 預定技術基底
 

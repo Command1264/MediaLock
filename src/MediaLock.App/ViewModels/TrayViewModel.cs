@@ -46,7 +46,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         PreviousCommand = Route(MediaCommand.Previous);
         NextCommand = Route(MediaCommand.Next);
         WindowsAutoCommand = new AsyncCommand(_ => DispatchAsync(
-            new ApplicationIntent.UseWindowsAuto()));
+            new ApplicationIntent.UseWindowsAutoForCurrentRun()));
         application.StateChanged += OnApplicationStateChanged;
     }
 

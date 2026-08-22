@@ -22,6 +22,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private MediaLockSettings settings = MediaLockSettings.Default;
     private string? settingsLoadWarning;
     private string? runtimeStateLoadWarning;
+    private RuntimeStateDocument? persistedRuntimeState;
+    private bool runtimeStatePersistenceSuppressed;
     private RouterIntent? startupRestoreIntent;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private string? catalogStatusMessage;
@@ -95,6 +97,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
         if (runtimeStateRepository is not null)
         {
             var loadedRuntimeState = await runtimeStateRepository.LoadAsync(cancellationToken);
+            if (loadedRuntimeState.Issues.Length == 0)
+            {
+                persistedRuntimeState = loadedRuntimeState.Value;
+            }
+
             if (loadedRuntimeState.Issues.Length > 0)
             {
                 runtimeStateLoadWarning = string.Join(
@@ -170,18 +177,30 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return await UpdateSettingsAsync(updateSettings.Settings, cancellationToken);
         }
 
-        RouterIntent routerIntent = intent switch
-        {
-            ApplicationIntent.LockSession lockSession =>
-                new RouterIntent.LockSession(lockSession.Session),
-            ApplicationIntent.LockApplication lockApplication =>
-                new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId),
-            ApplicationIntent.UsePriorityRules => new RouterIntent.UsePriorityRules(),
-            ApplicationIntent.UseWindowsAuto => new RouterIntent.UseWindowsAuto(),
-            ApplicationIntent.Route route => new RouterIntent.Route(route.Command),
-            _ => throw new ArgumentOutOfRangeException(nameof(intent)),
-        };
-        var dispatch = await DispatchRouterAsync(routerIntent, cancellationToken);
+        (RouterIntent routerIntent, RoutingMode? startupRoutingMode, bool persistRuntimeState) =
+            intent switch
+            {
+                ApplicationIntent.LockSession lockSession =>
+                    ((RouterIntent)new RouterIntent.LockSession(lockSession.Session), (RoutingMode?)RoutingMode.SessionLock, true),
+                ApplicationIntent.LockApplication lockApplication =>
+                    ((RouterIntent)new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId), (RoutingMode?)RoutingMode.AppLock, true),
+                ApplicationIntent.UsePriorityRules =>
+                    ((RouterIntent)new RouterIntent.UsePriorityRules(), (RoutingMode?)RoutingMode.PriorityRules, true),
+                ApplicationIntent.UseWindowsAuto =>
+                    ((RouterIntent)new RouterIntent.UseWindowsAuto(), (RoutingMode?)RoutingMode.WindowsAuto, true),
+                ApplicationIntent.UseWindowsAutoForCurrentRun =>
+                    ((RouterIntent)new RouterIntent.UseWindowsAuto(), (RoutingMode?)null, false),
+                ApplicationIntent.Route route =>
+                    ((RouterIntent)new RouterIntent.Route(route.Command), (RoutingMode?)null, true),
+                _ => throw new ArgumentOutOfRangeException(nameof(intent)),
+            };
+        var dispatch = await DispatchRouterAsync(
+            routerIntent,
+            cancellationToken,
+            persistRuntimeState: persistRuntimeState,
+            startupRoutingMode: startupRoutingMode,
+            suppressRuntimeStatePersistence: intent is ApplicationIntent.UseWindowsAutoForCurrentRun,
+            resumeRuntimeStatePersistence: startupRoutingMode is not null);
         return new ApplicationResult(State, dispatch.Result.Decision);
     }
 
@@ -389,7 +408,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
         CancellationToken cancellationToken,
         bool persistRuntimeState = true,
         MediaSessionCatalogStatus? nextCatalogStatus = null,
-        string? nextCatalogStatusMessage = null)
+        string? nextCatalogStatusMessage = null,
+        RoutingMode? startupRoutingMode = null,
+        bool suppressRuntimeStatePersistence = false,
+        bool resumeRuntimeStatePersistence = false)
     {
         using var dispatchCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -407,9 +429,39 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
             var result = await router.DispatchAsync(intent, dispatchCancellation.Token);
             Apply(result);
-            if (persistRuntimeState)
+            if (suppressRuntimeStatePersistence)
             {
+                runtimeStatePersistenceSuppressed = true;
+            }
+
+            var previousPersistedRuntimeState = persistedRuntimeState;
+            var shouldPersistRuntimeState =
+                persistRuntimeState &&
+                (!runtimeStatePersistenceSuppressed || resumeRuntimeStatePersistence);
+            var runtimeStatePersisted = !shouldPersistRuntimeState ||
                 await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
+            if (startupRoutingMode is { } mode)
+            {
+                var requiresPersistedTarget = mode is RoutingMode.AppLock or RoutingMode.SessionLock;
+                if (!requiresPersistedTarget || runtimeStatePersisted)
+                {
+                    await PersistStartupRoutingModeAsync(
+                        mode,
+                        preserveCurrentError: !runtimeStatePersisted,
+                        previousPersistedRuntimeState: previousPersistedRuntimeState,
+                        runtimeStateWasPersisted: shouldPersistRuntimeState && runtimeStatePersisted,
+                        cancellationToken: dispatchCancellation.Token);
+                    runtimeStatePersistenceSuppressed = false;
+                }
+                else
+                {
+                    runtimeStatePersistenceSuppressed = true;
+                    if (runtimeStateRepository is null)
+                    {
+                        PublishError(
+                            "Runtime state persistence is unavailable; startup routing mode was not changed.");
+                    }
+                }
             }
             await RecordStateTransitionAsync(
                 previousRevision,
@@ -448,6 +500,73 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
     }
 
+    private async ValueTask PersistStartupRoutingModeAsync(
+        RoutingMode mode,
+        bool preserveCurrentError,
+        RuntimeStateDocument? previousPersistedRuntimeState,
+        bool runtimeStateWasPersisted,
+        CancellationToken cancellationToken)
+    {
+        var currentError = preserveCurrentError ? State.ErrorMessage : null;
+        var updated = settings with { DefaultRoutingMode = mode };
+        if (settingsRepository is not null)
+        {
+            try
+            {
+                await settingsRepository.SaveAsync(updated, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                var failures = new List<Exception> { exception };
+                var runtimeRollbackSucceeded = false;
+                if (runtimeStateWasPersisted &&
+                    previousPersistedRuntimeState is not null &&
+                    runtimeStateRepository is not null)
+                {
+                    try
+                    {
+                        await runtimeStateRepository.SaveAsync(
+                            previousPersistedRuntimeState,
+                            CancellationToken.None);
+                        persistedRuntimeState = previousPersistedRuntimeState;
+                        runtimeRollbackSucceeded = true;
+                    }
+                    catch (Exception rollbackException)
+                    {
+                        failures.Add(rollbackException);
+                    }
+                }
+
+                var rollbackStatus = runtimeRollbackSucceeded
+                    ? " The previous runtime state was restored."
+                    : runtimeStateWasPersisted
+                        ? " The previous runtime state could not be restored."
+                        : string.Empty;
+                var message =
+                    $"Routing mode changed for this run, but the startup mode could not be saved: {exception.Message}{rollbackStatus}";
+                runtimeStatePersistenceSuppressed = true;
+                PublishError(message);
+                throw new InvalidOperationException(
+                    message,
+                    failures.Count == 1 ? exception : new AggregateException(failures));
+            }
+        }
+
+        settings = updated;
+        settingsLoadWarning = null;
+        runtimeStateLoadWarning = null;
+        State = new MediaLockApplicationState(
+            State.Router,
+            currentError ?? PersistenceWarnings,
+            settings,
+            catalogStatus,
+            catalogStatusMessage);
+        StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
+        await TryWriteDiagnosticAsync(
+            new DiagnosticEvent("settings.saved"),
+            cancellationToken);
+    }
+
     private async Task TransitionCatalogUnavailableAsync(
         string message,
         CancellationToken cancellationToken)
@@ -462,7 +581,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     new RouterIntent.CatalogUpdated([], null),
                     cancellationToken);
                 Apply(result);
-                await PersistRuntimeStateAsync(result.State, cancellationToken);
+                if (!runtimeStatePersistenceSuppressed)
+                {
+                    await PersistRuntimeStateAsync(result.State, cancellationToken);
+                }
                 await RecordStateTransitionAsync(
                     previousRevision,
                     result.State,
@@ -576,13 +698,13 @@ public sealed class MediaLockApplication : IMediaLockApplication
             new MediaLockApplicationStateChangedEventArgs(State));
     }
 
-    private async ValueTask PersistRuntimeStateAsync(
+    private async ValueTask<bool> PersistRuntimeStateAsync(
         RouterState routerState,
         CancellationToken cancellationToken)
     {
         if (runtimeStateRepository is null)
         {
-            return;
+            return false;
         }
 
         var fingerprint = routerState.LockedTarget?.Fingerprint;
@@ -602,6 +724,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
         try
         {
             await runtimeStateRepository.SaveAsync(persisted, cancellationToken);
+            persistedRuntimeState = persisted;
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -610,6 +734,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         catch (Exception exception)
         {
             PublishError($"Runtime state could not be saved: {exception.Message}");
+            return false;
         }
     }
 

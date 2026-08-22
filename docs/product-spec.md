@@ -112,10 +112,16 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
-At startup, Default Windows Auto ignores any previously saved lock. Default App Lock restores a valid persisted
-source application and resolves its current candidate with the same deterministic policy used for an interactive
-App Lock; it enters Recovery when that application has no current Session. Default Priority Rules loads its ordered
-settings without requiring a persisted Locked Target. Default Session Lock restores only a valid
+Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
+a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
+remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
+Target persistence attempt keeps the prior startup choice and remains observable instead of creating an invalid
+durable lock.
+
+At startup, saved Windows Auto ignores any previously saved lock. Saved App Lock restores a valid persisted source
+application and resolves its current candidate with the same deterministic policy used for an interactive App Lock;
+it enters Recovery when that application has no current Session. Saved Priority Rules loads its ordered settings
+without requiring a persisted Locked Target. Saved Session Lock restores only a valid
 persisted Session Lock whose fingerprint has one acceptable, unambiguous catalog successor. Missing, corrupt,
 expired or ambiguous state remains safely unbound and observable rather than selecting a guess.
 

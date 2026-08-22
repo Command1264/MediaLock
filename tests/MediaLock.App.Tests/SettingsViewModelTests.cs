@@ -9,11 +9,53 @@ namespace MediaLock.App.Tests;
 public sealed class SettingsViewModelTests
 {
     [Fact]
+    public async Task StartupRoutingModeIsReadOnlyAndPreservedWhenSettingsAreSaved()
+    {
+        var state = MediaLockApplicationState.Initial with
+        {
+            Settings = MediaLockSettings.Default with
+            {
+                DefaultRoutingMode = RoutingMode.PriorityRules,
+            },
+        };
+        var application = new FakeApplication(state);
+        using var viewModel = new SettingsViewModel(application);
+
+        Assert.Equal("Priority Rules", viewModel.StartupRoutingModeText);
+        viewModel.RecoveryTimeoutSeconds = 30;
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(
+            Assert.Single(application.Intents));
+        Assert.Equal(RoutingMode.PriorityRules, intent.Settings.DefaultRoutingMode);
+    }
+
+    [Fact]
+    public void StartupRoutingModeUpdateDoesNotOverwriteUnsavedSettingsEdits()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+        viewModel.CloseToTray = false;
+        viewModel.RecoveryTimeoutSeconds = 42;
+
+        application.Publish(application.State with
+        {
+            Settings = application.State.Settings with
+            {
+                DefaultRoutingMode = RoutingMode.PriorityRules,
+            },
+        });
+
+        Assert.Equal("Priority Rules", viewModel.StartupRoutingModeText);
+        Assert.False(viewModel.CloseToTray);
+        Assert.Equal(42, viewModel.RecoveryTimeoutSeconds);
+    }
+
+    [Fact]
     public void UnrelatedRouterUpdateDoesNotOverwriteUnsavedSettingsEdits()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
         using var viewModel = new SettingsViewModel(application);
-        Assert.Contains(RoutingMode.AppLock, viewModel.RoutingModes);
         viewModel.CloseToTray = false;
         viewModel.RecoveryTimeoutSeconds = 42;
 
@@ -33,7 +75,6 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
-        viewModel.DefaultRoutingMode = RoutingMode.AppLock;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -41,7 +82,7 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
-        Assert.Equal(RoutingMode.AppLock, intent.Settings.DefaultRoutingMode);
+        Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);
     }
 
     [Fact]
@@ -87,6 +128,7 @@ public sealed class SettingsViewModelTests
             },
             Settings = MediaLockSettings.Default with
             {
+                DefaultRoutingMode = RoutingMode.PriorityRules,
                 PriorityRules = [new PriorityRule("Brave")],
             },
         };
@@ -99,8 +141,6 @@ public sealed class SettingsViewModelTests
         await viewModel.MovePriorityRuleUpCommand.ExecuteAsync(viewModel.PriorityRules[1]);
         viewModel.PriorityRules[0].IsEnabled = false;
         await viewModel.RemovePriorityRuleCommand.ExecuteAsync(viewModel.PriorityRules[1]);
-        viewModel.DefaultRoutingMode = RoutingMode.PriorityRules;
-
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(

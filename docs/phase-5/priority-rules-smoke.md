@@ -7,8 +7,8 @@ Windows build, browser version, commit and privacy-safe diagnostic lines.
 
 1. Start playback in YouTube Music and ordinary YouTube.
 2. Open Settings. Add the YouTube Music PWA source as the first enabled rule and ordinary Brave as the second.
-3. Select `PriorityRules` as the default, save, explicitly Exit, then relaunch.
-4. Verify the main window and notification-area menu show `Priority Rules`.
+3. Save the rules, select `Priority Rules` on the main window, explicitly Exit, then relaunch.
+4. Verify the main window, notification-area menu and read-only Settings startup summary show `Priority Rules`.
 5. Route Play/Pause once and verify only YouTube Music changes once.
 
 ## Reordering, disabling and fallback
@@ -23,10 +23,13 @@ Windows build, browser version, commit and privacy-safe diagnostic lines.
 
 - Environment: Windows 25H2 build 26200.9168; Brave 151.1.93.137; Phase 5B production Release build from the
   `codex/feat/phase-5-priority-rules` Worktree.
-- Settings surface: pass. The WPF window exposed Default `PriorityRules`, the current source-application picker,
-  enabled state, ordering/removal controls and explanatory fallback text without clipping at the default size.
-- Ordered routing: pending human-assisted UI save/restart check. Windows automation could open and inspect the WPF
-  ComboBox popup but could not reliably commit a popup selection, so it was not used as evidence.
+- Settings surface: pass. The editable Default Routing Mode selector was removed after manual testing exposed that
+  an interactive main-window mode and its separate startup default could diverge. The replacement read-only summary
+  displayed `Priority Rules` without clipping; rule editing remained unchanged.
+- Startup mode persistence: pass. Switching from Priority Rules to Windows Auto changed `settings.json` to
+  `windowsAuto`; switching back changed it to `priorityRules` while preserving both rules. Two subsequent process
+  restarts opened directly in Priority Rules without the stale App Lock warning.
+- Ordered command routing: pending human-assisted Play/Pause verification using the persisted main-window mode.
 - Reordering/disabling: covered automatically through the public Settings ViewModel seam; production UI check pending
   with ordered routing.
 - Windows Current Session fallback: pass. With no saved rules, the main window remained `Priority Rules`; one

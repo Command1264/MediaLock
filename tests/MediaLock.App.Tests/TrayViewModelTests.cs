@@ -62,7 +62,7 @@ public sealed class TrayViewModelTests
             intent => Assert.Equal(
                 MediaCommand.TogglePlayPause,
                 Assert.IsType<ApplicationIntent.Route>(intent).Command),
-            intent => Assert.IsType<ApplicationIntent.UseWindowsAuto>(intent));
+            intent => Assert.IsType<ApplicationIntent.UseWindowsAutoForCurrentRun>(intent));
     }
 
     [Fact]

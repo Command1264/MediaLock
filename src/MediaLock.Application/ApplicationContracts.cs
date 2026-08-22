@@ -18,6 +18,8 @@ public abstract record ApplicationIntent
 
     public sealed record UseWindowsAuto : ApplicationIntent;
 
+    public sealed record UseWindowsAutoForCurrentRun : ApplicationIntent;
+
     public sealed record Route(MediaCommand Command) : ApplicationIntent;
 
     public sealed record UpdateSettings(MediaLockSettings Settings) : ApplicationIntent;

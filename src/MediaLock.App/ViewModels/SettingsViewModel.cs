@@ -15,7 +15,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly Action? requestClose;
     private bool closeToTray;
     private bool startWithWindows;
-    private RoutingMode defaultRoutingMode;
+    private RoutingMode startupRoutingMode;
+    private string startupRoutingModeText = "Windows Auto";
     private double recoveryTimeoutSeconds;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
@@ -44,9 +45,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<RoutingMode> RoutingModes { get; } =
-        [RoutingMode.WindowsAuto, RoutingMode.PriorityRules, RoutingMode.AppLock, RoutingMode.SessionLock];
-
     public IReadOnlyList<FallbackPolicy> FallbackPolicies { get; } =
         Enum.GetValues<FallbackPolicy>();
 
@@ -72,10 +70,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         set => SetField(ref startWithWindows, value);
     }
 
-    public RoutingMode DefaultRoutingMode
+    public string StartupRoutingModeText
     {
-        get => defaultRoutingMode;
-        set => SetField(ref defaultRoutingMode, value);
+        get => startupRoutingModeText;
+        private set => SetField(ref startupRoutingModeText, value);
     }
 
     public double RecoveryTimeoutSeconds
@@ -123,7 +121,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             var settings = new MediaLockSettings(
                 MediaLockSettings.CurrentSchemaVersion,
-                DefaultRoutingMode,
+                startupRoutingMode,
                 new RecoverySettings(
                     TimeSpan.FromSeconds(RecoveryTimeoutSeconds),
                     FallbackPolicy),
@@ -167,6 +165,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
+        if (appliedSettings is { } previous &&
+            Equals(settings with { DefaultRoutingMode = previous.DefaultRoutingMode }, previous))
+        {
+            appliedSettings = settings;
+            ApplyStartupRoutingMode(settings.DefaultRoutingMode);
+            return;
+        }
+
         Apply(settings);
     }
 
@@ -175,7 +181,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         appliedSettings = settings;
         CloseToTray = settings.Desktop!.CloseToTray;
         StartWithWindows = settings.Desktop.StartWithWindows;
-        DefaultRoutingMode = settings.DefaultRoutingMode;
+        ApplyStartupRoutingMode(settings.DefaultRoutingMode);
         RecoveryTimeoutSeconds = settings.Recovery!.Timeout.TotalSeconds;
         FallbackPolicy = settings.Recovery.FallbackPolicy;
         PriorityRules.Clear();
@@ -185,6 +191,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         RefreshAvailableApplications(application.State);
+    }
+
+    private void ApplyStartupRoutingMode(RoutingMode mode)
+    {
+        startupRoutingMode = mode;
+        StartupRoutingModeText = mode switch
+        {
+            RoutingMode.WindowsAuto => "Windows Auto",
+            RoutingMode.PriorityRules => "Priority Rules",
+            RoutingMode.AppLock => "App Lock",
+            RoutingMode.SessionLock => "Session Lock",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode)),
+        };
     }
 
     private Task AddPriorityRuleAsync(object? parameter)
