@@ -104,3 +104,9 @@ Exit criteria:
   writes pass from the packaged executable.
 - A clean supported Windows environment passes the documented smoke test before the artifact is called portable.
 - Unsigned candidates remain clearly labeled; tag, GitHub Release and public distribution require separate approval.
+
+Status: complete on 2026-08-23 for the formal `0.2.0-rc.1` candidate from commit
+`a2e85007ec570344ab91518f0b1de918605be8a0`. Windows Sandbox independently verified its archive digest, cold start,
+single-instance behavior, Settings and current-user files, reversible login startup, tray lifecycle, explicit Exit,
+`MSEdge` Session discovery and routed Play/Pause. The candidate remains unsigned; no tag, GitHub Release or public
+artifact is implied by phase completion.

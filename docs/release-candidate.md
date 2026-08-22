@@ -7,8 +7,9 @@ implemented Session Lock, App Lock, Priority Rules, Recovery, tray, settings and
 seek, volume, customizable shortcuts and browser integration remain outside this candidate.
 
 The candidate is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
-SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. Do not describe the ZIP
-as portable until the clean-environment gate below passes.
+SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. The formal candidate
+from source commit `a2e85007ec570344ab91518f0b1de918605be8a0` passed the clean-environment gate on 2026-08-23
+and may be described as portable in layout; it remains an unsigned prerelease rather than a signed release.
 
 Single-file publication embeds native libraries for extraction. On Windows, .NET can extract bundled files beneath
 `%TEMP%\.net` while the program runs. Trimming and ReadyToRun are disabled for this candidate.
@@ -105,5 +106,6 @@ rollback or remove only the exact current-user `MediaLock` startup entry after c
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
 approval after all release gates pass.
 
-Host-side packaged smoke evidence is recorded in [Phase 6 host smoke](phase-6/host-smoke.md). Clean-environment
-evidence remains a separate release gate.
+Host-side and clean-environment packaged evidence is recorded in
+[Phase 6 packaged validation](phase-6/host-smoke.md). The clean-environment gate has passed for the exact formal
+candidate identified there. A different source commit or archive digest requires new evidence.
