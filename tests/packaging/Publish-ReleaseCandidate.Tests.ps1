@@ -18,10 +18,22 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $publishScript = Join-Path $repositoryRoot 'eng\Publish-ReleaseCandidate.ps1'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "MediaLock-Packaging-Test-$([Guid]::NewGuid().ToString('N'))"
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
+$dirtyMarkerPath = Join-Path $repositoryRoot ".MediaLock-Packaging-Test-$([Guid]::NewGuid().ToString('N')).tmp"
 $version = '0.2.0-rc.1'
 $artifactStem = "MediaLock-$version-win-x64"
 
 try {
+    [IO.File]::WriteAllText($dirtyMarkerPath, 'Packaging provenance test marker.')
+
+    $rejectedDirtySource = $false
+    try {
+        & $publishScript -Version $version -OutputRoot $temporaryRoot
+    }
+    catch {
+        $rejectedDirtySource = $_.Exception.Message -like '*require a clean Git worktree*'
+    }
+    Assert-Condition $rejectedDirtySource 'Formal publication must reject a dirty source worktree.'
+
     & $publishScript -Version $version -OutputRoot $temporaryRoot -AllowDirty
 
     $archivePath = Join-Path $temporaryRoot "$artifactStem.zip"
@@ -53,6 +65,8 @@ try {
     Assert-Condition ($archiveFiles[0].VersionInfo.ProductVersion -eq $version) "Executable ProductVersion must be $version."
 }
 finally {
+    [IO.File]::Delete($dirtyMarkerPath)
+
     $resolvedTemporaryParent = (Resolve-Path ([IO.Path]::GetTempPath())).Path.TrimEnd('\')
     if (Test-Path -LiteralPath $temporaryRoot) {
         $resolvedTemporaryRoot = (Resolve-Path -LiteralPath $temporaryRoot).Path

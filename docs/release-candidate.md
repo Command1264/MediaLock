@@ -38,8 +38,10 @@ Then create the formal artifact:
 & .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.1
 ```
 
-The command refuses to overwrite existing outputs and refuses dirty source by default. `-AllowDirty` exists only for
-explicitly disclosed test artifacts; its manifest sets `sourceDirty: true`.
+The command refuses to overwrite existing outputs and refuses dirty source by default. It fingerprints tracked and
+untracked source before and after publication, then withholds all final outputs if source content or `HEAD` changed
+during the build. `-AllowDirty` exists only for explicitly disclosed test artifacts; its manifest sets
+`sourceDirty: true`.
 
 Expected files:
 

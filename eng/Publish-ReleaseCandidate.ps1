@@ -12,13 +12,56 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$sourceStatus = @(& git -C $repositoryRoot status --porcelain --untracked-files=normal)
-if ($LASTEXITCODE -ne 0) {
-    throw 'Could not inspect the source Git worktree.'
+function Get-SourceSnapshot {
+    param(
+        [Parameter(Mandatory)]
+        [string] $RepositoryRoot
+    )
+
+    $commit = (& git -C $RepositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not resolve the source Git commit.'
+    }
+
+    $status = @(& git -C $RepositoryRoot status --porcelain --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not inspect the source Git worktree.'
+    }
+
+    $sourcePaths = @(& git -C $RepositoryRoot ls-files --cached --others --exclude-standard) | Sort-Object
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not enumerate source files.'
+    }
+
+    $entries = foreach ($sourcePath in $sourcePaths) {
+        $absolutePath = Join-Path $RepositoryRoot $sourcePath
+        $contentHash = if (Test-Path -LiteralPath $absolutePath -PathType Leaf) {
+            (& git -C $RepositoryRoot hash-object -- $sourcePath).Trim()
+        }
+        else {
+            '<missing>'
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not hash source file: $sourcePath"
+        }
+
+        "$sourcePath`t$contentHash"
+    }
+
+    $fingerprintBytes = [Text.Encoding]::UTF8.GetBytes(($entries -join "`n"))
+    $fingerprint = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($fingerprintBytes)).ToLowerInvariant()
+    [pscustomobject]@{
+        Commit = $commit
+        Dirty = $status.Count -gt 0
+        Fingerprint = $fingerprint
+    }
 }
 
-$sourceDirty = $sourceStatus.Count -gt 0
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$initialSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
+$sourceDirty = $initialSource.Dirty
 if ($sourceDirty -and -not $AllowDirty) {
     throw 'Release candidates require a clean Git worktree. Commit the intended source or pass -AllowDirty for a disclosed test artifact.'
 }
@@ -89,9 +132,10 @@ try {
     Compress-Archive -LiteralPath $executable.FullName -DestinationPath $stagedArchivePath -CompressionLevel Optimal
     $archive = Get-Item -LiteralPath $stagedArchivePath
     $archiveHash = (Get-FileHash -LiteralPath $stagedArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not resolve the source Git commit.'
+    $finalSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
+    if ($finalSource.Commit -ne $initialSource.Commit -or
+        $finalSource.Fingerprint -ne $initialSource.Fingerprint) {
+        throw 'Source files or HEAD changed during publication; no release output was created.'
     }
 
     $dotnetSdkVersion = (& dotnet --version).Trim()
@@ -108,7 +152,7 @@ try {
         singleFile = $true
         trimmed = $false
         signed = $false
-        sourceCommit = $sourceCommit
+        sourceCommit = $initialSource.Commit
         sourceDirty = $sourceDirty
         dotnetSdkVersion = $dotnetSdkVersion
         generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
