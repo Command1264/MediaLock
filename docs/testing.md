@@ -196,6 +196,10 @@ After committing the reviewed source, produce the provenance-clean candidate wit
 `eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
 
+The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08-23. The exact source commit,
+archive digest, environment and results are preserved in
+[Phase 6 packaged validation](phase-6/host-smoke.md); the evidence does not transfer to a different commit or digest.
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected
