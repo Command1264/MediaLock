@@ -32,7 +32,8 @@ but may still surface Session information and manual controls.
 ### App Lock
 
 Prefer Media Sessions whose source application matches the Locked Target. If multiple Sessions belong to the same
-application, apply an explicit deterministic candidate policy; App Lock does not claim browser-tab precision.
+application, prefer a playing Session, then the most recently observed Session, then stable Session-key order.
+App Lock does not claim song, browser-URL or browser-tab precision.
 
 ### Session Lock
 
@@ -104,7 +105,9 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
-At startup, Default Windows Auto ignores any previously saved lock. Default Session Lock restores only a valid
+At startup, Default Windows Auto ignores any previously saved lock. Default App Lock restores a valid persisted
+source application and resolves its current candidate with the same deterministic policy used for an interactive
+App Lock; it enters Recovery when that application has no current Session. Default Session Lock restores only a valid
 persisted Session Lock whose fingerprint has one acceptable, unambiguous catalog successor. Missing, corrupt,
 expired or ambiguous state remains safely unbound and observable rather than selecting a guess.
 

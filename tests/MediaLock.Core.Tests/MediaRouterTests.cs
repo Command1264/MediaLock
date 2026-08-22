@@ -251,6 +251,49 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task AppLockPrefersTheMostRecentlyObservedCandidateWhenPlaybackIsEqual()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var older = Session(
+            "older",
+            "browser",
+            observedAt: DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        var newer = Session(
+            "newer",
+            "browser",
+            observedAt: DateTimeOffset.Parse("2026-08-22T00:05:00Z"));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([older, newer], older.Key),
+            CancellationToken.None);
+
+        var locked = await router.DispatchAsync(
+            new RouterIntent.LockApplication("browser"),
+            CancellationToken.None);
+
+        Assert.Equal(newer.Key, locked.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
+    public async Task AppLockUsesStableSessionKeyOrderWhenOtherCandidateSignalsMatch()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var second = Session("b", "browser", observedAt: observedAt);
+        var first = Session("a", "browser", observedAt: observedAt);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([second, first], second.Key),
+            CancellationToken.None);
+
+        var locked = await router.DispatchAsync(
+            new RouterIntent.LockApplication("browser"),
+            CancellationToken.None);
+
+        Assert.Equal(first.Key, locked.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
     public async Task RecoveryTimeoutCanFallBackToWindowsCurrentSession()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);

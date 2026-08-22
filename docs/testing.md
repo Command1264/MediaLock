@@ -46,6 +46,11 @@ Recovering. Windows adapter tests verify suspend disposal, old-subscription remo
 snapshots, exactly three bounded resume attempts and recovery on a later resume. ViewModel tests verify those
 catalog states are observable without exposing media metadata in diagnostics.
 
+Phase 5A tests App Lock through the existing router and application interfaces. Startup requires matching App Lock
+settings and runtime state, interactive commands submit source application identity through the application, and
+main/tray ViewModels distinguish `App Locked` from Session Lock. Existing Core tests own the deterministic
+playing/recency/stable-key candidate policy.
+
 ### Integration tests
 
 Cover:
@@ -98,6 +103,18 @@ playback state before/after, competing playback state and whether Windows also p
 6. Reopen the app and confirm `settings.json`, `state.json` and bounded `logs\*.jsonl` remain readable.
 
 Recorded production-boundary evidence: [Phase 3 manual smoke — 2026-08-22](phase-3/manual-smoke-2026-08-22.md).
+
+### Phase 5A App Lock smoke test
+
+1. Play YouTube Music and ordinary YouTube in the available Brave/PWA surfaces, then lock the selected source with
+   `Lock app`; verify the UI and tray show `App Locked`.
+2. Change Windows Current Session and route one supported command; verify only the resolved App Lock candidate
+   changes once.
+3. Stop the locked application's Session, verify `Recovering`, then recreate it and verify App Lock resolves again.
+4. Save App Lock as the default, exit from the notification area, relaunch, and verify the saved application is
+   restored without binding a different source application.
+
+Record results in [Phase 5A manual smoke](phase-5/manual-smoke.md).
 
 ## 4. Compatibility matrix
 

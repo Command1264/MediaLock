@@ -47,6 +47,26 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SelectedApplicationCanBeLockedThroughTheApplicationSeam()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave._crx_music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        var application = new FakeApplication(StateWith(session));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+        viewModel.SelectedSession = Assert.Single(viewModel.Sessions);
+
+        await viewModel.AppLockCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.LockApplication>(
+            Assert.Single(application.Intents));
+        Assert.Equal("Brave._crx_music", intent.SourceAppUserModelId);
+    }
+
+    [Fact]
     public void RecoveringStateShowsAnActionableEmptyState()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
@@ -65,6 +85,25 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Waiting for the locked Media Session to return.", viewModel.EmptyStateText);
         Assert.False(viewModel.HasSessions);
         Assert.False(viewModel.NextCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AppLockIsExplicitInTheRoutingStatus()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.AppLock,
+                Status = RouterStatus.Locked,
+                Revision = 1,
+            },
+        });
+
+        Assert.Equal("App Locked", viewModel.RoutingStatus);
     }
 
     [Fact]

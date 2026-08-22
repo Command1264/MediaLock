@@ -68,7 +68,7 @@
                                Margin="0,12,0,0"
                                Foreground="#FF666666"
                                TextWrapping="Wrap"
-                               Text="Changes apply after Media Lock restarts. A saved Session Lock restores only when one unambiguous target matches; otherwise Windows Auto remains active." />
+                               Text="Changes apply after Media Lock restarts. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match. Otherwise Windows Auto remains active." />
                 </Grid>
             </GroupBox>
         </StackPanel>

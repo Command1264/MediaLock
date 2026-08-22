@@ -178,9 +178,10 @@ user disclosure and bounded retention.
 Phase 3 stores schema-versioned `settings.json` and `state.json` beneath `%LocalAppData%\MediaLock\` with sibling
 temporary files and replace-on-success writes. A corrupt settings file produces safe defaults and remains untouched;
 if the user later saves replacement settings, the original is first copied to `settings.corrupt.<timestamp>.json`.
-Runtime state is saved after serialized router transitions. Startup restores a persisted Session Lock only when the
-saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate; Windows Auto
-never restores the saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
+Runtime state is saved after serialized router transitions. Startup restores App Lock by submitting the saved source
+application identity through the same router interface as an interactive App Lock. Session Lock restores only when
+the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
+Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
 unless a future explicitly disclosed diagnostic mode supplies them.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Saved changes
 take effect on the next process start.

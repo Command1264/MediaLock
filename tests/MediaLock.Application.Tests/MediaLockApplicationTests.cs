@@ -70,6 +70,62 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task DefaultAppLockRestoresPersistedApplicationAfterInitialCatalog()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.AppLock,
+        };
+        var runtimeState = new RecordingRuntimeStateRepository(new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.AppLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "Brave",
+                null,
+                PlaybackStatus.Playing,
+                observedAt,
+                MediaPlaybackType.Unknown,
+                null,
+                null))));
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null,
+            runtimeState);
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Equal(RoutingMode.AppLock, application.State.Router.Mode);
+        Assert.Equal(RouterStatus.Locked, application.State.Router.Status);
+        Assert.Equal(session.Key, application.State.Router.LockedTarget!.ResolvedSession);
+        Assert.All(runtimeState.Saved, saved => Assert.Equal(RoutingMode.AppLock, saved.Mode));
+    }
+
+    [Fact]
+    public async Task DefaultAppLockWithoutPersistedTargetStaysWindowsAutoWithWarning()
+    {
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.AppLock,
+        };
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null,
+            new RecordingRuntimeStateRepository());
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
+        Assert.Contains("persisted App Lock target", application.State.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task DefaultSessionLockWithoutPersistedTargetStaysWindowsAutoWithWarning()
     {
         var session = Session("music", "Brave");
@@ -387,6 +443,31 @@ public sealed class MediaLockApplicationTests
         Assert.Equal(RoutingMode.SessionLock, locked.State.Router.Mode);
         Assert.Equal(RouterStatus.Locked, locked.State.Router.Status);
         Assert.Equal(RouteDecisionKind.Routed, routed.Decision.Kind);
+        Assert.Equal([(session.Key, MediaCommand.Next)], controller.Commands);
+    }
+
+    [Fact]
+    public async Task UiIntentLocksAnApplicationThroughTheApplicationSeam()
+    {
+        var session = Session("music", "Brave");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+
+        var locked = await application.DispatchAsync(
+            new ApplicationIntent.LockApplication("Brave"),
+            CancellationToken.None);
+        var routed = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.AppLock, locked.State.Router.Mode);
+        Assert.Equal(RouterStatus.Locked, locked.State.Router.Status);
+        Assert.Equal(RouteReason.LockedApplication, routed.Decision.Reason);
         Assert.Equal([(session.Key, MediaCommand.Next)], controller.Commands);
     }
 

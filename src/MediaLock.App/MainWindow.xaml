@@ -71,7 +71,12 @@
                         Padding="14,7"
                         AutomationProperties.Name="Lock selected Media Session"
                         Command="{Binding LockCommand}"
-                        Content="Lock selected" />
+                        Content="Lock session" />
+                <Button Margin="8,0,0,0"
+                        Padding="14,7"
+                        AutomationProperties.Name="Lock selected source application"
+                        Command="{Binding AppLockCommand}"
+                        Content="Lock app" />
                 <Button Margin="8,0,0,0"
                         Padding="14,7"
                         AutomationProperties.Name="Use Windows automatic media target"

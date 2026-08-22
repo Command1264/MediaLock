@@ -17,6 +17,10 @@ _Avoid_: Active player, default player
 決定 Media Lock 如何選擇控制目標的使用者策略；正式值為 Windows Auto、App Lock 與 Session Lock。
 _Avoid_: Control mode, lock type
 
+**App Lock**:
+將來源應用程式身分保存為 Locked Target，並在該應用程式目前可用的 Media Sessions 中依明確候選政策選擇控制目標；它不承諾歌曲、瀏覽器 URL 或單一 Session 的連續性。
+_Avoid_: Browser lock, tab lock
+
 **Locked Target**:
 在 App Lock 或 Session Lock 下，Media Lock 承諾優先控制的目標描述。
 _Avoid_: Selected player, current player
