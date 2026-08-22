@@ -314,11 +314,16 @@ public sealed class MediaRouterTests
             new RouterIntent.CatalogUpdated([third, current, second], current.Key),
             CancellationToken.None);
 
-        await router.DispatchAsync(new RouterIntent.UsePriorityRules(), CancellationToken.None);
+        var activated = await router.DispatchAsync(
+            new RouterIntent.UsePriorityRules(),
+            CancellationToken.None);
         var result = await router.DispatchAsync(
             new RouterIntent.Route(MediaCommand.Next),
             CancellationToken.None);
 
+        Assert.Equal(RoutingMode.PriorityRules, activated.State.Mode);
+        Assert.Equal(RouteDecision.StateUpdated, activated.Decision);
+        Assert.Empty(activated.Effects);
         Assert.Equal(RoutingMode.PriorityRules, result.State.Mode);
         Assert.Equal(second.Key, result.State.ActiveTarget);
         Assert.Equal(second.Key, result.Decision.Target);
@@ -340,13 +345,47 @@ public sealed class MediaRouterTests
             new RouterIntent.CatalogUpdated([current], current.Key),
             CancellationToken.None);
 
-        await router.DispatchAsync(new RouterIntent.UsePriorityRules(), CancellationToken.None);
+        var activated = await router.DispatchAsync(
+            new RouterIntent.UsePriorityRules(),
+            CancellationToken.None);
         var result = await router.DispatchAsync(
             new RouterIntent.Route(MediaCommand.TogglePlayPause),
             CancellationToken.None);
 
+        Assert.Equal(RoutingMode.PriorityRules, activated.State.Mode);
+        Assert.Equal(RouteDecision.StateUpdated, activated.Decision);
+        Assert.Empty(activated.Effects);
         Assert.Equal(current.Key, result.Decision.Target);
         Assert.Equal(RouteReason.PriorityRulesWindowsCurrentSession, result.Decision.Reason);
+    }
+
+    [Fact]
+    public async Task UpdatedPriorityRulesImmediatelyRecalculateTheActiveTarget()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(
+            controller,
+            new RouterOptions(
+                FallbackPolicy.Wait,
+                TimeSpan.FromSeconds(15),
+                [new PriorityRule("first")]));
+        var first = Session("first", "first");
+        var second = Session("second", "second");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([first, second], first.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(new RouterIntent.UsePriorityRules(), CancellationToken.None);
+
+        var updated = await router.DispatchAsync(
+            new RouterIntent.UpdateOptions(new RouterOptions(
+                FallbackPolicy.Wait,
+                TimeSpan.FromSeconds(15),
+                [new PriorityRule("second")])),
+            CancellationToken.None);
+
+        Assert.Equal(second.Key, updated.State.ActiveTarget);
+        Assert.Equal(RouteDecision.StateUpdated, updated.Decision);
+        Assert.Empty(updated.Effects);
     }
 
     [Fact]

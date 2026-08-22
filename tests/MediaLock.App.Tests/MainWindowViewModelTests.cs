@@ -136,6 +136,26 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void PriorityRulesWithoutATargetDoNotClaimALockedTarget()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.PriorityRules,
+                Revision = 1,
+            },
+        });
+
+        Assert.Equal(
+            "No Priority Rule or Windows Current Session is available.",
+            viewModel.TargetDescription);
+    }
+
+    [Fact]
     public void CatalogReacquisitionOverridesRoutingStatusWithActionableState()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);

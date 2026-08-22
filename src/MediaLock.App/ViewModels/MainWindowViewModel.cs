@@ -148,7 +148,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return target is null
                 ? routerState.Mode == RoutingMode.WindowsAuto
                     ? "Windows Current Session is unavailable."
-                    : "Locked Target is unavailable."
+                    : routerState.Mode == RoutingMode.PriorityRules
+                        ? "No Priority Rule or Windows Current Session is available."
+                        : "Locked Target is unavailable."
                 : $"{target.SourceApplication} — {target.Title}";
         }
     }
