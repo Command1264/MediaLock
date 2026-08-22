@@ -72,9 +72,9 @@
   <data name="Settings_StartWithWindowsAutomation" xml:space="preserve"><value>讓 Media Lock 隨 Windows 啟動</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>顯示語言</value></data>
   <data name="Settings_LanguageAutomation" xml:space="preserve"><value>Media Lock 顯示語言</value></data>
-  <data name="Settings_LanguageRestart" xml:space="preserve"><value>語言變更會在下次啟動 Media Lock 時套用。</value></data>
+  <data name="Settings_LanguageApply" xml:space="preserve"><value>儲存設定後會立即套用語言變更。</value></data>
   <data name="Language_System" xml:space="preserve"><value>使用 Windows 語言</value></data>
-  <data name="Language_English" xml:space="preserve"><value>英文（美國）</value></data>
+  <data name="Language_English" xml:space="preserve"><value>English</value></data>
   <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
   <data name="Settings_RoutingRecovery" xml:space="preserve"><value>路由與復原</value></data>
   <data name="Settings_StartupMode" xml:space="preserve"><value>啟動時路由模式</value></data>

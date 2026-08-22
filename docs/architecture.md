@@ -205,8 +205,9 @@ Phase 7A advances settings to schema v4 by adding a desktop UI-language preferen
 to the Windows-language choice. The App project owns the localization module, culture resolution and WPF markup
 extension; Core stores and validates only the neutral preference values. Presentation strings, enum descriptions,
 accessibility names and notification-area labels resolve through the same resource manager. One culture is selected
-after settings load and before any ViewModel, window or tray surface is created; changing it in Settings applies on
-the next process start.
+after settings load and before any ViewModel, window or tray surface is created. A successful Settings save publishes
+one App-layer culture change that refreshes existing WPF bindings, ViewModel projections and notification-area menu
+labels without restarting routing, GSMTC discovery or input interception. A failed save does not change culture.
 
 ## 9. Composition
 

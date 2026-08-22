@@ -72,10 +72,10 @@
   <data name="Settings_StartWithWindowsAutomation" xml:space="preserve"><value>Start Media Lock with Windows</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Display language</value></data>
   <data name="Settings_LanguageAutomation" xml:space="preserve"><value>Media Lock display language</value></data>
-  <data name="Settings_LanguageRestart" xml:space="preserve"><value>Language changes apply the next time Media Lock starts.</value></data>
+  <data name="Settings_LanguageApply" xml:space="preserve"><value>Language changes apply immediately after settings are saved.</value></data>
   <data name="Language_System" xml:space="preserve"><value>Use Windows language</value></data>
-  <data name="Language_English" xml:space="preserve"><value>English (United States)</value></data>
-  <data name="Language_TraditionalChinese" xml:space="preserve"><value>Traditional Chinese</value></data>
+  <data name="Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
   <data name="Settings_RoutingRecovery" xml:space="preserve"><value>Routing and Recovery</value></data>
   <data name="Settings_StartupMode" xml:space="preserve"><value>Startup routing mode</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>Recovery timeout (seconds)</value></data>

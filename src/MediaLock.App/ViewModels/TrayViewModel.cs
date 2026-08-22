@@ -49,6 +49,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         WindowsAutoCommand = new AsyncCommand(_ => DispatchAsync(
             new ApplicationIntent.UseWindowsAutoForCurrentRun()));
         application.StateChanged += OnApplicationStateChanged;
+        UiText.CultureChanged += OnCultureChanged;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -105,6 +106,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         }
 
         application.StateChanged -= OnApplicationStateChanged;
+        UiText.CultureChanged -= OnCultureChanged;
         disposed = true;
     }
 
@@ -129,6 +131,19 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         MediaLockApplicationStateChangedEventArgs args)
     {
         var next = Describe(args.State);
+        if (synchronizationContext is not null &&
+            SynchronizationContext.Current != synchronizationContext)
+        {
+            synchronizationContext.Post(_ => StatusText = next, null);
+            return;
+        }
+
+        StatusText = next;
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs args)
+    {
+        var next = Describe(application.State);
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {

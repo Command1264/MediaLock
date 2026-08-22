@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using System.Resources;
+using System.Windows.Data;
 using MediaLock.Core.Configuration;
 
 namespace MediaLock.App.Localization;
@@ -10,15 +12,32 @@ internal static class UiText
     private static readonly ResourceManager Resources = new(
         "MediaLock.App.Resources.Strings",
         Assembly.GetExecutingAssembly());
+    private static readonly CultureInfo WindowsUiCulture = CultureInfo.CurrentUICulture;
+    private static readonly LocalizedTextBindingSource LocalizedBindingSource = new();
+    private static bool cultureApplied;
+
+    public static event EventHandler? CultureChanged;
+
+    public static object BindingSource => LocalizedBindingSource;
 
     public static CultureInfo CurrentCulture { get; private set; } =
         CultureInfo.GetCultureInfo(UiLanguagePreference.EnglishUnitedStates);
 
     public static void Apply(string preference)
     {
-        CurrentCulture = ResolveCulture(preference, CultureInfo.CurrentUICulture);
-        CultureInfo.CurrentUICulture = CurrentCulture;
-        CultureInfo.DefaultThreadCurrentUICulture = CurrentCulture;
+        var culture = ResolveCulture(preference, WindowsUiCulture);
+        var changed = !culture.Equals(CurrentCulture);
+        CurrentCulture = culture;
+        CultureInfo.CurrentUICulture = culture;
+        CultureInfo.DefaultThreadCurrentUICulture = culture;
+        if (!changed && cultureApplied)
+        {
+            return;
+        }
+
+        cultureApplied = true;
+        LocalizedBindingSource.NotifyChanged();
+        CultureChanged?.Invoke(null, EventArgs.Empty);
     }
 
     public static CultureInfo ResolveCulture(string preference, CultureInfo systemCulture)
@@ -60,4 +79,15 @@ internal static class UiText
 
     public static string Format(string key, params object?[] arguments) =>
         string.Format(CurrentCulture, Get(key), arguments);
+
+    private sealed class LocalizedTextBindingSource : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string this[string key] => Get(key);
+
+        public void NotifyChanged() => PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(System.Windows.Data.Binding.IndexerName));
+    }
 }

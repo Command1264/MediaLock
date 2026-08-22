@@ -27,12 +27,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         IMediaLockApplication application,
         SynchronizationContext? synchronizationContext = null,
         Action? showSettings = null,
-        Action? closeSettings = null)
+        Action? closeSettings = null,
+        Action<string>? applyLanguage = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
-        Settings = new SettingsViewModel(application, synchronizationContext, closeSettings);
+        Settings = new SettingsViewModel(
+            application,
+            synchronizationContext,
+            closeSettings,
+            applyLanguage);
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();
@@ -70,6 +75,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         PriorityRulesCommand = priorityRulesCommand;
         WindowsAutoCommand = windowsAutoCommand;
         application.StateChanged += OnApplicationStateChanged;
+        UiText.CultureChanged += OnCultureChanged;
         Apply(application.State);
     }
 
@@ -170,6 +176,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         application.StateChanged -= OnApplicationStateChanged;
+        UiText.CultureChanged -= OnCultureChanged;
         Settings.Dispose();
         disposed = true;
     }
@@ -238,6 +245,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         Apply(args.State);
     }
 
+    private void OnCultureChanged(object? sender, EventArgs args)
+    {
+        if (synchronizationContext is not null &&
+            SynchronizationContext.Current != synchronizationContext)
+        {
+            synchronizationContext.Post(_ => RefreshLocalizedProjection(), null);
+            return;
+        }
+
+        RefreshLocalizedProjection();
+    }
+
     private void Apply(MediaLockApplicationState state)
     {
         routerState = state.Router;
@@ -246,9 +265,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             (state.CatalogStatus == MediaSessionCatalogStatus.Unavailable
                 ? state.CatalogStatusMessage
                 : null);
+        RefreshLocalizedProjection();
+        OnPropertyChanged(nameof(HasError));
+        OnPropertyChanged(nameof(ErrorMessage));
+        windowsAutoCommand.RaiseCanExecuteChanged();
+        priorityRulesCommand.RaiseCanExecuteChanged();
+        foreach (var command in mediaCommands)
+        {
+            command.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void RefreshLocalizedProjection()
+    {
         var selectedKey = SelectedSession?.Key;
         Sessions.Clear();
-        foreach (var session in state.Router.Sessions)
+        foreach (var session in routerState.Sessions)
         {
             Sessions.Add(SessionItemViewModel.From(session));
         }
@@ -262,14 +294,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(RoutingStatus));
         OnPropertyChanged(nameof(RoutingStatusLine));
         OnPropertyChanged(nameof(TargetDescription));
-        OnPropertyChanged(nameof(HasError));
-        OnPropertyChanged(nameof(ErrorMessage));
-        windowsAutoCommand.RaiseCanExecuteChanged();
-        priorityRulesCommand.RaiseCanExecuteChanged();
-        foreach (var command in mediaCommands)
-        {
-            command.RaiseCanExecuteChanged();
-        }
     }
 
     private SessionItemViewModel? ResolveTarget()

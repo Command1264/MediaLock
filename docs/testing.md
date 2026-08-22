@@ -69,8 +69,9 @@ formal candidates reject dirty worktrees.
 
 Phase 7A tests language-preference validation and schema-v3 migration through the settings repository seam. App
 tests cover supported-culture resolution, English fallback, Traditional Chinese resource lookup, Settings language
-choices and persistence. A manual UI check must confirm that main-window text, Settings, playback/status labels,
-accessibility names and notification-area commands all use the selected language after restart.
+choices, language-native choice names, successful-save application and failed-save suppression. A manual UI check
+must confirm that main-window text, Settings, playback/status labels, accessibility names and notification-area
+commands switch immediately after Save without restarting routing or duplicating a media command.
 
 ### Integration tests
 

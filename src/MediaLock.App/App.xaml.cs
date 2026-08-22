@@ -64,7 +64,8 @@ public partial class App : System.Windows.Application
                 mediaApplication,
                 SynchronizationContext.Current,
                 ShowSettingsWindow,
-                CloseSettingsWindow);
+                CloseSettingsWindow,
+                UiText.Apply);
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;

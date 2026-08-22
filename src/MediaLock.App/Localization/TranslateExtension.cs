@@ -9,5 +9,10 @@ public sealed class TranslateExtension : MarkupExtension
 
     public string Key { get; }
 
-    public override object ProvideValue(IServiceProvider serviceProvider) => UiText.Get(Key);
+    public override object ProvideValue(IServiceProvider serviceProvider) =>
+        new System.Windows.Data.Binding($"[{Key}]")
+        {
+            Mode = System.Windows.Data.BindingMode.OneWay,
+            Source = UiText.BindingSource,
+        }.ProvideValue(serviceProvider);
 }

@@ -120,13 +120,14 @@ English plus Traditional Chinese resources. Keep routing vocabulary and state se
 
 Exit criteria:
 
-- Settings offers Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`) and states when the change
-  takes effect.
+- Settings offers Windows language, language-native `English` and `繁體中文` choices, applies a successfully saved
+  change immediately and leaves the current culture unchanged when save fails.
 - Main window, Settings, ViewModel projections, accessibility names and notification-area commands resolve through
   localized resources.
 - Settings schema migration preserves existing v1-v3 user choices and defaults language to Windows language.
 - Culture resolution, resource fallback, persistence and ViewModel language choices have automated coverage.
-- Both languages pass a restart-based desktop smoke test without routing or lifecycle regressions.
+- Both languages and Windows-language restoration pass immediate-save and restart smoke tests without routing or
+  lifecycle regressions.
 
 ### Phase 7B — WPF visual refresh and motion
 

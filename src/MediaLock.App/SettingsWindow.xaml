@@ -43,7 +43,7 @@
                               SelectedValue="{Binding SelectedLanguage}" />
                     <TextBlock Margin="0,6,0,0"
                                Foreground="#FF666666"
-                               Text="{loc:Translate Settings_LanguageRestart}" />
+                               Text="{loc:Translate Settings_LanguageApply}" />
                 </StackPanel>
             </GroupBox>
 

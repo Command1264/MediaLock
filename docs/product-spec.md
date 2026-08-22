@@ -115,8 +115,8 @@ an actionable error and safe defaults; they are not silently overwritten.
 The desktop settings persist a UI language preference independently from routing state. Supported choices are
 Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`). Windows-language selection uses Traditional
 Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English. Language changes take effect on
-the next process start so every WPF window, notification-area surface and presentation projection uses one
-consistent culture for its lifetime.
+successful Settings save across the existing WPF windows, notification-area surface and presentation projections.
+Language choices display `English` and `繁體中文` as language-native names regardless of the current UI culture.
 
 Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while

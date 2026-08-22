@@ -14,8 +14,9 @@ Date: 2026-08-23
 2. Inspect the main window, Session list, playback status and media controls.
 3. Open Settings and inspect headings, descriptions, choices and accessibility names.
 4. Inspect the notification-area commands and status.
-5. Select English, save, explicitly exit, restart and repeat steps 2-4.
-6. Select Traditional Chinese, save, explicitly exit, restart and repeat steps 2-4.
+5. Select English, save, confirm the current process refreshes immediately, then explicitly exit, restart and repeat
+   steps 2-4.
+6. Select Traditional Chinese, save, confirm immediate refresh, then explicitly exit, restart and repeat steps 2-4.
 7. Restore the original language preference.
 
 ## Results
@@ -27,11 +28,14 @@ Date: 2026-08-23
 | Settings | General, language, Recovery and Priority Rules surfaces use Traditional Chinese without clipping that blocks use | Pass |
 | Resource completeness | English and Traditional Chinese contain the same keys; every source reference resolves | Pass; 101 keys in each resource and no missing source key |
 | Single-file publish | Localization does not add a second packaged file | Pass; publish output contained only `MediaLock.exe` |
-| English restart | Saved `en-US` restarts with English main, Settings and notification-area surfaces | Pending |
-| Traditional-Chinese explicit restart | Saved `zh-TW` restarts with Traditional Chinese surfaces | Pending; Windows-language path is proven, explicit preference persistence is automated |
-| Routing/lifecycle regression | Language changes do not alter routing or leave a process after explicit Exit | Pending with the two restart rows |
+| English restart | Saved `en-US` restarts with English main, Settings and notification-area surfaces | Pass; main, Settings and Tray were English |
+| Traditional-Chinese explicit restart | Saved `zh-TW` restarts with Traditional Chinese surfaces | Pass; main, Settings and Tray were Traditional Chinese |
+| Routing/lifecycle regression | Language changes do not alter routing or leave a process after explicit Exit | Pass for restart baseline; Play/Pause changed media once in both languages and each explicit Exit left zero processes |
+| Immediate English application | Saving `en-US` updates existing main, Settings and Tray surfaces without restart | Pass |
+| Immediate Traditional-Chinese application | Saving `zh-TW` updates existing surfaces without restart | Pass |
+| Language-native choices | Language list always exposes `English` and `繁體中文` | Pass |
 
-No setting was saved during the completed UI inspection, so the existing user preference was not changed. Automated
-tests cover culture resolution, English and Traditional-Chinese resource lookup, schema-v3 migration, language
-choice projection and persistence through the application intent seam. Phase 7A remains open until the two explicit
-restart rows and notification-area inspection pass.
+The immediate-switch smoke test also confirmed that main, Settings and Tray text refreshed together, Play/Pause
+changed media exactly once and no error or crash occurred. Testing restored the original Windows-language preference.
+Automated tests cover culture resolution, English and Traditional-Chinese resource lookup, schema-v3 migration,
+language choice projection and persistence through the application intent seam.

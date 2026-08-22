@@ -11,6 +11,13 @@ internal sealed class TrayIconHost : IDisposable
     private readonly TrayViewModel viewModel;
     private readonly NotifyIcon notifyIcon;
     private readonly ToolStripMenuItem statusItem;
+    private readonly ToolStripMenuItem showItem;
+    private readonly ToolStripMenuItem settingsItem;
+    private readonly ToolStripMenuItem toggleItem;
+    private readonly ToolStripMenuItem previousItem;
+    private readonly ToolStripMenuItem nextItem;
+    private readonly ToolStripMenuItem windowsAutoItem;
+    private readonly ToolStripMenuItem exitItem;
     private bool disposed;
 
     public TrayIconHost(TrayViewModel viewModel)
@@ -21,18 +28,25 @@ internal sealed class TrayIconHost : IDisposable
         {
             Enabled = false,
         };
+        showItem = Item(UiText.Get("Tray_Show"), viewModel.ShowCommand);
+        settingsItem = Item(UiText.Get("Tray_Settings"), viewModel.SettingsCommand);
+        toggleItem = Item(UiText.Get("Command_Toggle"), viewModel.TogglePlayPauseCommand);
+        previousItem = Item(UiText.Get("Command_Previous"), viewModel.PreviousCommand);
+        nextItem = Item(UiText.Get("Command_Next"), viewModel.NextCommand);
+        windowsAutoItem = Item(UiText.Get("Mode_WindowsAuto"), viewModel.WindowsAutoCommand);
+        exitItem = Item(UiText.Get("Tray_Exit"), viewModel.ExitCommand);
         var menu = new ContextMenuStrip();
         menu.Items.Add(statusItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item(UiText.Get("Tray_Show"), viewModel.ShowCommand));
-        menu.Items.Add(Item(UiText.Get("Tray_Settings"), viewModel.SettingsCommand));
+        menu.Items.Add(showItem);
+        menu.Items.Add(settingsItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item(UiText.Get("Command_Toggle"), viewModel.TogglePlayPauseCommand));
-        menu.Items.Add(Item(UiText.Get("Command_Previous"), viewModel.PreviousCommand));
-        menu.Items.Add(Item(UiText.Get("Command_Next"), viewModel.NextCommand));
-        menu.Items.Add(Item(UiText.Get("Mode_WindowsAuto"), viewModel.WindowsAutoCommand));
+        menu.Items.Add(toggleItem);
+        menu.Items.Add(previousItem);
+        menu.Items.Add(nextItem);
+        menu.Items.Add(windowsAutoItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item(UiText.Get("Tray_Exit"), viewModel.ExitCommand));
+        menu.Items.Add(exitItem);
         notifyIcon = new NotifyIcon
         {
             Text = "Media Lock",
@@ -42,6 +56,8 @@ internal sealed class TrayIconHost : IDisposable
         };
         notifyIcon.DoubleClick += OnDoubleClick;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        UiText.CultureChanged += OnCultureChanged;
+        ApplyLocalizedText();
     }
 
     public void Dispose()
@@ -52,6 +68,7 @@ internal sealed class TrayIconHost : IDisposable
         }
 
         viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        UiText.CultureChanged -= OnCultureChanged;
         notifyIcon.DoubleClick -= OnDoubleClick;
         notifyIcon.Visible = false;
         notifyIcon.ContextMenuStrip?.Dispose();
@@ -68,6 +85,20 @@ internal sealed class TrayIconHost : IDisposable
 
     private void OnDoubleClick(object? sender, EventArgs e) =>
         viewModel.ShowCommand.Execute(null);
+
+    private void OnCultureChanged(object? sender, EventArgs args) => ApplyLocalizedText();
+
+    private void ApplyLocalizedText()
+    {
+        showItem.Text = UiText.Get("Tray_Show");
+        settingsItem.Text = UiText.Get("Tray_Settings");
+        toggleItem.Text = UiText.Get("Command_Toggle");
+        previousItem.Text = UiText.Get("Command_Previous");
+        nextItem.Text = UiText.Get("Command_Next");
+        windowsAutoItem.Text = UiText.Get("Mode_WindowsAuto");
+        exitItem.Text = UiText.Get("Tray_Exit");
+        notifyIcon.Text = $"Media Lock — {viewModel.StatusText}";
+    }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {

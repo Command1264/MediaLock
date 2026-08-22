@@ -14,6 +14,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly Action? requestClose;
+    private readonly Action<string>? applyLanguage;
     private bool closeToTray;
     private bool startWithWindows;
     private RoutingMode startupRoutingMode;
@@ -29,37 +30,31 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public SettingsViewModel(
         IMediaLockApplication application,
         SynchronizationContext? synchronizationContext = null,
-        Action? requestClose = null)
+        Action? requestClose = null,
+        Action<string>? applyLanguage = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
         this.requestClose = requestClose;
+        this.applyLanguage = applyLanguage;
         SaveCommand = new AsyncCommand(_ => SaveAsync());
         AddPriorityRuleCommand = new AsyncCommand(AddPriorityRuleAsync);
         MovePriorityRuleUpCommand = new AsyncCommand(MovePriorityRuleUpAsync);
         MovePriorityRuleDownCommand = new AsyncCommand(MovePriorityRuleDownAsync);
         RemovePriorityRuleCommand = new AsyncCommand(RemovePriorityRuleAsync);
         application.StateChanged += OnApplicationStateChanged;
+        UiText.CultureChanged += OnCultureChanged;
+        RefreshLocalizedOptions();
         Apply(application.State.Settings);
         RefreshAvailableApplications(application.State);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<LocalizedOption<FallbackPolicy>> FallbackPolicies { get; } =
-        Enum.GetValues<FallbackPolicy>()
-            .Select(value => new LocalizedOption<FallbackPolicy>(
-                value,
-                UiDescriptions.DescribeFallbackPolicy(value)))
-            .ToArray();
+    public IReadOnlyList<LocalizedOption<FallbackPolicy>> FallbackPolicies { get; private set; } = [];
 
-    public IReadOnlyList<LocalizedOption<string>> Languages { get; } =
-    [
-        new(UiLanguagePreference.System, UiText.Get("Language_System")),
-        new(UiLanguagePreference.EnglishUnitedStates, UiText.Get("Language_English")),
-        new(UiLanguagePreference.TraditionalChinese, UiText.Get("Language_TraditionalChinese")),
-    ];
+    public IReadOnlyList<LocalizedOption<string>> Languages { get; private set; } = [];
 
     public ObservableCollection<PriorityRuleItemViewModel> PriorityRules { get; } = [];
 
@@ -131,6 +126,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         application.StateChanged -= OnApplicationStateChanged;
+        UiText.CultureChanged -= OnCultureChanged;
         disposed = true;
     }
 
@@ -149,6 +145,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
+            applyLanguage?.Invoke(SelectedLanguage);
             ErrorMessage = null;
             requestClose?.Invoke();
         }
@@ -156,6 +153,36 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             ErrorMessage = exception.Message;
         }
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs args)
+    {
+        if (synchronizationContext is not null &&
+            SynchronizationContext.Current != synchronizationContext)
+        {
+            synchronizationContext.Post(_ => RefreshLocalizedOptions(), null);
+            return;
+        }
+
+        RefreshLocalizedOptions();
+    }
+
+    private void RefreshLocalizedOptions()
+    {
+        FallbackPolicies = Enum.GetValues<FallbackPolicy>()
+            .Select(value => new LocalizedOption<FallbackPolicy>(
+                value,
+                UiDescriptions.DescribeFallbackPolicy(value)))
+            .ToArray();
+        Languages =
+        [
+            new(UiLanguagePreference.System, UiText.Get("Language_System")),
+            new(UiLanguagePreference.EnglishUnitedStates, UiText.Get("Language_English")),
+            new(UiLanguagePreference.TraditionalChinese, UiText.Get("Language_TraditionalChinese")),
+        ];
+        OnPropertyChanged(nameof(FallbackPolicies));
+        OnPropertyChanged(nameof(Languages));
+        ApplyStartupRoutingMode(startupRoutingMode);
     }
 
     private void OnApplicationStateChanged(
@@ -319,4 +346,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
