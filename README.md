@@ -6,13 +6,32 @@ Media Lock 是規劃中的 Windows 桌面工具：它位於實體媒體鍵與 Wi
 
 ## 專案狀態
 
-目前為文件與技術驗證準備階段，尚未建立可執行程式。第一個里程碑是 Console Prototype，用來證明：
+目前已有可執行的 WPF 桌面殼層與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
+提供媒體控制、常駐通知區域，並保存 Phase 3 設定與執行狀態。Phase 4 的崩潰鎖定恢復與
+suspend/resume reacquisition 尚未完成。
+
+已驗證的基礎能力包括：
 
 1. 可列出 GSMTC Sessions。
 2. 可選定並持續辨識單一 Session。
 3. 可攔截並 consume 實體媒體鍵，避免 Windows 重複觸發。
 4. 可將命令可靠送往鎖定目標。
 5. Session 消失及重新出現時可恢復。
+
+## 執行桌面程式
+
+```powershell
+dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Release
+```
+
+關閉視窗預設只會隱藏至 Windows 通知區域；從托盤選單按 `Exit` 才會結束程式。設定頁可切換
+close-to-tray 與目前使用者的 Windows 登入啟動，也可保存預設 routing mode、Recovery timeout 與
+Fallback Policy。設定可由主視窗右上角或托盤選單開啟為獨立視窗；短淡入／隱藏動畫會遵循
+Windows 的用戶端動畫設定。使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
+有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。
+
+Recovery timeout 與 Fallback Policy 會在下次啟動時套入 router。Default routing mode 目前先保存為
+偏好；需要 persisted target 的 Session Lock 啟動恢復屬於 Phase 4，本階段不會自動恢復舊鎖定。
 
 ## 預定技術基底
 

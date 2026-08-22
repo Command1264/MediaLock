@@ -7,7 +7,7 @@ namespace MediaLock.Core.Routing;
 public sealed class MediaRouter : IMediaRouter
 {
     private readonly IMediaController controller;
-    private readonly RouterOptions options;
+    private RouterOptions options;
     private readonly Channel<PendingIntent> intents;
     private readonly CancellationTokenSource shutdown = new();
     private readonly Task worker;
@@ -18,23 +18,7 @@ public sealed class MediaRouter : IMediaRouter
         ArgumentNullException.ThrowIfNull(controller);
         this.controller = controller;
         this.options = options ?? RouterOptions.Default;
-        if (!Enum.IsDefined(this.options.FallbackPolicy))
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                this.options.FallbackPolicy,
-                "Unknown fallback policy.");
-        }
-
-        if (this.options.RecoveryTimeout < TimeSpan.Zero ||
-            this.options.RecoveryTimeout > TimeSpan.FromMinutes(5))
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                this.options.RecoveryTimeout,
-                "Recovery timeout must be between 0 seconds and 5 minutes.");
-        }
-
+        ValidateOptions(this.options);
         intents = Channel.CreateUnbounded<PendingIntent>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -42,6 +26,27 @@ public sealed class MediaRouter : IMediaRouter
             AllowSynchronousContinuations = false,
         });
         worker = ProcessQueueAsync();
+    }
+
+    private static void ValidateOptions(RouterOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (!Enum.IsDefined(options.FallbackPolicy))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.FallbackPolicy,
+                "Unknown fallback policy.");
+        }
+
+        if (options.RecoveryTimeout < TimeSpan.Zero ||
+            options.RecoveryTimeout > TimeSpan.FromMinutes(5))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.RecoveryTimeout,
+                "Recovery timeout must be between 0 seconds and 5 minutes.");
+        }
     }
 
     public ValueTask<RouterResult> DispatchAsync(
@@ -120,10 +125,18 @@ public sealed class MediaRouter : IMediaRouter
             RouterIntent.LockSession lockSession => LockSession(lockSession.Session),
             RouterIntent.LockApplication lockApplication => LockApplication(lockApplication.SourceAppUserModelId),
             RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryEpoch),
+            RouterIntent.UpdateOptions update => UpdateOptions(update.Options),
             RouterIntent.UseWindowsAuto => UseWindowsAuto(),
             RouterIntent.Route route => await RouteAsync(route.Command, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
         };
+    }
+
+    private RouterResult UpdateOptions(RouterOptions updated)
+    {
+        ValidateOptions(updated);
+        options = updated;
+        return new RouterResult(state, RouteDecision.StateUpdated);
     }
 
     private RouterResult UseWindowsAuto()

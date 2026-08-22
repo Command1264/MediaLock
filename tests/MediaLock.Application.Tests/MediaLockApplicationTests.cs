@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using MediaLock.Application;
+using MediaLock.Core.Configuration;
+using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 using Xunit;
@@ -9,6 +11,212 @@ namespace MediaLock.Application.Tests;
 
 public sealed class MediaLockApplicationTests
 {
+    [Fact]
+    public async Task LoadedRecoverySettingsConfigureTheRouterBeforeCatalogProcessing()
+    {
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            Recovery = new RecoverySettings(TimeSpan.FromSeconds(42), FallbackPolicy.Wait),
+        };
+        var router = new RecordingIntentRouter();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            router,
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null);
+
+        await application.StartAsync(CancellationToken.None);
+
+        var options = Assert.IsType<RouterIntent.UpdateOptions>(router.Intents[0]).Options;
+        Assert.Equal(TimeSpan.FromSeconds(42), options.RecoveryTimeout);
+        Assert.Equal(FallbackPolicy.Wait, options.FallbackPolicy);
+        Assert.IsType<RouterIntent.CatalogUpdated>(router.Intents[1]);
+    }
+
+    [Fact]
+    public async Task RouteDiagnosticsRemainInsideTheSerializedApplicationDispatch()
+    {
+        var session = Session("music", "Brave");
+        var router = new ImmediateCountingRouter();
+        var log = new BlockingRouteDiagnosticLog();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            router,
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: log);
+        await application.StartAsync(CancellationToken.None);
+
+        var first = application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None).AsTask();
+        await log.Started.WaitAsync(TimeSpan.FromSeconds(1));
+        var second = application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Previous),
+            CancellationToken.None).AsTask();
+
+        try
+        {
+            Assert.False(await router.TryWaitForCallCountAsync(
+                expected: 3,
+                TimeSpan.FromMilliseconds(100)));
+        }
+        finally
+        {
+            log.Release();
+        }
+
+        await Task.WhenAll(first, second);
+        Assert.Equal(3, router.CallCount);
+    }
+
+    [Fact]
+    public async Task SettingsLoadIssueRemainsObservableAfterInitialCatalogSnapshot()
+    {
+        var session = Session("music", "Brave");
+        var repository = new RecordingSettingsRepository(
+            MediaLockSettings.Default,
+            [new ConfigurationIssue("$", "settings.json is corrupt; defaults are active.")]);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            repository,
+            loginStartupManager: null);
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Contains("settings.json", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Single(application.State.Router.Sessions);
+    }
+
+    [Fact]
+    public async Task RouteOutcomeIsWrittenWithoutMediaMetadata()
+    {
+        var session = Session("music", "Brave");
+        var log = new RecordingDiagnosticLog();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: log);
+        await application.StartAsync(CancellationToken.None);
+
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
+            CancellationToken.None);
+
+        var route = Assert.Single(log.Events, entry => entry.Name == "route.completed");
+        var stateChanged = Assert.Single(log.Events, entry => entry.Name == "state.changed");
+        Assert.Equal("Routed", route.Properties?["decision"]);
+        Assert.Equal("WindowsAuto", stateChanged.Properties?["mode"]);
+        Assert.DoesNotContain(log.Events.SelectMany(entry => entry.Properties?.Keys ?? []), key =>
+            key.Contains("title", StringComparison.OrdinalIgnoreCase) ||
+            key.Contains("artist", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RouterTransitionsArePersistedWithoutRestoringThePreviousLock()
+    {
+        var session = Session("music", "Brave");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var runtimeState = new RecordingRuntimeStateRepository();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: runtimeState);
+
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(session.Key),
+            CancellationToken.None);
+
+        var saved = Assert.IsType<RuntimeStateDocument>(runtimeState.Saved.Last());
+        Assert.Equal(RoutingMode.SessionLock, saved.Mode);
+        Assert.Equal("Brave", saved.LockedTarget?.Fingerprint.SourceAppUserModelId);
+        Assert.Equal(RoutingMode.WindowsAuto, runtimeState.Loaded.Mode);
+    }
+
+    [Fact]
+    public async Task RuntimeAutosaveFailureIsObservableWithoutStoppingMediaRouting()
+    {
+        var session = Session("music", "Brave");
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: new FailingRuntimeStateRepository());
+
+        await application.StartAsync(CancellationToken.None);
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
+        Assert.Contains("state.json", application.State.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UpdatingDesktopSettingsPersistsAndSynchronizesLoginStartup()
+    {
+        var session = Session("music", "Brave");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        var startup = new RecordingLoginStartupManager();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            startup);
+        await application.StartAsync(CancellationToken.None);
+        var updated = MediaLockSettings.Default with
+        {
+            Desktop = new DesktopSettings(
+                CloseToTray: false,
+                StartWithWindows: true),
+        };
+
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(updated, application.State.Settings);
+        Assert.Equal([updated], settingsRepository.Saved);
+        Assert.Equal([true], startup.Updates);
+    }
+
+    [Fact]
+    public async Task FailedLoginStartupUpdateRollsSettingsBackToThePreviousValue()
+    {
+        var session = Session("music", "Brave");
+        var repository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            repository,
+            new FailingLoginStartupManager());
+        await application.StartAsync(CancellationToken.None);
+        var updated = MediaLockSettings.Default with
+        {
+            Desktop = MediaLockSettings.Default.Desktop! with { StartWithWindows = true },
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(() => application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None).AsTask());
+
+        Assert.Equal(MediaLockSettings.Default, application.State.Settings);
+        Assert.Equal([updated, MediaLockSettings.Default], repository.Saved);
+    }
+
     [Fact]
     public async Task CatalogSnapshotBecomesObservableApplicationState()
     {
@@ -340,5 +548,210 @@ public sealed class MediaLockApplicationTests
                 throw;
             }
         }
+    }
+
+    private sealed class RecordingSettingsRepository(
+        MediaLockSettings initial,
+        System.Collections.Immutable.ImmutableArray<ConfigurationIssue> issues = default) : ISettingsRepository
+    {
+        public List<MediaLockSettings> Saved { get; } = [];
+
+        public ValueTask<ConfigurationLoadResult<MediaLockSettings>> LoadAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ConfigurationLoadResult<MediaLockSettings>(
+                initial,
+                UsedDefaults: false,
+                Issues: issues.IsDefault ? [] : issues));
+
+        public ValueTask SaveAsync(
+            MediaLockSettings settings,
+            CancellationToken cancellationToken)
+        {
+            Saved.Add(settings);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingLoginStartupManager : ILoginStartupManager
+    {
+        public List<bool> Updates { get; } = [];
+
+        public ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(false);
+
+        public ValueTask SetEnabledAsync(bool enabled, CancellationToken cancellationToken)
+        {
+            Updates.Add(enabled);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingRuntimeStateRepository : IRuntimeStateRepository
+    {
+        public RuntimeStateDocument Loaded { get; } = new(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.WindowsAuto,
+            LockedTarget: null);
+
+        public List<RuntimeStateDocument> Saved { get; } = [];
+
+        public ValueTask<ConfigurationLoadResult<RuntimeStateDocument>> LoadAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ConfigurationLoadResult<RuntimeStateDocument>(
+                Loaded,
+                UsedDefaults: false,
+                Issues: []));
+
+        public ValueTask SaveAsync(
+            RuntimeStateDocument state,
+            CancellationToken cancellationToken)
+        {
+            Saved.Add(state);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingDiagnosticLog : IDiagnosticLog
+    {
+        public List<DiagnosticEvent> Events { get; } = [];
+
+        public ValueTask WriteAsync(
+            DiagnosticEvent diagnosticEvent,
+            CancellationToken cancellationToken)
+        {
+            Events.Add(diagnosticEvent);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FailingRuntimeStateRepository : IRuntimeStateRepository
+    {
+        public ValueTask<ConfigurationLoadResult<RuntimeStateDocument>> LoadAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ConfigurationLoadResult<RuntimeStateDocument>(
+                new RuntimeStateDocument(
+                    RuntimeStateDocument.CurrentSchemaVersion,
+                    RoutingMode.WindowsAuto,
+                    LockedTarget: null),
+                UsedDefaults: false,
+                Issues: []));
+
+        public ValueTask SaveAsync(
+            RuntimeStateDocument state,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException(new IOException("Could not write state.json."));
+    }
+
+    private sealed class FailingLoginStartupManager : ILoginStartupManager
+    {
+        public ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(false);
+
+        public ValueTask SetEnabledAsync(bool enabled, CancellationToken cancellationToken) =>
+            ValueTask.FromException(new IOException("Could not update the Run key."));
+    }
+
+    private sealed class ImmediateCountingRouter : IMediaRouter
+    {
+        private readonly object sync = new();
+        private TaskCompletionSource changed = NewSignal();
+
+        public int CallCount { get; private set; }
+
+        public ValueTask<RouterResult> DispatchAsync(
+            RouterIntent intent,
+            CancellationToken cancellationToken)
+        {
+            int revision;
+            lock (sync)
+            {
+                CallCount++;
+                revision = CallCount;
+                changed.TrySetResult();
+                changed = NewSignal();
+            }
+
+            return ValueTask.FromResult(new RouterResult(
+                RouterState.Initial with { Revision = revision },
+                intent is RouterIntent.Route route
+                    ? new RouteDecision(
+                        RouteDecisionKind.Routed,
+                        RouteReason.WindowsCurrentSession,
+                        route.Command)
+                    : RouteDecision.StateUpdated));
+        }
+
+        public async Task<bool> TryWaitForCallCountAsync(int expected, TimeSpan timeout)
+        {
+            try
+            {
+                while (true)
+                {
+                    Task signal;
+                    lock (sync)
+                    {
+                        if (CallCount >= expected)
+                        {
+                            return true;
+                        }
+
+                        signal = changed.Task;
+                    }
+
+                    await signal.WaitAsync(timeout);
+                }
+            }
+            catch (TimeoutException)
+            {
+                return false;
+            }
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        private static TaskCompletionSource NewSignal() => new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class BlockingRouteDiagnosticLog : IDiagnosticLog
+    {
+        private readonly TaskCompletionSource started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource released = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Started => started.Task;
+
+        public async ValueTask WriteAsync(
+            DiagnosticEvent diagnosticEvent,
+            CancellationToken cancellationToken)
+        {
+            if (diagnosticEvent.Name != "route.completed")
+            {
+                return;
+            }
+
+            started.TrySetResult();
+            await released.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Release() => released.TrySetResult();
+    }
+
+    private sealed class RecordingIntentRouter : IMediaRouter
+    {
+        public List<RouterIntent> Intents { get; } = [];
+
+        public ValueTask<RouterResult> DispatchAsync(
+            RouterIntent intent,
+            CancellationToken cancellationToken)
+        {
+            Intents.Add(intent);
+            return ValueTask.FromResult(new RouterResult(
+                RouterState.Initial with { Revision = Intents.Count },
+                RouteDecision.StateUpdated));
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

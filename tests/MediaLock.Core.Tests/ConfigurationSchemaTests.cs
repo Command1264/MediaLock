@@ -7,6 +7,14 @@ namespace MediaLock.Core.Tests;
 public sealed class ConfigurationSchemaTests
 {
     [Fact]
+    public void DefaultSettingsEnableCloseToTrayButNotLoginStartup()
+    {
+        Assert.Equal(2, MediaLockSettings.CurrentSchemaVersion);
+        Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
+        Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
+    }
+
+    [Fact]
     public void InvalidSettingsReturnActionableValidationIssues()
     {
         var settings = new MediaLockSettings(
@@ -14,14 +22,15 @@ public sealed class ConfigurationSchemaTests
             DefaultRoutingMode: RoutingMode.AppLock,
             Recovery: new RecoverySettings(
                 Timeout: TimeSpan.FromMilliseconds(-1),
-                FallbackPolicy.DisableRouting));
+                FallbackPolicy.DisableRouting),
+            Desktop: MediaLockSettings.Default.Desktop);
 
         var issues = settings.Validate();
 
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 1, but found 99.");
+            issue.Message == "Expected schema version 2, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
@@ -100,12 +109,28 @@ public sealed class ConfigurationSchemaTests
         var settings = new MediaLockSettings(
             MediaLockSettings.CurrentSchemaVersion,
             RoutingMode.WindowsAuto,
-            Recovery: null);
+            Recovery: null,
+            Desktop: MediaLockSettings.Default.Desktop);
 
         var issues = settings.Validate();
 
         var issue = Assert.Single(issues);
         Assert.Equal("recovery", issue.Path);
         Assert.Equal("Recovery settings are required.", issue.Message);
+    }
+
+    [Fact]
+    public void MissingDesktopSettingsReturnActionableValidationIssue()
+    {
+        var settings = new MediaLockSettings(
+            MediaLockSettings.CurrentSchemaVersion,
+            RoutingMode.WindowsAuto,
+            MediaLockSettings.Default.Recovery,
+            Desktop: null);
+
+        var issue = Assert.Single(settings.Validate());
+
+        Assert.Equal("desktop", issue.Path);
+        Assert.Equal("Desktop settings are required.", issue.Message);
     }
 }

@@ -9,6 +9,21 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public async Task SettingsCommandUsesTheDesktopNavigationSeam()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        var opened = 0;
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            showSettings: () => opened++);
+
+        await viewModel.SettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, opened);
+    }
+
+    [Fact]
     public async Task SessionSelectionCanBeLockedThroughTheApplicationSeam()
     {
         var session = new MediaSessionSnapshot(

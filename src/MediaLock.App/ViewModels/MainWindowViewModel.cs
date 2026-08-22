@@ -21,11 +21,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public MainWindowViewModel(
         IMediaLockApplication application,
-        SynchronizationContext? synchronizationContext = null)
+        SynchronizationContext? synchronizationContext = null,
+        Action? showSettings = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
+        Settings = new SettingsViewModel(application, synchronizationContext);
+        SettingsCommand = new AsyncCommand(_ =>
+        {
+            showSettings?.Invoke();
+            return Task.CompletedTask;
+        });
         lockCommand = new AsyncCommand(
             LockSelectedAsync,
             _ => SelectedSession is not null);
@@ -56,6 +63,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
+
+    public SettingsViewModel Settings { get; }
+
+    public IAsyncCommand SettingsCommand { get; }
 
     public SessionItemViewModel? SelectedSession
     {
@@ -122,6 +133,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         application.StateChanged -= OnApplicationStateChanged;
+        Settings.Dispose();
         disposed = true;
     }
 

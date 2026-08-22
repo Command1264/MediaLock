@@ -7,19 +7,27 @@ public sealed record RecoverySettings(
     TimeSpan Timeout,
     FallbackPolicy FallbackPolicy);
 
+public sealed record DesktopSettings(
+    bool CloseToTray,
+    bool StartWithWindows);
+
 public sealed record MediaLockSettings(
     int SchemaVersion,
     RoutingMode DefaultRoutingMode,
-    RecoverySettings? Recovery)
+    RecoverySettings? Recovery,
+    DesktopSettings? Desktop = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
         RoutingMode.WindowsAuto,
         new RecoverySettings(
             TimeSpan.FromSeconds(15),
-            FallbackPolicy.SameApplicationThenWindowsCurrentSession));
+            FallbackPolicy.SameApplicationThenWindowsCurrentSession),
+        new DesktopSettings(
+            CloseToTray: true,
+            StartWithWindows: false));
 
     public ImmutableArray<ConfigurationIssue> Validate()
     {
@@ -59,6 +67,13 @@ public sealed record MediaLockSettings(
             issues.Add(new ConfigurationIssue(
                 "defaultRoutingMode",
                 $"Unknown routing mode value {(int)DefaultRoutingMode}."));
+        }
+
+        if (Desktop is null)
+        {
+            issues.Add(new ConfigurationIssue(
+                "desktop",
+                "Desktop settings are required."));
         }
 
         return issues.ToImmutable();

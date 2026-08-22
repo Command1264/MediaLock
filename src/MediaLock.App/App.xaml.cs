@@ -1,7 +1,14 @@
 using System.Windows;
+using System.ComponentModel;
+using MediaLock.App.Tray;
 using MediaLock.App.ViewModels;
+using MediaLock.Core.Lifecycle;
 using MediaLock.Core.Routing;
+using MediaLock.Windows.Lifecycle;
+using MediaLock.Windows.Persistence;
+using MediaLock.Windows.Startup;
 using MediaLock.Windows.Gsmtc;
+using MediaLock.Windows.Diagnostics;
 
 namespace MediaLock.App;
 
@@ -9,35 +16,100 @@ public partial class App : System.Windows.Application
 {
     private MediaLock.Application.MediaLockApplication? mediaApplication;
     private MainWindowViewModel? mainWindowViewModel;
+    private TrayViewModel? trayViewModel;
+    private TrayIconHost? trayIconHost;
+    private NamedPipeInstanceCoordinator? instanceCoordinator;
+    private Window? mainWindow;
+    private SettingsWindow? settingsWindow;
+    private bool explicitExit;
+    private bool shutdownStarted;
+    private bool hideAnimationRunning;
+    private JsonLinesDiagnosticLog? diagnosticLog;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        var adapter = new GsmtcMediaAdapter();
-        var router = new MediaRouter(adapter);
-        mediaApplication = new MediaLock.Application.MediaLockApplication(adapter, router);
 
         try
         {
+            instanceCoordinator = new NamedPipeInstanceCoordinator();
+            instanceCoordinator.ActivationRequested += OnActivationRequested;
+            var instance = await instanceCoordinator.StartAsync(CancellationToken.None);
+            if (instance != InstanceStartResult.Primary)
+            {
+                await instanceCoordinator.DisposeAsync();
+                instanceCoordinator = null;
+                Shutdown();
+                return;
+            }
+
+            var adapter = new GsmtcMediaAdapter();
+            var router = new MediaRouter(adapter);
+            diagnosticLog = new JsonLinesDiagnosticLog();
+            mediaApplication = new MediaLock.Application.MediaLockApplication(
+                adapter,
+                router,
+                new JsonSettingsRepository(),
+                new RegistryLoginStartupManager(),
+                new JsonRuntimeStateRepository(),
+                diagnosticLog);
             await mediaApplication.StartAsync(CancellationToken.None);
             mainWindowViewModel = new MainWindowViewModel(
                 mediaApplication,
-                SynchronizationContext.Current);
+                SynchronizationContext.Current,
+                ShowSettingsWindow);
             var window = new MainWindow(mainWindowViewModel);
+            mainWindow = window;
             MainWindow = window;
+            window.Closing += OnMainWindowClosing;
             window.Closed += OnMainWindowClosed;
-            window.Show();
+            trayViewModel = new TrayViewModel(
+                mediaApplication,
+                ShowMainWindow,
+                ExitApplication,
+                SynchronizationContext.Current,
+                ShowSettingsWindow);
+            trayIconHost = new TrayIconHost(trayViewModel);
+            if (!e.Args.Contains("--startup", StringComparer.OrdinalIgnoreCase))
+            {
+                ShowMainWindow();
+            }
         }
         catch (Exception exception)
         {
-            MessageBox.Show(
-                $"Media Lock could not start GSMTC.\n\n{exception.Message}",
+            var details = exception.Message;
+            try
+            {
+                await ShutdownAsync();
+            }
+            catch (Exception cleanupException)
+            {
+                details += $"\n\nCleanup also failed: {cleanupException.Message}";
+            }
+
+            System.Windows.MessageBox.Show(
+                $"Media Lock could not start.\n\n{details}",
                 "Media Lock startup error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
-            await mediaApplication.DisposeAsync();
-            mediaApplication = null;
             Shutdown(1);
+        }
+    }
+
+    private void OnMainWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (!explicitExit &&
+            mediaApplication?.State.Settings.Desktop?.CloseToTray == true)
+        {
+            e.Cancel = true;
+            settingsWindow?.Hide();
+            if (mainWindow is not null && !hideAnimationRunning)
+            {
+                hideAnimationRunning = true;
+                WindowAnimations.HideWithFade(
+                    mainWindow,
+                    () => hideAnimationRunning = false);
+            }
         }
     }
 
@@ -45,22 +117,17 @@ public partial class App : System.Windows.Application
     {
         if (sender is Window window)
         {
+            window.Closing -= OnMainWindowClosing;
             window.Closed -= OnMainWindowClosed;
         }
 
-        mainWindowViewModel?.Dispose();
-        mainWindowViewModel = null;
-
         try
         {
-            if (mediaApplication is not null)
-            {
-                await mediaApplication.DisposeAsync();
-            }
+            await ShutdownAsync();
         }
         catch (Exception exception)
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 $"Media Lock could not shut down cleanly.\n\n{exception.Message}",
                 "Media Lock shutdown error",
                 MessageBoxButton.OK,
@@ -68,8 +135,187 @@ public partial class App : System.Windows.Application
         }
         finally
         {
-            mediaApplication = null;
             Shutdown();
+        }
+    }
+
+    private void ShowMainWindow()
+    {
+        if (mainWindow is null)
+        {
+            return;
+        }
+
+        if (hideAnimationRunning)
+        {
+            hideAnimationRunning = false;
+            WindowAnimations.ShowWithFade(mainWindow);
+        }
+        else if (!mainWindow.IsVisible)
+        {
+            WindowAnimations.ShowWithFade(mainWindow);
+        }
+
+        if (mainWindow.WindowState == WindowState.Minimized)
+        {
+            mainWindow.WindowState = WindowState.Normal;
+        }
+
+        mainWindow.Activate();
+    }
+
+    private void ShowSettingsWindow()
+    {
+        if (mainWindowViewModel is null)
+        {
+            return;
+        }
+
+        ShowMainWindow();
+
+        if (settingsWindow is null)
+        {
+            settingsWindow = new SettingsWindow(mainWindowViewModel.Settings)
+            {
+                Owner = mainWindow,
+            };
+            settingsWindow.Closed += OnSettingsWindowClosed;
+        }
+
+        if (!settingsWindow.IsVisible)
+        {
+            WindowAnimations.ShowWithFade(settingsWindow);
+        }
+
+        if (settingsWindow.WindowState == WindowState.Minimized)
+        {
+            settingsWindow.WindowState = WindowState.Normal;
+        }
+
+        settingsWindow.Activate();
+    }
+
+    private void OnSettingsWindowClosed(object? sender, EventArgs e)
+    {
+        if (sender is SettingsWindow window)
+        {
+            window.Closed -= OnSettingsWindowClosed;
+        }
+
+        settingsWindow = null;
+    }
+
+    private void ExitApplication()
+    {
+        explicitExit = true;
+        mainWindow?.Close();
+    }
+
+    private void OnActivationRequested(object? sender, EventArgs e) =>
+        Dispatcher.InvokeAsync(ShowMainWindow);
+
+    private async ValueTask ShutdownAsync()
+    {
+        if (shutdownStarted)
+        {
+            return;
+        }
+
+        shutdownStarted = true;
+        var failures = new List<Exception>();
+        try
+        {
+            trayIconHost?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        trayIconHost = null;
+        try
+        {
+            trayViewModel?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        trayViewModel = null;
+        if (settingsWindow is not null)
+        {
+            try
+            {
+                settingsWindow.Closed -= OnSettingsWindowClosed;
+                settingsWindow.Close();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            settingsWindow = null;
+        }
+
+        try
+        {
+            mainWindowViewModel?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        mainWindowViewModel = null;
+        mainWindow = null;
+
+        if (mediaApplication is not null)
+        {
+            try
+            {
+                await mediaApplication.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            mediaApplication = null;
+        }
+
+        if (diagnosticLog is not null)
+        {
+            try
+            {
+                await diagnosticLog.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            diagnosticLog = null;
+        }
+
+        if (instanceCoordinator is not null)
+        {
+            instanceCoordinator.ActivationRequested -= OnActivationRequested;
+            try
+            {
+                await instanceCoordinator.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            instanceCoordinator = null;
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException("One or more Media Lock resources failed to shut down.", failures);
         }
     }
 }
