@@ -51,6 +51,16 @@ settings and runtime state, interactive commands submit source application ident
 main/tray ViewModels distinguish `App Locked` from Session Lock. Existing Core tests own the deterministic
 playing/recency/stable-key candidate policy.
 
+Phase 5B tests Priority Rules through the same public seams. Core coverage proves enabled-rule ordering, the
+Windows Current Session fallback and invalid duplicates. Application coverage proves startup without a persisted
+Locked Target, interactive activation and persistence of every successful explicit Routing Mode as the startup
+mode, including preservation of the prior startup mode when settings or Locked Target persistence fails. Settings
+tests cover its read-only startup-mode projection, preservation of unsaved edits during a mode-only update, plus Priority Rule add,
+enable/disable, move, remove and schema-v3 round trips, including v1/v2 migration. Main/tray ViewModels expose the
+mode explicitly; tray Windows Auto remains a current-run action.
+Application regression coverage also keeps runtime autosave suppressed after that tray override across later media
+commands, and restores the prior runtime document if the startup-settings commit fails.
+
 ### Integration tests
 
 Cover:
@@ -115,6 +125,17 @@ Recorded production-boundary evidence: [Phase 3 manual smoke — 2026-08-22](pha
    restored without binding a different source application.
 
 Record results in [Phase 5A manual smoke](phase-5/manual-smoke.md).
+
+### Phase 5B Priority Rules smoke test
+
+1. Add the ordinary Brave source below the Brave YouTube Music PWA source and save. Activate `Priority Rules` on
+   the main window, restart, and verify the UI, tray and read-only Settings summary show `Priority Rules`.
+2. With both sources available, route Play/Pause and verify only YouTube Music changes once.
+3. Disable or remove the YouTube Music rule, save and restart; verify ordinary YouTube now receives one command.
+4. Make every enabled rule unavailable while another Windows Current Session exists; verify that current Session
+   receives one command and Media Lock remains in `Priority Rules`.
+
+Record results in [Phase 5B manual smoke](phase-5/priority-rules-smoke.md).
 
 ## 4. Compatibility matrix
 

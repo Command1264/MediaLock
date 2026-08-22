@@ -14,7 +14,11 @@ public abstract record ApplicationIntent
 
     public sealed record LockApplication(string SourceAppUserModelId) : ApplicationIntent;
 
+    public sealed record UsePriorityRules : ApplicationIntent;
+
     public sealed record UseWindowsAuto : ApplicationIntent;
+
+    public sealed record UseWindowsAutoForCurrentRun : ApplicationIntent;
 
     public sealed record Route(MediaCommand Command) : ApplicationIntent;
 

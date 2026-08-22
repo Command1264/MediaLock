@@ -79,7 +79,9 @@ and optional browser integration as separately scoped work.
 
 Implementation note: App Lock is delivered before Priority Rules. It persists source application identity, reuses
 one deterministic candidate policy for interactive and startup resolution, and remains distinct from Session Lock.
-Priority Rules and every optional media/browser feature use later independent branches.
+Priority Rules use an ordered, enabled list of exact source application identities. The first available match wins,
+same-application selection reuses App Lock policy, and no match falls back to Windows Current Session. Every optional
+media/browser feature uses a later independent branch.
 
 Exit criteria:
 

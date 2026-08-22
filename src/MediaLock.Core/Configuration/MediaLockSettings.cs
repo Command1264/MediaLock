@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Core.Configuration;
@@ -11,13 +12,24 @@ public sealed record DesktopSettings(
     bool CloseToTray,
     bool StartWithWindows);
 
+[method: JsonConstructor]
 public sealed record MediaLockSettings(
     int SchemaVersion,
     RoutingMode DefaultRoutingMode,
     RecoverySettings? Recovery,
-    DesktopSettings? Desktop = null)
+    DesktopSettings? Desktop,
+    ImmutableArray<PriorityRule> PriorityRules)
 {
-    public const int CurrentSchemaVersion = 2;
+    public MediaLockSettings(
+        int SchemaVersion,
+        RoutingMode DefaultRoutingMode,
+        RecoverySettings? Recovery,
+        DesktopSettings? Desktop = null)
+        : this(SchemaVersion, DefaultRoutingMode, Recovery, Desktop, [])
+    {
+    }
+
+    public const int CurrentSchemaVersion = 3;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -27,7 +39,8 @@ public sealed record MediaLockSettings(
             FallbackPolicy.SameApplicationThenWindowsCurrentSession),
         new DesktopSettings(
             CloseToTray: true,
-            StartWithWindows: false));
+            StartWithWindows: false),
+        []);
 
     public ImmutableArray<ConfigurationIssue> Validate()
     {
@@ -74,6 +87,35 @@ public sealed record MediaLockSettings(
             issues.Add(new ConfigurationIssue(
                 "desktop",
                 "Desktop settings are required."));
+        }
+
+        if (PriorityRules.IsDefault)
+        {
+            issues.Add(new ConfigurationIssue(
+                "priorityRules",
+                "Priority Rules must be present."));
+        }
+        else
+        {
+            var sourceApplications = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < PriorityRules.Length; index++)
+            {
+                var rule = PriorityRules[index];
+                if (rule is null || string.IsNullOrWhiteSpace(rule.SourceAppUserModelId))
+                {
+                    issues.Add(new ConfigurationIssue(
+                        $"priorityRules[{index}].sourceAppUserModelId",
+                        "Priority Rule source application ID must not be blank."));
+                    continue;
+                }
+
+                if (!sourceApplications.Add(rule.SourceAppUserModelId))
+                {
+                    issues.Add(new ConfigurationIssue(
+                        $"priorityRules[{index}].sourceAppUserModelId",
+                        $"Priority Rule source application ID '{rule.SourceAppUserModelId}' is duplicated."));
+                }
+            }
         }
 
         return issues.ToImmutable();

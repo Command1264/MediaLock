@@ -27,11 +27,13 @@ public sealed record RuntimeStateDocument(
                 "routingMode",
                 $"Unknown routing mode value {(int)Mode}."));
         }
-        else if (Mode == RoutingMode.WindowsAuto && LockedTarget is not null)
+        else if (Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules && LockedTarget is not null)
         {
             issues.Add(new ConfigurationIssue(
                 "lockedTarget",
-                "Windows Auto runtime state must not contain a Locked Target."));
+                Mode == RoutingMode.WindowsAuto
+                    ? "Windows Auto runtime state must not contain a Locked Target."
+                    : "Priority Rules runtime state must not contain a Locked Target."));
         }
         else if (Mode is RoutingMode.AppLock or RoutingMode.SessionLock && LockedTarget is null)
         {

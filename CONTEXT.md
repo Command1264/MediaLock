@@ -14,8 +14,16 @@ Windows 目前判定最適合接收媒體控制的 Media Session；它可以隨�
 _Avoid_: Active player, default player
 
 **Routing Mode**:
-決定 Media Lock 如何選擇控制目標的使用者策略；正式值為 Windows Auto、App Lock 與 Session Lock。
+決定 Media Lock 如何選擇控制目標的使用者策略；正式值為 Windows Auto、Priority Rules、App Lock 與 Session Lock。
 _Avoid_: Control mode, lock type
+
+**Priority Rule**:
+Priority Rules 中一條可啟用、具順序的來源應用程式偏好；第一條目前可解析的偏好具有最高優先權。
+_Avoid_: Filter, automatic lock
+
+**Priority Rules**:
+依 Priority Rule 順序選擇控制目標的 Routing Mode；沒有規則可解析時使用 Windows Current Session。
+_Avoid_: Smart mode, rule engine
 
 **App Lock**:
 將來源應用程式身分保存為 Locked Target，並在該應用程式目前可用的 Media Sessions 中依明確候選政策選擇控制目標；它不承諾歌曲、瀏覽器 URL 或單一 Session 的連續性。

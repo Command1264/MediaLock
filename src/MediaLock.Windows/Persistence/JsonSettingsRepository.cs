@@ -58,12 +58,15 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                 stream,
                 SerializerOptions,
                 cancellationToken);
-            if (settings?.SchemaVersion == 1)
+            if (settings?.SchemaVersion is 1 or 2)
             {
                 settings = settings with
                 {
                     SchemaVersion = MediaLockSettings.CurrentSchemaVersion,
-                    Desktop = MediaLockSettings.Default.Desktop,
+                    Desktop = settings.SchemaVersion == 1
+                        ? MediaLockSettings.Default.Desktop
+                        : settings.Desktop,
+                    PriorityRules = [],
                 };
             }
 

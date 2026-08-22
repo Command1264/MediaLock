@@ -12,6 +12,332 @@ namespace MediaLock.Application.Tests;
 public sealed class MediaLockApplicationTests
 {
     [Fact]
+    public async Task PriorityRulesDefaultActivatesWithoutPersistedLockedTarget()
+    {
+        var preferred = Session("preferred", "music");
+        var current = Session("current", "browser");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([current, preferred], current.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+
+        await application.StartAsync(CancellationToken.None);
+        var routed = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, application.State.Router.Mode);
+        Assert.Equal(preferred.Key, routed.Decision.Target);
+        Assert.Equal(RouteReason.PriorityRule, routed.Decision.Reason);
+    }
+
+    [Fact]
+    public async Task ActivatingPriorityRulesPersistsItAsTheStartupRoutingMode()
+    {
+        var session = Session("music", "music");
+        var settings = MediaLockSettings.Default with
+        {
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var settingsRepository = new RecordingSettingsRepository(settings);
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager());
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UsePriorityRules(),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
+        Assert.Equal(session.Key, result.State.Router.ActiveTarget);
+        var saved = Assert.Single(settingsRepository.Saved);
+        Assert.Equal(RoutingMode.PriorityRules, saved.DefaultRoutingMode);
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Settings.DefaultRoutingMode);
+    }
+
+    [Fact]
+    public async Task ActivatingWindowsAutoPersistsItAsTheStartupRoutingMode()
+    {
+        var session = Session("music", "music");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+        };
+        var settingsRepository = new RecordingSettingsRepository(settings);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager());
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UseWindowsAuto(),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.WindowsAuto, result.State.Router.Mode);
+        var saved = Assert.Single(settingsRepository.Saved);
+        Assert.Equal(RoutingMode.WindowsAuto, saved.DefaultRoutingMode);
+        Assert.Equal(RoutingMode.WindowsAuto, result.State.Settings.DefaultRoutingMode);
+    }
+
+    [Fact]
+    public async Task UsingWindowsAutoForCurrentRunDoesNotReplaceTheStartupRoutingMode()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var session = Session("music", "music");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.AppLock,
+        };
+        var settingsRepository = new RecordingSettingsRepository(settings);
+        var runtimeStateRepository = new RecordingRuntimeStateRepository(new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.AppLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "music",
+                null,
+                PlaybackStatus.Playing,
+                observedAt,
+                MediaPlaybackType.Unknown,
+                null,
+                null))));
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            runtimeStateRepository);
+        await application.StartAsync(CancellationToken.None);
+        var runtimeSaveCount = runtimeStateRepository.Saved.Count;
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UseWindowsAutoForCurrentRun(),
+            CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.WindowsAuto, result.State.Router.Mode);
+        Assert.Equal(RoutingMode.AppLock, result.State.Settings.DefaultRoutingMode);
+        Assert.Empty(settingsRepository.Saved);
+        Assert.Equal(runtimeSaveCount, runtimeStateRepository.Saved.Count);
+        Assert.NotNull(runtimeStateRepository.Loaded.LockedTarget);
+    }
+
+    [Fact]
+    public async Task StartupSettingsFailureRestoresAPreviouslyPersistedLockTarget()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.AppLock,
+        };
+        var persistedAppLock = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.AppLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "Brave",
+                null,
+                PlaybackStatus.Playing,
+                observedAt,
+                MediaPlaybackType.Unknown,
+                null,
+                null)));
+        var runtimeStateRepository = new RecordingRuntimeStateRepository(persistedAppLock);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new FailingSaveSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            runtimeStateRepository);
+        await application.StartAsync(CancellationToken.None);
+        var runtimeSaveCount = runtimeStateRepository.Saved.Count;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => application.DispatchAsync(
+            new ApplicationIntent.UsePriorityRules(),
+            CancellationToken.None).AsTask());
+        var persistenceError = application.State.ErrorMessage;
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, application.State.Router.Mode);
+        Assert.Equal(RoutingMode.AppLock, application.State.Settings.DefaultRoutingMode);
+        Assert.Equal(runtimeSaveCount + 2, runtimeStateRepository.Saved.Count);
+        Assert.Equal(persistedAppLock, runtimeStateRepository.Saved.Last());
+        Assert.Contains(
+            "previous runtime state was restored",
+            persistenceError,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LockingAnApplicationPersistsAppLockAsTheStartupRoutingMode()
+    {
+        var session = Session("music", "Brave");
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        var runtimeStateRepository = new RecordingRuntimeStateRepository();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            runtimeStateRepository);
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.LockApplication("Brave"),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.AppLock, result.State.Router.Mode);
+        var savedSettings = Assert.Single(settingsRepository.Saved);
+        Assert.Equal(RoutingMode.AppLock, savedSettings.DefaultRoutingMode);
+        var savedRuntimeState = runtimeStateRepository.Saved.Last();
+        Assert.Equal(RoutingMode.AppLock, savedRuntimeState.Mode);
+        Assert.Equal("Brave", savedRuntimeState.LockedTarget?.Fingerprint.SourceAppUserModelId);
+    }
+
+    [Fact]
+    public async Task LockingASessionPersistsSessionLockAsTheStartupRoutingMode()
+    {
+        var session = Session("music", "Brave");
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        var runtimeStateRepository = new RecordingRuntimeStateRepository();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            runtimeStateRepository);
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.LockSession(session.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.SessionLock, result.State.Router.Mode);
+        var savedSettings = Assert.Single(settingsRepository.Saved);
+        Assert.Equal(RoutingMode.SessionLock, savedSettings.DefaultRoutingMode);
+        var savedRuntimeState = runtimeStateRepository.Saved.Last();
+        Assert.Equal(RoutingMode.SessionLock, savedRuntimeState.Mode);
+        Assert.Equal("Brave", savedRuntimeState.LockedTarget?.Fingerprint.SourceAppUserModelId);
+    }
+
+    [Fact]
+    public async Task FailedSessionLockDoesNotReplaceTheStartupRoutingMode()
+    {
+        var session = Session("music", "Brave");
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => application.DispatchAsync(
+            new ApplicationIntent.LockSession(new SessionKey("missing")),
+            CancellationToken.None).AsTask());
+
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Settings.DefaultRoutingMode);
+        Assert.Empty(settingsRepository.Saved);
+    }
+
+    [Fact]
+    public async Task RuntimePersistenceFailureDoesNotSaveALockAsTheStartupRoutingMode()
+    {
+        var session = Session("music", "Brave");
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        var runtimeStateRepository = new FailingRuntimeStateRepository();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            runtimeStateRepository);
+        await application.StartAsync(CancellationToken.None);
+        var runtimeSaveAttempts = runtimeStateRepository.SaveAttempts;
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.LockApplication("Brave"),
+            CancellationToken.None);
+        var persistenceError = result.State.ErrorMessage;
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.AppLock, result.State.Router.Mode);
+        Assert.Equal(RoutingMode.WindowsAuto, result.State.Settings.DefaultRoutingMode);
+        Assert.Empty(settingsRepository.Saved);
+        Assert.Equal(runtimeSaveAttempts + 1, runtimeStateRepository.SaveAttempts);
+        Assert.Contains("state.json", persistenceError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StartupSettingsFailureKeepsTheCurrentRunChangeAndPriorStartupMode()
+    {
+        var session = Session("music", "Brave");
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new FailingSaveSettingsRepository(MediaLockSettings.Default),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => application.DispatchAsync(
+            new ApplicationIntent.UsePriorityRules(),
+            CancellationToken.None).AsTask());
+
+        Assert.Equal(RoutingMode.PriorityRules, application.State.Router.Mode);
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Settings.DefaultRoutingMode);
+        Assert.Contains("startup mode could not be saved", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("settings.json", application.State.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TargetlessStartupModePreservesARuntimePersistenceError()
+    {
+        var session = Session("music", "Brave");
+        var settingsRepository = new RecordingSettingsRepository(MediaLockSettings.Default);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository,
+            new RecordingLoginStartupManager(),
+            new FailingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UsePriorityRules(),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Settings.DefaultRoutingMode);
+        Assert.Contains("state.json", result.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(RoutingMode.PriorityRules, Assert.Single(settingsRepository.Saved).DefaultRoutingMode);
+    }
+
+    [Fact]
     public async Task LoadedRecoverySettingsConfigureTheRouterBeforeCatalogProcessing()
     {
         var session = Session("music", "Brave");
@@ -784,6 +1110,21 @@ public sealed class MediaLockApplicationTests
         }
     }
 
+    private sealed class FailingSaveSettingsRepository(MediaLockSettings initial) : ISettingsRepository
+    {
+        public ValueTask<ConfigurationLoadResult<MediaLockSettings>> LoadAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ConfigurationLoadResult<MediaLockSettings>(
+                initial,
+                UsedDefaults: false,
+                Issues: []));
+
+        public ValueTask SaveAsync(
+            MediaLockSettings settings,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException(new IOException("Could not write settings.json."));
+    }
+
     private sealed class RecordingLoginStartupManager : ILoginStartupManager
     {
         public List<bool> Updates { get; } = [];
@@ -843,6 +1184,8 @@ public sealed class MediaLockApplicationTests
 
     private sealed class FailingRuntimeStateRepository : IRuntimeStateRepository
     {
+        public int SaveAttempts { get; private set; }
+
         public ValueTask<ConfigurationLoadResult<RuntimeStateDocument>> LoadAsync(
             CancellationToken cancellationToken) =>
             ValueTask.FromResult(new ConfigurationLoadResult<RuntimeStateDocument>(
@@ -855,8 +1198,11 @@ public sealed class MediaLockApplicationTests
 
         public ValueTask SaveAsync(
             RuntimeStateDocument state,
-            CancellationToken cancellationToken) =>
-            ValueTask.FromException(new IOException("Could not write state.json."));
+            CancellationToken cancellationToken)
+        {
+            SaveAttempts++;
+            return ValueTask.FromException(new IOException("Could not write state.json."));
+        }
     }
 
     private sealed class FailingLoginStartupManager : ILoginStartupManager
