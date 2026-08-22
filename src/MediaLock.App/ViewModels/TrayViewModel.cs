@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using MediaLock.App.Localization;
 using MediaLock.Application;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
@@ -48,6 +49,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         WindowsAutoCommand = new AsyncCommand(_ => DispatchAsync(
             new ApplicationIntent.UseWindowsAutoForCurrentRun()));
         application.StateChanged += OnApplicationStateChanged;
+        UiText.CultureChanged += OnCultureChanged;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -104,6 +106,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         }
 
         application.StateChanged -= OnApplicationStateChanged;
+        UiText.CultureChanged -= OnCultureChanged;
         disposed = true;
     }
 
@@ -138,22 +141,35 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         StatusText = next;
     }
 
+    private void OnCultureChanged(object? sender, EventArgs args)
+    {
+        var next = Describe(application.State);
+        if (synchronizationContext is not null &&
+            SynchronizationContext.Current != synchronizationContext)
+        {
+            synchronizationContext.Post(_ => StatusText = next, null);
+            return;
+        }
+
+        StatusText = next;
+    }
+
     private static string Describe(MediaLockApplicationState state) => state.CatalogStatus switch
     {
-        MediaSessionCatalogStatus.Suspended => "Suspended",
-        MediaSessionCatalogStatus.Reacquiring => "Reacquiring",
-        MediaSessionCatalogStatus.Unavailable => "Unavailable",
+        MediaSessionCatalogStatus.Suspended => UiDescriptions.DescribeCatalogStatus(MediaSessionCatalogStatus.Suspended),
+        MediaSessionCatalogStatus.Reacquiring => UiDescriptions.DescribeCatalogStatus(MediaSessionCatalogStatus.Reacquiring),
+        MediaSessionCatalogStatus.Unavailable => UiDescriptions.DescribeCatalogStatus(MediaSessionCatalogStatus.Unavailable),
         _ => DescribeRouter(state.Router),
     };
 
     private static string DescribeRouter(RouterState state) => state.Status switch
     {
-        RouterStatus.Recovering => "Recovering",
-        RouterStatus.Locked when state.Mode == RoutingMode.AppLock => "App Locked",
-        _ when state.Mode == RoutingMode.PriorityRules => "Priority Rules",
-        RouterStatus.Locked => "Locked",
-        _ when state.Mode == RoutingMode.WindowsAuto => "Windows Auto",
-        _ => state.Status.ToString(),
+        RouterStatus.Recovering => UiDescriptions.DescribeRouterStatus(RouterStatus.Recovering),
+        RouterStatus.Locked when state.Mode == RoutingMode.AppLock => UiText.Get("Mode_AppLocked"),
+        _ when state.Mode == RoutingMode.PriorityRules => UiText.Get("Mode_PriorityRules"),
+        RouterStatus.Locked => UiDescriptions.DescribeRouterStatus(RouterStatus.Locked),
+        _ when state.Mode == RoutingMode.WindowsAuto => UiText.Get("Mode_WindowsAuto"),
+        _ => UiDescriptions.DescribeRouterStatus(state.Status),
     };
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>

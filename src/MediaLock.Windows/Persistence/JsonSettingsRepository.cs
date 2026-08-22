@@ -58,15 +58,21 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                 stream,
                 SerializerOptions,
                 cancellationToken);
-            if (settings?.SchemaVersion is 1 or 2)
+            if (settings?.SchemaVersion is >= 1 and <= 3)
             {
+                var sourceVersion = settings.SchemaVersion;
                 settings = settings with
                 {
                     SchemaVersion = MediaLockSettings.CurrentSchemaVersion,
-                    Desktop = settings.SchemaVersion == 1
+                    Desktop = sourceVersion == 1
                         ? MediaLockSettings.Default.Desktop
-                        : settings.Desktop,
-                    PriorityRules = [],
+                        : settings.Desktop is null
+                            ? null
+                            : settings.Desktop with
+                            {
+                                Language = UiLanguagePreference.System,
+                            },
+                    PriorityRules = sourceVersion <= 2 ? [] : settings.PriorityRules,
                 };
             }
 

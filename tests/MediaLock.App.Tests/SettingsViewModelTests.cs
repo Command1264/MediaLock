@@ -75,6 +75,7 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
+        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -82,19 +83,45 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
+        Assert.Equal(UiLanguagePreference.TraditionalChinese, intent.Settings.Desktop.Language);
         Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);
+    }
+
+    [Fact]
+    public void LanguageChoicesIncludeSystemEnglishAndTraditionalChinese()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+
+        Assert.Equal(
+            [
+                UiLanguagePreference.System,
+                UiLanguagePreference.EnglishUnitedStates,
+                UiLanguagePreference.TraditionalChinese,
+            ],
+            viewModel.Languages.Select(option => option.Value));
     }
 
     [Fact]
     public async Task SuccessfulSaveRequestsSettingsClose()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
-        var closeRequests = 0;
-        using var viewModel = new SettingsViewModel(application, requestClose: () => closeRequests++);
+        var callbacks = new List<string>();
+        string? appliedLanguage = null;
+        using var viewModel = new SettingsViewModel(
+            application,
+            requestClose: () => callbacks.Add("close"),
+            applyLanguage: language =>
+            {
+                appliedLanguage = language;
+                callbacks.Add("apply");
+            });
+        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
-        Assert.Equal(1, closeRequests);
+        Assert.Equal(["apply", "close"], callbacks);
+        Assert.Equal(UiLanguagePreference.TraditionalChinese, appliedLanguage);
     }
 
     [Fact]
@@ -105,11 +132,16 @@ public sealed class SettingsViewModelTests
             DispatchException = new InvalidOperationException("Settings could not be saved."),
         };
         var closeRequests = 0;
-        using var viewModel = new SettingsViewModel(application, requestClose: () => closeRequests++);
+        var languageApplyRequests = 0;
+        using var viewModel = new SettingsViewModel(
+            application,
+            requestClose: () => closeRequests++,
+            applyLanguage: _ => languageApplyRequests++);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         Assert.Equal(0, closeRequests);
+        Assert.Equal(0, languageApplyRequests);
         Assert.Equal("Settings could not be saved.", viewModel.ErrorMessage);
     }
 

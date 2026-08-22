@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="App_StartupFailed" xml:space="preserve"><value>Media Lock 無法啟動。</value></data>
+  <data name="App_StartupErrorTitle" xml:space="preserve"><value>Media Lock 啟動錯誤</value></data>
+  <data name="App_CleanupAlsoFailed" xml:space="preserve"><value>清理也失敗：{0}</value></data>
+  <data name="App_ShutdownFailed" xml:space="preserve"><value>Media Lock 無法正常關閉。</value></data>
+  <data name="App_ShutdownErrorTitle" xml:space="preserve"><value>Media Lock 關閉錯誤</value></data>
+  <data name="App_ShutdownAggregate" xml:space="preserve"><value>一或多個 Media Lock 資源無法正常關閉。</value></data>
+  <data name="Main_RoutingStatus" xml:space="preserve"><value>路由狀態</value></data>
+  <data name="Main_StatusFormat" xml:space="preserve"><value>狀態：{0}</value></data>
+  <data name="Main_CurrentTarget" xml:space="preserve"><value>目前媒體目標</value></data>
+  <data name="Main_OpenSettings" xml:space="preserve"><value>開啟 Media Lock 設定</value></data>
+  <data name="Main_Settings" xml:space="preserve"><value>⚙ 設定</value></data>
+  <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>
+  <data name="Main_MediaSessions" xml:space="preserve"><value>媒體工作階段</value></data>
+  <data name="Main_LockSession" xml:space="preserve"><value>鎖定工作階段</value></data>
+  <data name="Main_LockSessionAutomation" xml:space="preserve"><value>鎖定選取的媒體工作階段</value></data>
+  <data name="Main_LockApp" xml:space="preserve"><value>鎖定應用程式</value></data>
+  <data name="Main_LockAppAutomation" xml:space="preserve"><value>鎖定選取的來源應用程式</value></data>
+  <data name="Main_PriorityRulesAutomation" xml:space="preserve"><value>使用應用程式優先規則</value></data>
+  <data name="Main_WindowsAutoAutomation" xml:space="preserve"><value>使用 Windows 自動媒體目標</value></data>
+  <data name="Main_AvailableSessions" xml:space="preserve"><value>可用的媒體工作階段</value></data>
+  <data name="Main_NoSessions" xml:space="preserve"><value>沒有媒體工作階段</value></data>
+  <data name="Command_Previous" xml:space="preserve"><value>上一首</value></data>
+  <data name="Command_Play" xml:space="preserve"><value>播放</value></data>
+  <data name="Command_Pause" xml:space="preserve"><value>暫停</value></data>
+  <data name="Command_Toggle" xml:space="preserve"><value>播放／暫停</value></data>
+  <data name="Command_ToggleAutomation" xml:space="preserve"><value>切換播放與暫停</value></data>
+  <data name="Command_Next" xml:space="preserve"><value>下一首</value></data>
+  <data name="Command_Stop" xml:space="preserve"><value>停止</value></data>
+  <data name="Mode_WindowsAuto" xml:space="preserve"><value>Windows 自動</value></data>
+  <data name="Mode_PriorityRules" xml:space="preserve"><value>優先規則</value></data>
+  <data name="Mode_AppLock" xml:space="preserve"><value>應用程式鎖定</value></data>
+  <data name="Mode_AppLocked" xml:space="preserve"><value>已鎖定應用程式</value></data>
+  <data name="Mode_SessionLock" xml:space="preserve"><value>工作階段鎖定</value></data>
+  <data name="Status_Ready" xml:space="preserve"><value>就緒</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>已鎖定</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>正在復原</value></data>
+  <data name="Status_Fallback" xml:space="preserve"><value>已採用備援</value></data>
+  <data name="Status_Unavailable" xml:space="preserve"><value>無法使用</value></data>
+  <data name="Status_Suspended" xml:space="preserve"><value>已暫停</value></data>
+  <data name="Status_Reacquiring" xml:space="preserve"><value>正在重新取得</value></data>
+  <data name="Empty_Suspended" xml:space="preserve"><value>Windows 睡眠時，媒體工作階段會暫停。</value></data>
+  <data name="Empty_Reacquiring" xml:space="preserve"><value>Windows 喚醒後正在重新取得媒體工作階段。</value></data>
+  <data name="Empty_Unavailable" xml:space="preserve"><value>媒體工作階段目前無法使用。請喚醒 Windows 或重新啟動 Media Lock 後再試。</value></data>
+  <data name="Empty_Recovering" xml:space="preserve"><value>正在等待鎖定的媒體工作階段返回。</value></data>
+  <data name="Empty_Default" xml:space="preserve"><value>請在支援的應用程式中開始播放媒體。</value></data>
+  <data name="Target_WindowsUnavailable" xml:space="preserve"><value>Windows 目前的工作階段無法使用。</value></data>
+  <data name="Target_RulesUnavailable" xml:space="preserve"><value>沒有可用的優先規則或 Windows 目前工作階段。</value></data>
+  <data name="Target_LockedUnavailable" xml:space="preserve"><value>鎖定目標無法使用。</value></data>
+  <data name="Error_CommandNotCompleted" xml:space="preserve"><value>媒體命令未完成：{0}。</value></data>
+  <data name="Media_UnknownTitle" xml:space="preserve"><value>未知標題</value></data>
+  <data name="Media_UnknownArtist" xml:space="preserve"><value>未知演出者</value></data>
+  <data name="Playback_Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="Playback_Closed" xml:space="preserve"><value>已關閉</value></data>
+  <data name="Playback_Opened" xml:space="preserve"><value>已開啟</value></data>
+  <data name="Playback_Changing" xml:space="preserve"><value>正在切換</value></data>
+  <data name="Playback_Stopped" xml:space="preserve"><value>已停止</value></data>
+  <data name="Playback_Playing" xml:space="preserve"><value>播放中</value></data>
+  <data name="Playback_Paused" xml:space="preserve"><value>已暫停</value></data>
+  <data name="Settings_WindowTitle" xml:space="preserve"><value>Media Lock 設定</value></data>
+  <data name="Settings_Title" xml:space="preserve"><value>設定</value></data>
+  <data name="Settings_Description" xml:space="preserve"><value>選擇 Media Lock 在此 Windows 帳戶中的運作方式。</value></data>
+  <data name="Settings_General" xml:space="preserve"><value>一般</value></data>
+  <data name="Settings_CloseToTray" xml:space="preserve"><value>關閉主視窗時縮小至通知區域</value></data>
+  <data name="Settings_CloseToTrayAutomation" xml:space="preserve"><value>關閉視窗時縮小至通知區域</value></data>
+  <data name="Settings_StartWithWindows" xml:space="preserve"><value>登入 Windows 時啟動 Media Lock</value></data>
+  <data name="Settings_StartWithWindowsAutomation" xml:space="preserve"><value>讓 Media Lock 隨 Windows 啟動</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>顯示語言</value></data>
+  <data name="Settings_LanguageAutomation" xml:space="preserve"><value>Media Lock 顯示語言</value></data>
+  <data name="Settings_LanguageApply" xml:space="preserve"><value>儲存設定後會立即套用語言變更。</value></data>
+  <data name="Language_System" xml:space="preserve"><value>使用 Windows 語言</value></data>
+  <data name="Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Settings_RoutingRecovery" xml:space="preserve"><value>路由與復原</value></data>
+  <data name="Settings_StartupMode" xml:space="preserve"><value>啟動時路由模式</value></data>
+  <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>復原逾時（秒）</value></data>
+  <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>復原逾時秒數</value></data>
+  <data name="Settings_FallbackPolicy" xml:space="preserve"><value>備援政策</value></data>
+  <data name="Settings_RoutingHelp" xml:space="preserve"><value>啟動時會沿用主畫面最後選擇的路由模式。復原與優先規則變更會在 Media Lock 重新啟動後套用。優先規則會使用第一個可用且已啟用的應用程式，否則使用 Windows 目前工作階段。應用程式鎖定會還原已儲存的來源應用程式；工作階段鎖定只會還原唯一且明確相符的工作階段。</value></data>
+  <data name="Settings_PriorityRules" xml:space="preserve"><value>應用程式優先規則</value></data>
+  <data name="Settings_PriorityRulesHelp" xml:space="preserve"><value>從目前媒體工作階段清單加入來源應用程式。規則會由上而下評估，停用的規則會被略過。</value></data>
+  <data name="Settings_Add" xml:space="preserve"><value>新增</value></data>
+  <data name="Settings_AddRuleAutomation" xml:space="preserve"><value>新增選取的應用程式優先規則</value></data>
+  <data name="Settings_AvailableAppsAutomation" xml:space="preserve"><value>可用的來源應用程式</value></data>
+  <data name="Settings_RulesAutomation" xml:space="preserve"><value>應用程式優先規則</value></data>
+  <data name="Settings_EnableRuleAutomation" xml:space="preserve"><value>啟用應用程式優先規則</value></data>
+  <data name="Settings_MoveRuleUpAutomation" xml:space="preserve"><value>將應用程式優先規則向上移</value></data>
+  <data name="Settings_MoveRuleDownAutomation" xml:space="preserve"><value>將應用程式優先規則向下移</value></data>
+  <data name="Settings_RemoveRuleAutomation" xml:space="preserve"><value>移除應用程式優先規則</value></data>
+  <data name="Settings_Remove" xml:space="preserve"><value>移除</value></data>
+  <data name="Settings_ErrorAutomation" xml:space="preserve"><value>設定錯誤</value></data>
+  <data name="Settings_SaveAutomation" xml:space="preserve"><value>儲存 Media Lock 設定</value></data>
+  <data name="Settings_Save" xml:space="preserve"><value>儲存設定</value></data>
+  <data name="Fallback_Wait" xml:space="preserve"><value>等待</value></data>
+  <data name="Fallback_SameApplication" xml:space="preserve"><value>相同應用程式</value></data>
+  <data name="Fallback_WindowsCurrent" xml:space="preserve"><value>Windows 目前工作階段</value></data>
+  <data name="Fallback_SameApplicationThenWindows" xml:space="preserve"><value>相同應用程式，其次為 Windows 目前工作階段</value></data>
+  <data name="Fallback_DisableRouting" xml:space="preserve"><value>停用路由</value></data>
+  <data name="Tray_Show" xml:space="preserve"><value>顯示 Media Lock</value></data>
+  <data name="Tray_Settings" xml:space="preserve"><value>設定…</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>結束</value></data>
+  <data name="Tray_CommandFailed" xml:space="preserve"><value>Media Lock 命令失敗</value></data>
+</root>
