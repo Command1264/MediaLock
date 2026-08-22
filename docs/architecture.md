@@ -201,6 +201,13 @@ and delegates same-application choice to the App Lock candidate policy. With no 
 Session without changing to Windows Auto. Priority Rules have no Locked Target and therefore need no runtime-state
 identity; settings schema v1/v2 migrate to an empty rule list.
 
+Phase 7A advances settings to schema v4 by adding a desktop UI-language preference. Schema v1-v3 documents migrate
+to the Windows-language choice. The App project owns the localization module, culture resolution and WPF markup
+extension; Core stores and validates only the neutral preference values. Presentation strings, enum descriptions,
+accessibility names and notification-area labels resolve through the same resource manager. One culture is selected
+after settings load and before any ViewModel, window or tray surface is created; changing it in Settings applies on
+the next process start.
+
 ## 9. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

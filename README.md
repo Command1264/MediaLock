@@ -26,7 +26,8 @@ dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Rele
 
 關閉視窗預設只會隱藏至 Windows 通知區域；從托盤選單按 `Exit` 才會結束程式。設定頁可切換
 close-to-tray 與目前使用者的 Windows 登入啟動，也可設定 Recovery timeout、Fallback Policy 與
-Priority Rules。設定可由主視窗右上角或托盤選單開啟為獨立視窗；短淡入／隱藏動畫會遵循
+Priority Rules，並可選擇跟隨 Windows、英文或繁體中文介面。語言變更會在下次啟動時套用。
+設定可由主視窗右上角或托盤選單開啟為獨立視窗；短淡入／隱藏動畫會遵循
 Windows 的用戶端動畫設定。`Save settings` 成功後會關閉設定視窗；儲存失敗則保留視窗與錯誤訊息。
 使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
 有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。

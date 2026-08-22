@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using MediaLock.App.Localization;
 using MediaLock.Application;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
@@ -121,23 +122,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         MediaSessionCatalogStatus.Available
             when routerState.Mode == RoutingMode.AppLock && routerState.Status == RouterStatus.Locked =>
-                "App Locked",
+                UiText.Get("Mode_AppLocked"),
         MediaSessionCatalogStatus.Available when routerState.Mode == RoutingMode.PriorityRules =>
-            "Priority Rules",
-        MediaSessionCatalogStatus.Available => routerState.Status.ToString(),
-        var status => status.ToString(),
+            UiText.Get("Mode_PriorityRules"),
+        MediaSessionCatalogStatus.Available => UiDescriptions.DescribeRouterStatus(routerState.Status),
+        var status => UiDescriptions.DescribeCatalogStatus(status),
     };
+
+    public string RoutingStatusLine => UiText.Format("Main_StatusFormat", RoutingStatus);
 
     public bool HasSessions => Sessions.Count > 0;
 
     public string EmptyStateText => catalogStatus switch
     {
-        MediaSessionCatalogStatus.Suspended => "Media sessions are suspended while Windows sleeps.",
-        MediaSessionCatalogStatus.Reacquiring => "Reacquiring media sessions after Windows resumed.",
-        MediaSessionCatalogStatus.Unavailable => "Media sessions are unavailable. Resume Windows or restart Media Lock to retry.",
+        MediaSessionCatalogStatus.Suspended => UiText.Get("Empty_Suspended"),
+        MediaSessionCatalogStatus.Reacquiring => UiText.Get("Empty_Reacquiring"),
+        MediaSessionCatalogStatus.Unavailable => UiText.Get("Empty_Unavailable"),
         _ when routerState.Status == RouterStatus.Recovering =>
-            "Waiting for the locked Media Session to return.",
-        _ => "Start media playback in a supported application.",
+            UiText.Get("Empty_Recovering"),
+        _ => UiText.Get("Empty_Default"),
     };
 
     public string TargetDescription
@@ -147,10 +150,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             var target = ResolveTarget();
             return target is null
                 ? routerState.Mode == RoutingMode.WindowsAuto
-                    ? "Windows Current Session is unavailable."
+                    ? UiText.Get("Target_WindowsUnavailable")
                     : routerState.Mode == RoutingMode.PriorityRules
-                        ? "No Priority Rule or Windows Current Session is available."
-                        : "Locked Target is unavailable."
+                        ? UiText.Get("Target_RulesUnavailable")
+                        : UiText.Get("Target_LockedUnavailable")
                 : $"{target.SourceApplication} — {target.Title}";
         }
     }
@@ -205,7 +208,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                 result.Decision.Reason == RouteReason.ControlRejected)
             {
                 SetError(result.Decision.Error ??
-                    $"Media command was not completed: {result.Decision.Reason}.");
+                    UiText.Format("Error_CommandNotCompleted", result.Decision.Reason));
             }
         }
         catch (Exception exception)
@@ -257,6 +260,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(HasSessions));
         OnPropertyChanged(nameof(EmptyStateText));
         OnPropertyChanged(nameof(RoutingStatus));
+        OnPropertyChanged(nameof(RoutingStatusLine));
         OnPropertyChanged(nameof(TargetDescription));
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));

@@ -22,4 +22,8 @@
     <ProjectReference Include="..\MediaLock.Windows\MediaLock.Windows.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MediaLock.App.Tests" />
+  </ItemGroup>
+
 </Project>

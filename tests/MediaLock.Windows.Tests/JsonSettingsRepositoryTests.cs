@@ -78,7 +78,7 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(3, result.Value.SchemaVersion);
+        Assert.Equal(4, result.Value.SchemaVersion);
         Assert.Equal(TimeSpan.FromSeconds(30), result.Value.Recovery!.Timeout);
         Assert.Equal(FallbackPolicy.Wait, result.Value.Recovery.FallbackPolicy);
         Assert.Equal(MediaLockSettings.Default.Desktop, result.Value.Desktop);
@@ -112,10 +112,52 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(3, result.Value.SchemaVersion);
+        Assert.Equal(4, result.Value.SchemaVersion);
         Assert.Equal(RoutingMode.AppLock, result.Value.DefaultRoutingMode);
-        Assert.Equal(new DesktopSettings(false, true), result.Value.Desktop);
+        Assert.Equal(new DesktopSettings(false, true, UiLanguagePreference.System), result.Value.Desktop);
         Assert.Empty(result.Value.PriorityRules);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public async Task VersionThreeSettingsMigrateToSystemLanguage()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(
+            System.IO.Path.Combine(directory.Path, "settings.json"),
+            """
+            {
+              "schemaVersion": 3,
+              "defaultRoutingMode": "windowsAuto",
+              "recovery": {
+                "timeout": "00:00:15",
+                "fallbackPolicy": "sameApplicationThenWindowsCurrentSession"
+              },
+              "desktop": {
+                "closeToTray": false,
+                "startWithWindows": true
+              },
+              "priorityRules": [
+                {
+                  "sourceAppUserModelId": "Brave._crx_music",
+                  "isEnabled": false
+                }
+              ]
+            }
+            """);
+
+        var result = await new JsonSettingsRepository(
+            directory.Path,
+            TimeProvider.System).LoadAsync(CancellationToken.None);
+
+        Assert.Equal(4, result.Value.SchemaVersion);
+        Assert.Equal(
+            new DesktopSettings(false, true, UiLanguagePreference.System),
+            result.Value.Desktop);
+        var rule = Assert.Single(result.Value.PriorityRules);
+        Assert.Equal("Brave._crx_music", rule.SourceAppUserModelId);
+        Assert.False(rule.IsEnabled);
+        Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);
     }
 

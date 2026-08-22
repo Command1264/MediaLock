@@ -110,3 +110,29 @@ Status: complete on 2026-08-23 for the formal `0.2.0-rc.1` candidate from commit
 single-instance behavior, Settings and current-user files, reversible login startup, tray lifecycle, explicit Exit,
 `MSEdge` Session discovery and routed Play/Pause. The candidate remains unsigned; no tag, GitHub Release or public
 artifact is implied by phase completion.
+
+## Phase 7 — UX and localization foundation
+
+### Phase 7A — Localization foundation
+
+Move presentation-owned text behind one App-layer localization module, persist a UI-language preference and ship
+English plus Traditional Chinese resources. Keep routing vocabulary and state semantics unchanged.
+
+Exit criteria:
+
+- Settings offers Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`) and states when the change
+  takes effect.
+- Main window, Settings, ViewModel projections, accessibility names and notification-area commands resolve through
+  localized resources.
+- Settings schema migration preserves existing v1-v3 user choices and defaults language to Windows language.
+- Culture resolution, resource fallback, persistence and ViewModel language choices have automated coverage.
+- Both languages pass a restart-based desktop smoke test without routing or lifecycle regressions.
+
+### Phase 7B — WPF visual refresh and motion
+
+Apply a coherent Windows 11-inspired WPF visual system, theme support, clearer state hierarchy and restrained motion
+without changing the established Core/Application seams.
+
+### Phase 7C — Now Playing artwork and timeline
+
+Evaluate artwork and timeline presentation first; seek remains separately gated on real GSMTC capability evidence.

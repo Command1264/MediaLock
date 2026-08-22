@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using MediaLock.App.ViewModels;
+using MediaLock.App.Localization;
 
 namespace MediaLock.App.Tray;
 
@@ -23,15 +24,15 @@ internal sealed class TrayIconHost : IDisposable
         var menu = new ContextMenuStrip();
         menu.Items.Add(statusItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item("Show Media Lock", viewModel.ShowCommand));
-        menu.Items.Add(Item("Settings…", viewModel.SettingsCommand));
+        menu.Items.Add(Item(UiText.Get("Tray_Show"), viewModel.ShowCommand));
+        menu.Items.Add(Item(UiText.Get("Tray_Settings"), viewModel.SettingsCommand));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item("Play/Pause", viewModel.TogglePlayPauseCommand));
-        menu.Items.Add(Item("Previous", viewModel.PreviousCommand));
-        menu.Items.Add(Item("Next", viewModel.NextCommand));
-        menu.Items.Add(Item("Windows Auto", viewModel.WindowsAutoCommand));
+        menu.Items.Add(Item(UiText.Get("Command_Toggle"), viewModel.TogglePlayPauseCommand));
+        menu.Items.Add(Item(UiText.Get("Command_Previous"), viewModel.PreviousCommand));
+        menu.Items.Add(Item(UiText.Get("Command_Next"), viewModel.NextCommand));
+        menu.Items.Add(Item(UiText.Get("Mode_WindowsAuto"), viewModel.WindowsAutoCommand));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item("Exit", viewModel.ExitCommand));
+        menu.Items.Add(Item(UiText.Get("Tray_Exit"), viewModel.ExitCommand));
         notifyIcon = new NotifyIcon
         {
             Text = "Media Lock",
@@ -80,7 +81,7 @@ internal sealed class TrayIconHost : IDisposable
         {
             notifyIcon.ShowBalloonTip(
                 timeout: 5000,
-                tipTitle: "Media Lock command failed",
+                tipTitle: UiText.Get("Tray_CommandFailed"),
                 tipText: error,
                 tipIcon: ToolTipIcon.Error);
         }

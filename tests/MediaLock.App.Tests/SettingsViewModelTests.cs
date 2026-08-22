@@ -75,6 +75,7 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
+        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -82,7 +83,23 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
+        Assert.Equal(UiLanguagePreference.TraditionalChinese, intent.Settings.Desktop.Language);
         Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);
+    }
+
+    [Fact]
+    public void LanguageChoicesIncludeSystemEnglishAndTraditionalChinese()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+
+        Assert.Equal(
+            [
+                UiLanguagePreference.System,
+                UiLanguagePreference.EnglishUnitedStates,
+                UiLanguagePreference.TraditionalChinese,
+            ],
+            viewModel.Languages.Select(option => option.Value));
     }
 
     [Fact]

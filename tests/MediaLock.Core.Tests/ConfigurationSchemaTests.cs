@@ -9,9 +9,10 @@ public sealed class ConfigurationSchemaTests
     [Fact]
     public void DefaultSettingsEnableCloseToTrayButNotLoginStartup()
     {
-        Assert.Equal(3, MediaLockSettings.CurrentSchemaVersion);
+        Assert.Equal(4, MediaLockSettings.CurrentSchemaVersion);
         Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
         Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
+        Assert.Equal(UiLanguagePreference.System, MediaLockSettings.Default.Desktop.Language);
     }
 
     [Fact]
@@ -30,10 +31,24 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 3, but found 99.");
+            issue.Message == "Expected schema version 4, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
+    }
+
+    [Fact]
+    public void UnsupportedLanguageReturnsAnActionableValidationIssue()
+    {
+        var settings = MediaLockSettings.Default with
+        {
+            Desktop = MediaLockSettings.Default.Desktop! with { Language = "fr-FR" },
+        };
+
+        var issue = Assert.Single(settings.Validate());
+
+        Assert.Equal("desktop.language", issue.Path);
+        Assert.Contains("fr-FR", issue.Message, StringComparison.Ordinal);
     }
 
     [Fact]

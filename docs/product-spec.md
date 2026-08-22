@@ -112,6 +112,12 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
+The desktop settings persist a UI language preference independently from routing state. Supported choices are
+Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`). Windows-language selection uses Traditional
+Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English. Language changes take effect on
+the next process start so every WPF window, notification-area surface and presentation projection uses one
+consistent culture for its lifetime.
+
 Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
 remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
@@ -162,6 +168,9 @@ the candidate version does not imply those unfinished features are present.
 ### v0.3
 
 Optional Chromium and Firefox adapters that correlate browser tabs with GSMTC Sessions when technically feasible.
+
+Before browser integration, Phase 7 establishes localization and visual foundations as independently reviewed
+post-RC work. Localization does not alter Session matching or routing semantics.
 
 ### v1.0
 

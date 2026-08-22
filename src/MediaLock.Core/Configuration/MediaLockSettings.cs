@@ -10,7 +10,18 @@ public sealed record RecoverySettings(
 
 public sealed record DesktopSettings(
     bool CloseToTray,
-    bool StartWithWindows);
+    bool StartWithWindows,
+    string Language = UiLanguagePreference.System);
+
+public static class UiLanguagePreference
+{
+    public const string System = "system";
+    public const string EnglishUnitedStates = "en-US";
+    public const string TraditionalChinese = "zh-TW";
+
+    public static bool IsSupported(string? value) => value is
+        System or EnglishUnitedStates or TraditionalChinese;
+}
 
 [method: JsonConstructor]
 public sealed record MediaLockSettings(
@@ -29,7 +40,7 @@ public sealed record MediaLockSettings(
     {
     }
 
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -87,6 +98,12 @@ public sealed record MediaLockSettings(
             issues.Add(new ConfigurationIssue(
                 "desktop",
                 "Desktop settings are required."));
+        }
+        else if (!UiLanguagePreference.IsSupported(Desktop.Language))
+        {
+            issues.Add(new ConfigurationIssue(
+                "desktop.language",
+                $"Unsupported UI language preference '{Desktop.Language}'."));
         }
 
         if (PriorityRules.IsDefault)

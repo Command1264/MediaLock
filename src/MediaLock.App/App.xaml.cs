@@ -9,6 +9,8 @@ using MediaLock.Windows.Persistence;
 using MediaLock.Windows.Startup;
 using MediaLock.Windows.Gsmtc;
 using MediaLock.Windows.Diagnostics;
+using MediaLock.App.Localization;
+using MediaLock.Core.Configuration;
 
 namespace MediaLock.App;
 
@@ -30,6 +32,7 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        UiText.Apply(UiLanguagePreference.System);
 
         try
         {
@@ -56,6 +59,7 @@ public partial class App : System.Windows.Application
                 new JsonRuntimeStateRepository(),
                 diagnosticLog);
             await mediaApplication.StartAsync(CancellationToken.None);
+            UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             mainWindowViewModel = new MainWindowViewModel(
                 mediaApplication,
                 SynchronizationContext.Current,
@@ -87,12 +91,12 @@ public partial class App : System.Windows.Application
             }
             catch (Exception cleanupException)
             {
-                details += $"\n\nCleanup also failed: {cleanupException.Message}";
+                details += $"\n\n{UiText.Format("App_CleanupAlsoFailed", cleanupException.Message)}";
             }
 
             System.Windows.MessageBox.Show(
-                $"Media Lock could not start.\n\n{details}",
-                "Media Lock startup error",
+                $"{UiText.Get("App_StartupFailed")}\n\n{details}",
+                UiText.Get("App_StartupErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             Shutdown(1);
@@ -131,8 +135,8 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
         {
             System.Windows.MessageBox.Show(
-                $"Media Lock could not shut down cleanly.\n\n{exception.Message}",
-                "Media Lock shutdown error",
+                $"{UiText.Get("App_ShutdownFailed")}\n\n{exception.Message}",
+                UiText.Get("App_ShutdownErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -331,7 +335,7 @@ public partial class App : System.Windows.Application
 
         if (failures.Count > 0)
         {
-            throw new AggregateException("One or more Media Lock resources failed to shut down.", failures);
+            throw new AggregateException(UiText.Get("App_ShutdownAggregate"), failures);
         }
     }
 }

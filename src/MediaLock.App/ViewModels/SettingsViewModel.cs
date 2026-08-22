@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using MediaLock.App.Localization;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Routing;
@@ -16,7 +17,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private bool closeToTray;
     private bool startWithWindows;
     private RoutingMode startupRoutingMode;
-    private string startupRoutingModeText = "Windows Auto";
+    private string startupRoutingModeText = UiText.Get("Mode_WindowsAuto");
+    private string selectedLanguage = UiLanguagePreference.System;
     private double recoveryTimeoutSeconds;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
@@ -45,8 +47,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<FallbackPolicy> FallbackPolicies { get; } =
-        Enum.GetValues<FallbackPolicy>();
+    public IReadOnlyList<LocalizedOption<FallbackPolicy>> FallbackPolicies { get; } =
+        Enum.GetValues<FallbackPolicy>()
+            .Select(value => new LocalizedOption<FallbackPolicy>(
+                value,
+                UiDescriptions.DescribeFallbackPolicy(value)))
+            .ToArray();
+
+    public IReadOnlyList<LocalizedOption<string>> Languages { get; } =
+    [
+        new(UiLanguagePreference.System, UiText.Get("Language_System")),
+        new(UiLanguagePreference.EnglishUnitedStates, UiText.Get("Language_English")),
+        new(UiLanguagePreference.TraditionalChinese, UiText.Get("Language_TraditionalChinese")),
+    ];
 
     public ObservableCollection<PriorityRuleItemViewModel> PriorityRules { get; } = [];
 
@@ -68,6 +81,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         get => startWithWindows;
         set => SetField(ref startWithWindows, value);
+    }
+
+    public string SelectedLanguage
+    {
+        get => selectedLanguage;
+        set => SetField(ref selectedLanguage, value);
     }
 
     public string StartupRoutingModeText
@@ -125,7 +144,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 new RecoverySettings(
                     TimeSpan.FromSeconds(RecoveryTimeoutSeconds),
                     FallbackPolicy),
-                new DesktopSettings(CloseToTray, StartWithWindows),
+                new DesktopSettings(CloseToTray, StartWithWindows, SelectedLanguage),
                 PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
@@ -181,6 +200,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         appliedSettings = settings;
         CloseToTray = settings.Desktop!.CloseToTray;
         StartWithWindows = settings.Desktop.StartWithWindows;
+        SelectedLanguage = settings.Desktop.Language;
         ApplyStartupRoutingMode(settings.DefaultRoutingMode);
         RecoveryTimeoutSeconds = settings.Recovery!.Timeout.TotalSeconds;
         FallbackPolicy = settings.Recovery.FallbackPolicy;
@@ -196,14 +216,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private void ApplyStartupRoutingMode(RoutingMode mode)
     {
         startupRoutingMode = mode;
-        StartupRoutingModeText = mode switch
-        {
-            RoutingMode.WindowsAuto => "Windows Auto",
-            RoutingMode.PriorityRules => "Priority Rules",
-            RoutingMode.AppLock => "App Lock",
-            RoutingMode.SessionLock => "Session Lock",
-            _ => throw new ArgumentOutOfRangeException(nameof(mode)),
-        };
+        StartupRoutingModeText = UiDescriptions.DescribeRoutingMode(mode);
     }
 
     private Task AddPriorityRuleAsync(object? parameter)
