@@ -15,30 +15,39 @@ function Assert-Condition {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$publishScript = Join-Path $repositoryRoot 'eng\Publish-ReleaseCandidate.ps1'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "MediaLock-Packaging-Test-$([Guid]::NewGuid().ToString('N'))"
+$isolatedSourceRoot = Join-Path $temporaryRoot 'source'
+$artifactOutputRoot = Join-Path $temporaryRoot 'output'
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
-$dirtyMarkerPath = Join-Path $repositoryRoot ".MediaLock-Packaging-Test-$([Guid]::NewGuid().ToString('N')).tmp"
+$dirtyMarkerPath = Join-Path $isolatedSourceRoot '.MediaLock-Packaging-Test.tmp'
 $version = '0.2.0-rc.1'
 $artifactStem = "MediaLock-$version-win-x64"
+$isolatedWorktreeCreated = $false
 
 try {
+    New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+    & git -C $repositoryRoot worktree add --detach $isolatedSourceRoot HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not create the isolated packaging-test worktree.'
+    }
+    $isolatedWorktreeCreated = $true
+    $publishScript = Join-Path $isolatedSourceRoot 'eng\Publish-ReleaseCandidate.ps1'
     [IO.File]::WriteAllText($dirtyMarkerPath, 'Packaging provenance test marker.')
 
     $rejectedDirtySource = $false
     try {
-        & $publishScript -Version $version -OutputRoot $temporaryRoot
+        & $publishScript -Version $version -OutputRoot $artifactOutputRoot
     }
     catch {
         $rejectedDirtySource = $_.Exception.Message -like '*require a clean Git worktree*'
     }
     Assert-Condition $rejectedDirtySource 'Formal publication must reject a dirty source worktree.'
 
-    & $publishScript -Version $version -OutputRoot $temporaryRoot -AllowDirty
+    & $publishScript -Version $version -OutputRoot $artifactOutputRoot -AllowDirty
 
-    $archivePath = Join-Path $temporaryRoot "$artifactStem.zip"
-    $manifestPath = Join-Path $temporaryRoot "$artifactStem.manifest.json"
-    $checksumPath = Join-Path $temporaryRoot "$artifactStem.sha256"
+    $archivePath = Join-Path $artifactOutputRoot "$artifactStem.zip"
+    $manifestPath = Join-Path $artifactOutputRoot "$artifactStem.manifest.json"
+    $checksumPath = Join-Path $artifactOutputRoot "$artifactStem.sha256"
     Assert-Condition (Test-Path -LiteralPath $archivePath -PathType Leaf) "Archive was not created: $archivePath"
     Assert-Condition (Test-Path -LiteralPath $manifestPath -PathType Leaf) "Manifest was not created: $manifestPath"
     Assert-Condition (Test-Path -LiteralPath $checksumPath -PathType Leaf) "Checksum was not created: $checksumPath"
@@ -66,6 +75,12 @@ try {
 }
 finally {
     [IO.File]::Delete($dirtyMarkerPath)
+    if ($isolatedWorktreeCreated) {
+        & git -C $repositoryRoot worktree remove $isolatedSourceRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not remove the isolated packaging-test worktree: $isolatedSourceRoot"
+        }
+    }
 
     $resolvedTemporaryParent = (Resolve-Path ([IO.Path]::GetTempPath())).Path.TrimEnd('\')
     if (Test-Path -LiteralPath $temporaryRoot) {

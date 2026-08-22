@@ -56,6 +56,7 @@ function Get-SourceSnapshot {
         Commit = $commit
         Dirty = $status.Count -gt 0
         Fingerprint = $fingerprint
+        Entries = @($entries)
     }
 }
 
@@ -135,7 +136,15 @@ try {
     $finalSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
     if ($finalSource.Commit -ne $initialSource.Commit -or
         $finalSource.Fingerprint -ne $initialSource.Fingerprint) {
-        throw 'Source files or HEAD changed during publication; no release output was created.'
+        $changedEntries = @(Compare-Object $initialSource.Entries $finalSource.Entries |
+            Select-Object -First 10 -ExpandProperty InputObject)
+        $changedDescription = if ($changedEntries.Count -gt 0) {
+            " Changed entries: $($changedEntries -join ', ')"
+        }
+        else {
+            [string]::Empty
+        }
+        throw "Source files or HEAD changed during publication; no release output was created.$changedDescription"
     }
 
     $dotnetSdkVersion = (& dotnet --version).Trim()
