@@ -7,6 +7,38 @@ namespace MediaLock.Core.Tests;
 public sealed class MediaRouterTests
 {
     [Fact]
+    public async Task UpdatedOptionsApplyToTheNextRecoveryTransition()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var locked = Session("locked", "music");
+
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([locked], locked.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.LockSession(locked.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.UpdateOptions(new RouterOptions(
+                FallbackPolicy.Wait,
+                TimeSpan.Zero)),
+            CancellationToken.None);
+
+        var lost = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+        var timeout = Assert.Single(lost.Effects.OfType<RouterEffect.ScheduleRecoveryTimeout>());
+        var fallback = await router.DispatchAsync(
+            new RouterIntent.RecoveryTimedOut(timeout.RecoveryEpoch),
+            CancellationToken.None);
+
+        Assert.Equal(TimeSpan.Zero, timeout.Delay);
+        Assert.Equal(RouterStatus.Unavailable, fallback.State.Status);
+        Assert.Equal(FallbackPolicy.Wait, fallback.State.ActiveFallback);
+    }
+
+    [Fact]
     public async Task WindowsAutoRoutesToCurrentSessionAtCommandTime()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);

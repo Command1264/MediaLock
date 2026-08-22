@@ -153,6 +153,13 @@ The GSMTC adapter uses one refresh worker with a capacity-one coalescing signal;
 most one follow-up refresh instead of creating an unbounded task backlog. Adapter lifetime cancellation interrupts
 an in-flight Session read before shutdown waits for the worker.
 
+Phase 3 keeps desktop lifecycle composition at the WPF application root. A current-user named semaphore identifies
+the primary process and a current-user named pipe activates its window. The primary creates persistence, startup,
+diagnostic, GSMTC, application and presentation components in that order. Explicit shutdown first removes the tray
+surface, then disposes presentation/application resources and finally releases instance coordination.
+The main-window toolbar and tray both open one owned settings window through ViewModel navigation callbacks. WPF
+window transitions use short opacity animations only when Windows client-area animations are enabled.
+
 ## 8. Persistence and diagnostics
 
 Settings and runtime state use separate repositories and files. Persistence uses replace-on-success semantics:
@@ -162,6 +169,16 @@ migration.
 Structured logs include timestamps, state transitions, anonymizable Session source data, route reasons and control
 outcomes. Normal logs minimize title and artist retention; an explicit diagnostic mode may add metadata with clear
 user disclosure and bounded retention.
+
+Phase 3 stores schema-versioned `settings.json` and `state.json` beneath `%LocalAppData%\MediaLock\` with sibling
+temporary files and replace-on-success writes. A corrupt settings file produces safe defaults and remains untouched;
+if the user later saves replacement settings, the original is first copied to `settings.corrupt.<timestamp>.json`.
+Runtime state is saved after serialized router transitions, but automatic restoration of a persisted lock remains a
+Phase 4 responsibility. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist unless a
+future explicitly disclosed diagnostic mode supplies them.
+Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Saved changes
+take effect on the next process start; applying a non-WindowsAuto default that requires a persisted target remains
+part of Phase 4 crash recovery.
 
 ## 9. Composition
 

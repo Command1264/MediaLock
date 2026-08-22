@@ -1,12 +1,24 @@
+using MediaLock.Core.Configuration;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Application;
 
 public sealed record MediaLockApplicationState(
     RouterState Router,
-    string? ErrorMessage = null)
+    string? ErrorMessage,
+    MediaLockSettings Settings)
 {
-    public static MediaLockApplicationState Initial { get; } = new(RouterState.Initial);
+    public MediaLockApplicationState(
+        RouterState router,
+        string? errorMessage = null)
+        : this(router, errorMessage, MediaLockSettings.Default)
+    {
+    }
+
+    public static MediaLockApplicationState Initial { get; } = new(
+        RouterState.Initial,
+        null,
+        MediaLockSettings.Default);
 }
 
 public sealed class MediaLockApplicationStateChangedEventArgs(

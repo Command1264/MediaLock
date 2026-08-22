@@ -161,5 +161,7 @@ public abstract record RouterIntent
 
     public sealed record RecoveryTimedOut(long RecoveryEpoch) : RouterIntent;
 
+    public sealed record UpdateOptions(RouterOptions Options) : RouterIntent;
+
     public sealed record UseWindowsAuto : RouterIntent;
 }

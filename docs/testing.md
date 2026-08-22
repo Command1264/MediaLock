@@ -36,6 +36,11 @@ tests use only public binding properties and async commands. Windows adapter tes
 ordered application projection under concurrent dispatch, stale-target removal after terminal catalog failure and
 capacity-one coalescing of burst GSMTC events, including cancellation of a blocked refresh during disposal.
 
+Phase 3 tests settings schema migration, corrupt-file preservation, atomic settings/runtime-state round trips,
+bounded diagnostic rotation, reversible current-user login startup, current-user single-instance activation, tray
+state/commands and settings ViewModel commands. Runtime-state tests deliberately verify persistence without enabling
+Phase 4 automatic lock restoration.
+
 ### Integration tests
 
 Cover:
@@ -74,6 +79,20 @@ playback state before/after, competing playback state and whether Windows also p
 2. Verify manager/subscriptions are reacquired and no event is duplicated.
 3. Restart or intentionally terminate Media Lock.
 4. Verify valid settings and runtime state restore according to startup policy.
+
+### Phase 3 desktop lifecycle smoke test
+
+1. Start `MediaLock.App`, confirm the main window and one notification-area icon appear; open Settings from the
+   upper-right toolbar and confirm only one independent settings window appears.
+2. Close the window with close-to-tray enabled; confirm the process and icon remain, then reopen from `Show Media Lock`.
+3. Start a second `MediaLock.App`; confirm it activates the first window and exits without adding another icon.
+4. Toggle `Start with Windows`, save, and verify the current-user Run entry is added; disable and verify it is removed.
+5. Open Settings from the tray, route one command, switch to Windows Auto, then choose `Exit`; confirm the icon disappears and no
+   Media Lock process remains.
+6. Reopen the app and confirm `settings.json`, `state.json` and bounded `logs\*.jsonl` remain readable. Do not expect
+   the persisted Session Lock to restore until Phase 4.
+
+Recorded production-boundary evidence: [Phase 3 manual smoke — 2026-08-22](phase-3/manual-smoke-2026-08-22.md).
 
 ## 4. Compatibility matrix
 

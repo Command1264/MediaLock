@@ -1,3 +1,5 @@
+using MediaLock.Core.Configuration;
+using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 
@@ -7,21 +9,49 @@ public sealed class MediaLockApplication : IMediaLockApplication
 {
     private readonly IMediaSessionCatalog catalog;
     private readonly IMediaRouter router;
+    private readonly ISettingsRepository? settingsRepository;
+    private readonly ILoginStartupManager? loginStartupManager;
+    private readonly IRuntimeStateRepository? runtimeStateRepository;
+    private readonly IDiagnosticLog? diagnosticLog;
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim dispatchGate = new(1, 1);
     private readonly Lock recoverySync = new();
     private readonly Dictionary<long, RecoveryDeadline> recoveryDeadlines = [];
     private Task? catalogWorker;
     private bool disposed;
+    private MediaLockSettings settings = MediaLockSettings.Default;
+    private string? settingsLoadWarning;
+    private string? runtimeStateLoadWarning;
 
     public MediaLockApplication(
         IMediaSessionCatalog catalog,
         IMediaRouter router)
+        : this(
+            catalog,
+            router,
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: null)
+    {
+    }
+
+    public MediaLockApplication(
+        IMediaSessionCatalog catalog,
+        IMediaRouter router,
+        ISettingsRepository? settingsRepository,
+        ILoginStartupManager? loginStartupManager,
+        IRuntimeStateRepository? runtimeStateRepository = null,
+        IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(router);
         this.catalog = catalog;
         this.router = router;
+        this.settingsRepository = settingsRepository;
+        this.loginStartupManager = loginStartupManager;
+        this.runtimeStateRepository = runtimeStateRepository;
+        this.diagnosticLog = diagnosticLog;
     }
 
     public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
@@ -34,6 +64,51 @@ public sealed class MediaLockApplication : IMediaLockApplication
         if (catalogWorker is not null)
         {
             throw new InvalidOperationException("Media Lock application has already started.");
+        }
+
+        if (settingsRepository is not null)
+        {
+            var loaded = await settingsRepository.LoadAsync(cancellationToken);
+            settings = loaded.Value;
+            settingsLoadWarning = loaded.Issues.Length == 0
+                ? null
+                : string.Join(" ", loaded.Issues.Select(issue => issue.Message));
+            State = new MediaLockApplicationState(
+                State.Router,
+                PersistenceWarnings,
+                settings);
+            if (loginStartupManager is not null &&
+                await loginStartupManager.IsEnabledAsync(cancellationToken) !=
+                settings.Desktop!.StartWithWindows)
+            {
+                await loginStartupManager.SetEnabledAsync(
+                    settings.Desktop.StartWithWindows,
+                    cancellationToken);
+            }
+        }
+
+        if (runtimeStateRepository is not null)
+        {
+            var loadedRuntimeState = await runtimeStateRepository.LoadAsync(cancellationToken);
+            if (loadedRuntimeState.Issues.Length > 0)
+            {
+                runtimeStateLoadWarning = string.Join(
+                    " ",
+                    loadedRuntimeState.Issues.Select(issue => issue.Message));
+                State = State with
+                {
+                    ErrorMessage = PersistenceWarnings,
+                };
+            }
+        }
+
+        if (settingsRepository is not null)
+        {
+            await DispatchRouterAsync(
+                new RouterIntent.UpdateOptions(new RouterOptions(
+                    settings.Recovery!.FallbackPolicy,
+                    settings.Recovery.Timeout)),
+                cancellationToken);
         }
 
         var initialized = new TaskCompletionSource(
@@ -53,6 +128,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
             throw new InvalidOperationException("Media Lock application must be started before dispatching intents.");
         }
 
+        if (intent is ApplicationIntent.UpdateSettings updateSettings)
+        {
+            return await UpdateSettingsAsync(updateSettings.Settings, cancellationToken);
+        }
+
         RouterIntent routerIntent = intent switch
         {
             ApplicationIntent.LockSession lockSession =>
@@ -62,7 +142,92 @@ public sealed class MediaLockApplication : IMediaLockApplication
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
         };
         var dispatch = await DispatchRouterAsync(routerIntent, cancellationToken);
-        return new ApplicationResult(dispatch.State, dispatch.Result.Decision);
+        return new ApplicationResult(State, dispatch.Result.Decision);
+    }
+
+    private async ValueTask<ApplicationResult> UpdateSettingsAsync(
+        MediaLockSettings updated,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(updated);
+        var issues = updated.Validate();
+        if (issues.Length > 0)
+        {
+            throw new ArgumentException(
+                string.Join(" ", issues.Select(issue => $"{issue.Path}: {issue.Message}")),
+                nameof(updated));
+        }
+
+        using var updateCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            lifetime.Token);
+        await dispatchGate.WaitAsync(updateCancellation.Token);
+        try
+        {
+            if (settingsRepository is not null)
+            {
+                await settingsRepository.SaveAsync(updated, updateCancellation.Token);
+            }
+
+            if (loginStartupManager is not null &&
+                settings.Desktop!.StartWithWindows != updated.Desktop!.StartWithWindows)
+            {
+                try
+                {
+                    await loginStartupManager.SetEnabledAsync(
+                        updated.Desktop.StartWithWindows,
+                        updateCancellation.Token);
+                }
+                catch (Exception exception)
+                {
+                    var failures = new List<Exception> { exception };
+                    try
+                    {
+                        await loginStartupManager.SetEnabledAsync(
+                            settings.Desktop.StartWithWindows,
+                            CancellationToken.None);
+                    }
+                    catch (Exception rollbackException)
+                    {
+                        failures.Add(rollbackException);
+                    }
+
+                    if (settingsRepository is not null)
+                    {
+                        try
+                        {
+                            await settingsRepository.SaveAsync(settings, CancellationToken.None);
+                        }
+                        catch (Exception rollbackException)
+                        {
+                            failures.Add(rollbackException);
+                        }
+                    }
+
+                    if (exception is OperationCanceledException && failures.Count == 1)
+                    {
+                        throw;
+                    }
+
+                    throw new AggregateException(
+                        "Login startup could not be updated; rollback was attempted.",
+                        failures);
+                }
+            }
+
+            settings = updated;
+            settingsLoadWarning = null;
+            State = new MediaLockApplicationState(State.Router, PersistenceWarnings, settings);
+            StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
+            await TryWriteDiagnosticAsync(
+                new DiagnosticEvent("settings.saved"),
+                updateCancellation.Token);
+            return new ApplicationResult(State, RouteDecision.StateUpdated);
+        }
+        finally
+        {
+            dispatchGate.Release();
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -171,8 +336,28 @@ public sealed class MediaLockApplication : IMediaLockApplication
         await dispatchGate.WaitAsync(dispatchCancellation.Token);
         try
         {
+            var previousRevision = State.Router.Revision;
             var result = await router.DispatchAsync(intent, dispatchCancellation.Token);
             Apply(result);
+            await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
+            await RecordStateTransitionAsync(
+                previousRevision,
+                result.State,
+                dispatchCancellation.Token);
+            if (intent is RouterIntent.Route routedCommand)
+            {
+                await TryWriteDiagnosticAsync(
+                    new DiagnosticEvent(
+                        "route.completed",
+                        new Dictionary<string, string>
+                        {
+                            ["command"] = routedCommand.Command.ToString(),
+                            ["decision"] = result.Decision.Kind.ToString(),
+                            ["reason"] = result.Decision.Reason.ToString(),
+                        }),
+                    dispatchCancellation.Token);
+            }
+
             return (result, State);
         }
         finally
@@ -190,10 +375,16 @@ public sealed class MediaLockApplication : IMediaLockApplication
         {
             try
             {
+                var previousRevision = State.Router.Revision;
                 var result = await router.DispatchAsync(
                     new RouterIntent.CatalogUpdated([], null),
                     cancellationToken);
                 Apply(result);
+                await PersistRuntimeStateAsync(result.State, cancellationToken);
+                await RecordStateTransitionAsync(
+                    previousRevision,
+                    result.State,
+                    cancellationToken);
                 PublishError(message);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -284,7 +475,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private void Publish(RouterState routerState)
     {
-        State = new MediaLockApplicationState(routerState);
+        State = new MediaLockApplicationState(routerState, PersistenceWarnings, settings);
         StateChanged?.Invoke(
             this,
             new MediaLockApplicationStateChangedEventArgs(State));
@@ -297,6 +488,92 @@ public sealed class MediaLockApplication : IMediaLockApplication
             this,
             new MediaLockApplicationStateChangedEventArgs(State));
     }
+
+    private async ValueTask PersistRuntimeStateAsync(
+        RouterState routerState,
+        CancellationToken cancellationToken)
+    {
+        if (runtimeStateRepository is null)
+        {
+            return;
+        }
+
+        var fingerprint = routerState.LockedTarget?.Fingerprint;
+        var persisted = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            routerState.Mode,
+            fingerprint is null
+                ? null
+                : new PersistedLockedTarget(new PersistedSessionFingerprint(
+                    fingerprint.Descriptor.SourceAppUserModelId,
+                    fingerprint.Descriptor.SessionInstanceHint,
+                    fingerprint.PlaybackStatus,
+                    fingerprint.ObservedAt,
+                    fingerprint.PlaybackType,
+                    fingerprint.Title,
+                    fingerprint.Artist)));
+        try
+        {
+            await runtimeStateRepository.SaveAsync(persisted, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            PublishError($"Runtime state could not be saved: {exception.Message}");
+        }
+    }
+
+    private string? PersistenceWarnings =>
+        string.Join(
+            " ",
+            new[] { settingsLoadWarning, runtimeStateLoadWarning }
+                .Where(message => !string.IsNullOrWhiteSpace(message))) is { Length: > 0 } warnings
+            ? warnings
+            : null;
+
+    private async ValueTask TryWriteDiagnosticAsync(
+        DiagnosticEvent diagnosticEvent,
+        CancellationToken cancellationToken)
+    {
+        if (diagnosticLog is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await diagnosticLog.WriteAsync(diagnosticEvent, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            PublishError($"Diagnostic logging is unavailable: {exception.Message}");
+        }
+    }
+
+    private ValueTask RecordStateTransitionAsync(
+        long previousRevision,
+        RouterState routerState,
+        CancellationToken cancellationToken) =>
+        routerState.Revision == previousRevision
+            ? ValueTask.CompletedTask
+            : TryWriteDiagnosticAsync(
+                new DiagnosticEvent(
+                    "state.changed",
+                    new Dictionary<string, string>
+                    {
+                        ["mode"] = routerState.Mode.ToString(),
+                        ["status"] = routerState.Status.ToString(),
+                        ["revision"] = routerState.Revision.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture),
+                    }),
+                cancellationToken);
 
     private sealed class RecoveryDeadline(CancellationTokenSource cancellation)
     {
