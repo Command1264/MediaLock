@@ -155,6 +155,10 @@ essential controls without opening the window.
 
 App Lock, ordered application Priority Rules, customizable shortcuts, artwork, timeline/seek, volume and richer Recovery.
 
+The first packaged candidate is `0.2.0-rc.1` because the current product already includes App Lock and ordered
+Priority Rules. Customizable shortcuts, artwork, timeline/seek, volume and richer Recovery remain separately scoped;
+the candidate version does not imply those unfinished features are present.
+
 ### v0.3
 
 Optional Chromium and Firefox adapters that correlate browser tabs with GSMTC Sessions when technically feasible.

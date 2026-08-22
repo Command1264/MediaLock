@@ -8,6 +8,12 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AssemblyName>MediaLock</AssemblyName>
+    <Product>Media Lock</Product>
+    <Version>0.2.0-rc.1</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
+    <InformationalVersion>0.2.0-rc.1</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
