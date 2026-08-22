@@ -13,7 +13,7 @@ public sealed class SettingsViewModelTests
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
         using var viewModel = new SettingsViewModel(application);
-        Assert.DoesNotContain(RoutingMode.AppLock, viewModel.RoutingModes);
+        Assert.Contains(RoutingMode.AppLock, viewModel.RoutingModes);
         viewModel.CloseToTray = false;
         viewModel.RecoveryTimeoutSeconds = 42;
 
@@ -33,6 +33,7 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
+        viewModel.DefaultRoutingMode = RoutingMode.AppLock;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -40,6 +41,7 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
+        Assert.Equal(RoutingMode.AppLock, intent.Settings.DefaultRoutingMode);
     }
 
     [Fact]

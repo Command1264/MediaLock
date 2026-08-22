@@ -12,6 +12,8 @@ public abstract record ApplicationIntent
 
     public sealed record LockSession(SessionKey Session) : ApplicationIntent;
 
+    public sealed record LockApplication(string SourceAppUserModelId) : ApplicationIntent;
+
     public sealed record UseWindowsAuto : ApplicationIntent;
 
     public sealed record Route(MediaCommand Command) : ApplicationIntent;

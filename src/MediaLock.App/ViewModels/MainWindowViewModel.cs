@@ -12,6 +12,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly AsyncCommand lockCommand;
+    private readonly AsyncCommand appLockCommand;
     private readonly AsyncCommand windowsAutoCommand;
     private readonly AsyncCommand[] mediaCommands;
     private SessionItemViewModel? selectedSession;
@@ -38,6 +39,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         lockCommand = new AsyncCommand(
             LockSelectedAsync,
             _ => SelectedSession is not null);
+        appLockCommand = new AsyncCommand(
+            LockSelectedApplicationAsync,
+            _ => SelectedSession is not null);
         windowsAutoCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.UseWindowsAuto()),
             _ => routerState.Mode != RoutingMode.WindowsAuto);
@@ -57,6 +61,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             (AsyncCommand)StopCommand,
         ];
         LockCommand = lockCommand;
+        AppLockCommand = appLockCommand;
         WindowsAutoCommand = windowsAutoCommand;
         application.StateChanged += OnApplicationStateChanged;
         Apply(application.State);
@@ -83,10 +88,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             selectedSession = value;
             OnPropertyChanged();
             lockCommand.RaiseCanExecuteChanged();
+            appLockCommand.RaiseCanExecuteChanged();
         }
     }
 
     public IAsyncCommand LockCommand { get; }
+
+    public IAsyncCommand AppLockCommand { get; }
 
     public IAsyncCommand WindowsAutoCommand { get; }
 
@@ -104,6 +112,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public string RoutingStatus => catalogStatus switch
     {
+        MediaSessionCatalogStatus.Available
+            when routerState.Mode == RoutingMode.AppLock && routerState.Status == RouterStatus.Locked =>
+                "App Locked",
         MediaSessionCatalogStatus.Available => routerState.Status.ToString(),
         var status => status.ToString(),
     };
@@ -157,6 +168,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         await DispatchAsync(new ApplicationIntent.LockSession(SelectedSession.Key));
+    }
+
+    private async Task LockSelectedApplicationAsync(object? parameter)
+    {
+        if (SelectedSession is null)
+        {
+            return;
+        }
+
+        await DispatchAsync(new ApplicationIntent.LockApplication(SelectedSession.SourceApplication));
     }
 
     private AsyncCommand MediaCommand(MediaLock.Core.Media.MediaCommand command) => new(

@@ -79,6 +79,25 @@ public sealed class TrayViewModelTests
         Assert.Equal("GSMTC unavailable", viewModel.ErrorMessage);
     }
 
+    [Fact]
+    public void TrayMakesAppLockExplicit()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new TrayViewModel(application, () => { }, () => { });
+
+        application.Publish(application.State with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.AppLock,
+                Status = RouterStatus.Locked,
+                Revision = 1,
+            },
+        });
+
+        Assert.Equal("App Locked", viewModel.StatusText);
+    }
+
     private sealed class FakeApplication(MediaLockApplicationState initial) : IMediaLockApplication
     {
         public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;

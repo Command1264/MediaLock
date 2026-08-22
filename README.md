@@ -31,7 +31,10 @@ Windows 的用戶端動畫設定。`Save settings` 成功後會關閉設定視�
 使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
 有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。
 
-Recovery timeout、Fallback Policy 與 Default routing mode 會在下次啟動時套用。Default Session Lock
+Recovery timeout、Fallback Policy 與 Default routing mode 會在下次啟動時套用。App Lock 可從主視窗選取
+Session 的來源應用程式，並在該應用程式的候選 Sessions 間依確定性政策切換；它不辨識瀏覽器 URL 或
+保證單一 Session 連續性。Default App Lock 會從有效的 `state.json` 恢復保存的來源應用程式。
+Default Session Lock
 只在 `state.json` 含有有效的 Session Fingerprint，且目前 catalog 有唯一可接受候選時恢復；缺少、
 損毀、過期或模糊的候選都不會被靜默鎖定。Default Windows Auto 一律忽略先前保存的鎖定。
 

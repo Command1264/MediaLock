@@ -22,7 +22,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private MediaLockSettings settings = MediaLockSettings.Default;
     private string? settingsLoadWarning;
     private string? runtimeStateLoadWarning;
-    private SessionFingerprint? startupRestoreFingerprint;
+    private RouterIntent? startupRestoreIntent;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private string? catalogStatusMessage;
 
@@ -105,27 +105,31 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     ErrorMessage = PersistenceWarnings,
                 };
             }
-            else if (settings.DefaultRoutingMode == RoutingMode.SessionLock)
+            else if (settings.DefaultRoutingMode is RoutingMode.SessionLock or RoutingMode.AppLock)
             {
                 if (loadedRuntimeState.Value is
                     {
-                        Mode: RoutingMode.SessionLock,
+                        Mode: var persistedMode,
                         LockedTarget.Fingerprint: { } persistedFingerprint,
-                    })
+                    } && persistedMode == settings.DefaultRoutingMode)
                 {
-                    startupRestoreFingerprint = ToSessionFingerprint(persistedFingerprint);
+                    startupRestoreIntent = persistedMode == RoutingMode.SessionLock
+                        ? new RouterIntent.RestoreSessionLock(ToSessionFingerprint(persistedFingerprint))
+                        : new RouterIntent.LockApplication(persistedFingerprint.SourceAppUserModelId);
                 }
                 else
                 {
-                    runtimeStateLoadWarning =
-                        "Default Session Lock requires a valid persisted Session Lock target; Windows Auto is active.";
+                    runtimeStateLoadWarning = settings.DefaultRoutingMode == RoutingMode.SessionLock
+                        ? "Default Session Lock requires a valid persisted Session Lock target; Windows Auto is active."
+                        : "Default App Lock requires a valid persisted App Lock target; Windows Auto is active.";
                 }
             }
         }
-        else if (settings.DefaultRoutingMode == RoutingMode.SessionLock)
+        else if (settings.DefaultRoutingMode is RoutingMode.SessionLock or RoutingMode.AppLock)
         {
-            runtimeStateLoadWarning =
-                "Default Session Lock requires runtime-state persistence; Windows Auto is active.";
+            runtimeStateLoadWarning = settings.DefaultRoutingMode == RoutingMode.SessionLock
+                ? "Default Session Lock requires runtime-state persistence; Windows Auto is active."
+                : "Default App Lock requires runtime-state persistence; Windows Auto is active.";
         }
 
         if (settingsRepository is not null)
@@ -135,7 +139,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     settings.Recovery!.FallbackPolicy,
                     settings.Recovery.Timeout)),
                 cancellationToken,
-                persistRuntimeState: startupRestoreFingerprint is null);
+                persistRuntimeState: startupRestoreIntent is null);
         }
 
         var initialized = new TaskCompletionSource(
@@ -164,6 +168,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
         {
             ApplicationIntent.LockSession lockSession =>
                 new RouterIntent.LockSession(lockSession.Session),
+            ApplicationIntent.LockApplication lockApplication =>
+                new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId),
             ApplicationIntent.UseWindowsAuto => new RouterIntent.UseWindowsAuto(),
             ApplicationIntent.Route route => new RouterIntent.Route(route.Command),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
@@ -331,15 +337,15 @@ public sealed class MediaLockApplication : IMediaLockApplication
                         snapshot.Sessions,
                         snapshot.WindowsCurrentSession),
                     cancellationToken,
-                    persistRuntimeState: !firstSnapshot || startupRestoreFingerprint is null,
+                    persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
                     nextCatalogStatus: snapshot.Status,
                     nextCatalogStatusMessage: snapshot.StatusMessage);
-                if (firstSnapshot && startupRestoreFingerprint is { } fingerprint)
+                if (firstSnapshot && startupRestoreIntent is { } restoreIntent)
                 {
                     await DispatchRouterAsync(
-                        new RouterIntent.RestoreSessionLock(fingerprint),
+                        restoreIntent,
                         cancellationToken);
-                    startupRestoreFingerprint = null;
+                    startupRestoreIntent = null;
                 }
 
                 firstSnapshot = false;

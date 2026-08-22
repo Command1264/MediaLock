@@ -77,6 +77,10 @@ Exit criteria:
 Add App Lock and priority rules after Session Lock is reliable. Then evaluate artwork, seek, volume, custom hotkeys
 and optional browser integration as separately scoped work.
 
+Implementation note: App Lock is delivered before Priority Rules. It persists source application identity, reuses
+one deterministic candidate policy for interactive and startup resolution, and remains distinct from Session Lock.
+Priority Rules and every optional media/browser feature use later independent branches.
+
 Exit criteria:
 
 - Rule ordering and conflicts have deterministic behavior.

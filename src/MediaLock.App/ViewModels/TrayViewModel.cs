@@ -149,6 +149,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
     private static string DescribeRouter(RouterState state) => state.Status switch
     {
         RouterStatus.Recovering => "Recovering",
+        RouterStatus.Locked when state.Mode == RoutingMode.AppLock => "App Locked",
         RouterStatus.Locked => "Locked",
         _ when state.Mode == RoutingMode.WindowsAuto => "Windows Auto",
         _ => state.Status.ToString(),

@@ -37,7 +37,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<RoutingMode> RoutingModes { get; } =
-        [RoutingMode.WindowsAuto, RoutingMode.SessionLock];
+        [RoutingMode.WindowsAuto, RoutingMode.AppLock, RoutingMode.SessionLock];
 
     public IReadOnlyList<FallbackPolicy> FallbackPolicies { get; } =
         Enum.GetValues<FallbackPolicy>();
