@@ -25,6 +25,7 @@ public partial class App : System.Windows.Application
     private bool shutdownStarted;
     private bool hideAnimationRunning;
     private JsonLinesDiagnosticLog? diagnosticLog;
+    private SystemLifecycle? systemLifecycle;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -43,7 +44,8 @@ public partial class App : System.Windows.Application
                 return;
             }
 
-            var adapter = new GsmtcMediaAdapter();
+            systemLifecycle = new SystemLifecycle();
+            var adapter = new GsmtcMediaAdapter(systemLifecycle);
             var router = new MediaRouter(adapter);
             diagnosticLog = new JsonLinesDiagnosticLog();
             mediaApplication = new MediaLock.Application.MediaLockApplication(
@@ -57,7 +59,8 @@ public partial class App : System.Windows.Application
             mainWindowViewModel = new MainWindowViewModel(
                 mediaApplication,
                 SynchronizationContext.Current,
-                ShowSettingsWindow);
+                ShowSettingsWindow,
+                CloseSettingsWindow);
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -205,6 +208,8 @@ public partial class App : System.Windows.Application
         settingsWindow = null;
     }
 
+    private void CloseSettingsWindow() => settingsWindow?.Close();
+
     private void ExitApplication()
     {
         explicitExit = true;
@@ -297,6 +302,17 @@ public partial class App : System.Windows.Application
 
             diagnosticLog = null;
         }
+
+        try
+        {
+            systemLifecycle?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        systemLifecycle = null;
 
         if (instanceCoordinator is not null)
         {

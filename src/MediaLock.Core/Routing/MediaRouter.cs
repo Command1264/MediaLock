@@ -123,6 +123,7 @@ public sealed class MediaRouter : IMediaRouter
         {
             RouterIntent.CatalogUpdated catalog => UpdateCatalog(catalog),
             RouterIntent.LockSession lockSession => LockSession(lockSession.Session),
+            RouterIntent.RestoreSessionLock restore => RestoreSessionLock(restore.Fingerprint),
             RouterIntent.LockApplication lockApplication => LockApplication(lockApplication.SourceAppUserModelId),
             RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryEpoch),
             RouterIntent.UpdateOptions update => UpdateOptions(update.Options),
@@ -269,6 +270,32 @@ public sealed class MediaRouter : IMediaRouter
             ActiveFallback = null,
             RecoveryEpoch = null,
             Revision = state.Revision + 1,
+        };
+
+        return StateUpdated(previous);
+    }
+
+    private RouterResult RestoreSessionLock(SessionFingerprint fingerprint)
+    {
+        ArgumentNullException.ThrowIfNull(fingerprint);
+
+        var previous = state;
+        state = state with
+        {
+            Mode = RoutingMode.SessionLock,
+            Status = RouterStatus.Recovering,
+            LockedTarget = new LockedTarget(fingerprint, null),
+            ActiveFallback = null,
+            RecoveryEpoch = null,
+            Revision = state.Revision + 1,
+        };
+        var (status, lockedTarget, activeFallback) = ResolveLockedTarget(state.Sessions);
+        state = state with
+        {
+            Status = status,
+            LockedTarget = lockedTarget,
+            ActiveFallback = activeFallback,
+            RecoveryEpoch = status == RouterStatus.Recovering ? state.Revision : null,
         };
 
         return StateUpdated(previous);

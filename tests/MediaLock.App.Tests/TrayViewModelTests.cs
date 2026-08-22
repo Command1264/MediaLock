@@ -41,6 +41,12 @@ public sealed class TrayViewModelTests
             },
         });
         Assert.Equal("Recovering", viewModel.StatusText);
+        application.Publish(application.State with
+        {
+            CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
+            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
+        });
+        Assert.Equal("Reacquiring", viewModel.StatusText);
 
         await viewModel.ShowCommand.ExecuteAsync(null);
         await viewModel.SettingsCommand.ExecuteAsync(null);

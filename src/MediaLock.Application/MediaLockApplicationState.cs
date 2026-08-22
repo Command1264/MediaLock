@@ -1,4 +1,5 @@
 using MediaLock.Core.Configuration;
+using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Application;
@@ -6,7 +7,9 @@ namespace MediaLock.Application;
 public sealed record MediaLockApplicationState(
     RouterState Router,
     string? ErrorMessage,
-    MediaLockSettings Settings)
+    MediaLockSettings Settings,
+    MediaSessionCatalogStatus CatalogStatus = MediaSessionCatalogStatus.Available,
+    string? CatalogStatusMessage = null)
 {
     public MediaLockApplicationState(
         RouterState router,

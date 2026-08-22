@@ -10,6 +10,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
+    private readonly Action? requestClose;
     private bool closeToTray;
     private bool startWithWindows;
     private RoutingMode defaultRoutingMode;
@@ -21,11 +22,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public SettingsViewModel(
         IMediaLockApplication application,
-        SynchronizationContext? synchronizationContext = null)
+        SynchronizationContext? synchronizationContext = null,
+        Action? requestClose = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
+        this.requestClose = requestClose;
         SaveCommand = new AsyncCommand(_ => SaveAsync());
         application.StateChanged += OnApplicationStateChanged;
         Apply(application.State.Settings);
@@ -103,6 +106,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
             ErrorMessage = null;
+            requestClose?.Invoke();
         }
         catch (Exception exception)
         {

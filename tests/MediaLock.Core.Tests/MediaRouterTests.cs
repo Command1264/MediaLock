@@ -117,6 +117,108 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task PersistedSessionLockRestoresAUniqueFingerprintSuccessor()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var persisted = new SessionFingerprint(
+            new SessionDescriptor("music", null),
+            PlaybackStatus.Playing,
+            observedAt,
+            MediaPlaybackType.Music,
+            "Track A",
+            "Artist A");
+        var replacement = Session(
+            "replacement",
+            "music",
+            playbackStatus: PlaybackStatus.Playing,
+            observedAt: observedAt.AddSeconds(30),
+            metadata: new MediaMetadata("Track A", "Artist A", null, null),
+            playbackType: MediaPlaybackType.Music);
+
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([replacement], replacement.Key),
+            CancellationToken.None);
+        var restored = await router.DispatchAsync(
+            new RouterIntent.RestoreSessionLock(persisted),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.SessionLock, restored.State.Mode);
+        Assert.Equal(RouterStatus.Locked, restored.State.Status);
+        Assert.Equal(replacement.Key, restored.State.LockedTarget!.ResolvedSession);
+        Assert.Empty(restored.Effects.OfType<RouterEffect.ScheduleRecoveryTimeout>());
+    }
+
+    [Fact]
+    public async Task AmbiguousPersistedSessionLockRemainsRecoveringWithoutSelectingEitherCandidate()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var persisted = new SessionFingerprint(
+            new SessionDescriptor("music", null),
+            PlaybackStatus.Playing,
+            observedAt,
+            MediaPlaybackType.Music,
+            "Track A",
+            "Artist A");
+        var first = Session(
+            "first",
+            "music",
+            playbackStatus: PlaybackStatus.Playing,
+            observedAt: observedAt.AddSeconds(30),
+            metadata: new MediaMetadata("Track A", "Artist A", null, null),
+            playbackType: MediaPlaybackType.Music);
+        var second = first with { Key = new SessionKey("second") };
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([first, second], first.Key),
+            CancellationToken.None);
+
+        var restored = await router.DispatchAsync(
+            new RouterIntent.RestoreSessionLock(persisted),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Recovering, restored.State.Status);
+        Assert.Null(restored.State.LockedTarget!.ResolvedSession);
+        var timeout = Assert.Single(restored.Effects.OfType<RouterEffect.ScheduleRecoveryTimeout>());
+        Assert.Equal(restored.State.RecoveryEpoch, timeout.RecoveryEpoch);
+    }
+
+    [Fact]
+    public async Task ExpiredPersistedStableDescriptorDoesNotRestore()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var persisted = new SessionFingerprint(
+            new SessionDescriptor("music", "stable-session"),
+            PlaybackStatus.Playing,
+            observedAt,
+            MediaPlaybackType.Music,
+            "Track A",
+            "Artist A");
+        var staleCandidate = Session(
+            "candidate",
+            "music",
+            "stable-session",
+            PlaybackStatus.Playing,
+            observedAt.AddMinutes(16),
+            metadata: new MediaMetadata("Track A", "Artist A", null, null),
+            playbackType: MediaPlaybackType.Music);
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([staleCandidate], staleCandidate.Key),
+            CancellationToken.None);
+
+        var restored = await router.DispatchAsync(
+            new RouterIntent.RestoreSessionLock(persisted),
+            CancellationToken.None);
+
+        Assert.Equal(RouterStatus.Recovering, restored.State.Status);
+        Assert.Null(restored.State.LockedTarget!.ResolvedSession);
+    }
+
+    [Fact]
     public async Task AppLockUsesDeterministicCandidatePolicy()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);

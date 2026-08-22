@@ -68,6 +68,25 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void CatalogReacquisitionOverridesRoutingStatusWithActionableState()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(MediaLockApplicationState.Initial with
+        {
+            CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
+            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
+        });
+
+        Assert.Equal("Reacquiring", viewModel.RoutingStatus);
+        Assert.Equal(
+            "Reacquiring media sessions after Windows resumed.",
+            viewModel.EmptyStateText);
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task ManualCommandUsesResolvedTargetCapabilities()
     {
         var session = new MediaSessionSnapshot(

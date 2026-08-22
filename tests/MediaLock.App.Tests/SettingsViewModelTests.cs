@@ -42,11 +42,41 @@ public sealed class SettingsViewModelTests
         Assert.True(intent.Settings.Desktop.StartWithWindows);
     }
 
+    [Fact]
+    public async Task SuccessfulSaveRequestsSettingsClose()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        var closeRequests = 0;
+        using var viewModel = new SettingsViewModel(application, requestClose: () => closeRequests++);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, closeRequests);
+    }
+
+    [Fact]
+    public async Task FailedSaveKeepsSettingsOpenAndShowsTheError()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial)
+        {
+            DispatchException = new InvalidOperationException("Settings could not be saved."),
+        };
+        var closeRequests = 0;
+        using var viewModel = new SettingsViewModel(application, requestClose: () => closeRequests++);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, closeRequests);
+        Assert.Equal("Settings could not be saved.", viewModel.ErrorMessage);
+    }
+
     private sealed class FakeApplication(MediaLockApplicationState initial) : IMediaLockApplication
     {
         public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
 
         public List<ApplicationIntent> Intents { get; } = [];
+
+        public Exception? DispatchException { get; init; }
 
         public MediaLockApplicationState State { get; private set; } = initial;
 
@@ -56,6 +86,11 @@ public sealed class SettingsViewModelTests
             ApplicationIntent intent,
             CancellationToken cancellationToken)
         {
+            if (DispatchException is not null)
+            {
+                throw DispatchException;
+            }
+
             Intents.Add(intent);
             if (intent is ApplicationIntent.UpdateSettings update)
             {

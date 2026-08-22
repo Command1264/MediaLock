@@ -16,18 +16,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncCommand[] mediaCommands;
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
+    private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private string? errorMessage;
     private bool disposed;
 
     public MainWindowViewModel(
         IMediaLockApplication application,
         SynchronizationContext? synchronizationContext = null,
-        Action? showSettings = null)
+        Action? showSettings = null,
+        Action? closeSettings = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
-        Settings = new SettingsViewModel(application, synchronizationContext);
+        Settings = new SettingsViewModel(application, synchronizationContext, closeSettings);
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();
@@ -100,13 +102,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public IAsyncCommand StopCommand { get; }
 
-    public string RoutingStatus => routerState.Status.ToString();
+    public string RoutingStatus => catalogStatus switch
+    {
+        MediaSessionCatalogStatus.Available => routerState.Status.ToString(),
+        var status => status.ToString(),
+    };
 
     public bool HasSessions => Sessions.Count > 0;
 
-    public string EmptyStateText => routerState.Status == RouterStatus.Recovering
-        ? "Waiting for the locked Media Session to return."
-        : "Start media playback in a supported application.";
+    public string EmptyStateText => catalogStatus switch
+    {
+        MediaSessionCatalogStatus.Suspended => "Media sessions are suspended while Windows sleeps.",
+        MediaSessionCatalogStatus.Reacquiring => "Reacquiring media sessions after Windows resumed.",
+        MediaSessionCatalogStatus.Unavailable => "Media sessions are unavailable. Resume Windows or restart Media Lock to retry.",
+        _ when routerState.Status == RouterStatus.Recovering =>
+            "Waiting for the locked Media Session to return.",
+        _ => "Start media playback in a supported application.",
+    };
 
     public string TargetDescription
     {
@@ -194,7 +206,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private void Apply(MediaLockApplicationState state)
     {
         routerState = state.Router;
-        errorMessage = state.ErrorMessage;
+        catalogStatus = state.CatalogStatus;
+        errorMessage = state.ErrorMessage ??
+            (state.CatalogStatus == MediaSessionCatalogStatus.Unavailable
+                ? state.CatalogStatusMessage
+                : null);
         var selectedKey = SelectedSession?.Key;
         Sessions.Clear();
         foreach (var session in state.Router.Sessions)

@@ -35,6 +35,91 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task DefaultSessionLockRestoresPersistedTargetAfterInitialCatalog()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-22T00:00:00Z");
+        var session = Session("replacement", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.SessionLock,
+        };
+        var runtimeState = new RecordingRuntimeStateRepository(new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "Brave",
+                null,
+                PlaybackStatus.Playing,
+                observedAt,
+                MediaPlaybackType.Unknown,
+                null,
+                null))));
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null,
+            runtimeState);
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Equal(RoutingMode.SessionLock, application.State.Router.Mode);
+        Assert.Equal(RouterStatus.Locked, application.State.Router.Status);
+        Assert.Equal(session.Key, application.State.Router.LockedTarget!.ResolvedSession);
+        Assert.All(runtimeState.Saved, saved => Assert.Equal(RoutingMode.SessionLock, saved.Mode));
+    }
+
+    [Fact]
+    public async Task DefaultSessionLockWithoutPersistedTargetStaysWindowsAutoWithWarning()
+    {
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.SessionLock,
+        };
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null,
+            new RecordingRuntimeStateRepository());
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
+        Assert.Contains("persisted Session Lock target", application.State.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DefaultWindowsAutoIgnoresPersistedSessionLock()
+    {
+        var session = Session("replacement", "Brave");
+        var runtimeState = new RecordingRuntimeStateRepository(new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "Brave",
+                null,
+                PlaybackStatus.Playing,
+                DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+                MediaPlaybackType.Unknown,
+                null,
+                null))));
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            loginStartupManager: null,
+            runtimeState);
+
+        await application.StartAsync(CancellationToken.None);
+
+        Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
+        Assert.Null(application.State.Router.LockedTarget);
+        Assert.Null(application.State.ErrorMessage);
+    }
+
+    [Fact]
     public async Task RouteDiagnosticsRemainInsideTheSerializedApplicationDispatch()
     {
         var session = Session("music", "Brave");
@@ -233,6 +318,52 @@ public sealed class MediaLockApplicationTests
         Assert.Equal(session, Assert.Single(application.State.Router.Sessions));
         Assert.Equal(session.Key, application.State.Router.WindowsCurrentSession);
         Assert.Contains(application.State, observed);
+    }
+
+    [Fact]
+    public async Task ReacquiringCatalogBecomesObservableAndSuspendsLockedRouting()
+    {
+        var session = Session("music", "Brave");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var log = new RecordingDiagnosticLog();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: log);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(session.Key),
+            CancellationToken.None);
+        var observed = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.CatalogStatus == MediaSessionCatalogStatus.Reacquiring)
+            {
+                observed.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [],
+            null,
+            MediaSessionCatalogStatus.Reacquiring,
+            "Reacquiring GSMTC after Windows resumed."));
+        var state = await observed.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(MediaSessionCatalogStatus.Reacquiring, state.CatalogStatus);
+        Assert.Equal("Reacquiring GSMTC after Windows resumed.", state.CatalogStatusMessage);
+        Assert.Equal(RouterStatus.Recovering, state.Router.Status);
+        Assert.Empty(state.Router.Sessions);
+        var diagnostic = Assert.Single(log.Events, entry => entry.Name == "catalog.status");
+        Assert.Equal("Reacquiring", diagnostic.Properties!["status"]);
+        Assert.DoesNotContain(diagnostic.Properties.Keys, key =>
+            key.Contains("title", StringComparison.OrdinalIgnoreCase) ||
+            key.Contains("artist", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -588,10 +719,15 @@ public sealed class MediaLockApplicationTests
 
     private sealed class RecordingRuntimeStateRepository : IRuntimeStateRepository
     {
-        public RuntimeStateDocument Loaded { get; } = new(
-            RuntimeStateDocument.CurrentSchemaVersion,
-            RoutingMode.WindowsAuto,
-            LockedTarget: null);
+        public RecordingRuntimeStateRepository(RuntimeStateDocument? loaded = null)
+        {
+            Loaded = loaded ?? new RuntimeStateDocument(
+                RuntimeStateDocument.CurrentSchemaVersion,
+                RoutingMode.WindowsAuto,
+                LockedTarget: null);
+        }
+
+        public RuntimeStateDocument Loaded { get; }
 
         public List<RuntimeStateDocument> Saved { get; } = [];
 

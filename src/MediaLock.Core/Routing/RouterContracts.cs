@@ -157,6 +157,8 @@ public abstract record RouterIntent
 
     public sealed record LockSession(SessionKey Session) : RouterIntent;
 
+    public sealed record RestoreSessionLock(SessionFingerprint Fingerprint) : RouterIntent;
+
     public sealed record LockApplication(string SourceAppUserModelId) : RouterIntent;
 
     public sealed record RecoveryTimedOut(long RecoveryEpoch) : RouterIntent;

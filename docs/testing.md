@@ -38,8 +38,13 @@ capacity-one coalescing of burst GSMTC events, including cancellation of a block
 
 Phase 3 tests settings schema migration, corrupt-file preservation, atomic settings/runtime-state round trips,
 bounded diagnostic rotation, reversible current-user login startup, current-user single-instance activation, tray
-state/commands and settings ViewModel commands. Runtime-state tests deliberately verify persistence without enabling
-Phase 4 automatic lock restoration.
+state/commands and settings ViewModel commands.
+
+Phase 4 tests startup policy at `IMediaLockApplication`: Windows Auto ignores a saved lock, while Session Lock
+requires a valid persisted fingerprint and a unique acceptable candidate. Core tests keep ambiguous candidates in
+Recovering. Windows adapter tests verify suspend disposal, old-subscription removal, Reacquiring/Unavailable
+snapshots, exactly three bounded resume attempts and recovery on a later resume. ViewModel tests verify those
+catalog states are observable without exposing media metadata in diagnostics.
 
 ### Integration tests
 
@@ -86,11 +91,11 @@ playback state before/after, competing playback state and whether Windows also p
    upper-right toolbar and confirm only one independent settings window appears.
 2. Close the window with close-to-tray enabled; confirm the process and icon remain, then reopen from `Show Media Lock`.
 3. Start a second `MediaLock.App`; confirm it activates the first window and exits without adding another icon.
-4. Toggle `Start with Windows`, save, and verify the current-user Run entry is added; disable and verify it is removed.
+4. Toggle `Start with Windows`, save, verify the Settings window closes and the current-user Run entry is added;
+   disable and verify it is removed. A failed save must leave Settings open with an actionable error.
 5. Open Settings from the tray, route one command, switch to Windows Auto, then choose `Exit`; confirm the icon disappears and no
    Media Lock process remains.
-6. Reopen the app and confirm `settings.json`, `state.json` and bounded `logs\*.jsonl` remain readable. Do not expect
-   the persisted Session Lock to restore until Phase 4.
+6. Reopen the app and confirm `settings.json`, `state.json` and bounded `logs\*.jsonl` remain readable.
 
 Recorded production-boundary evidence: [Phase 3 manual smoke — 2026-08-22](phase-3/manual-smoke-2026-08-22.md).
 

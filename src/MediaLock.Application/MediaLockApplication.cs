@@ -22,6 +22,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private MediaLockSettings settings = MediaLockSettings.Default;
     private string? settingsLoadWarning;
     private string? runtimeStateLoadWarning;
+    private SessionFingerprint? startupRestoreFingerprint;
+    private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
+    private string? catalogStatusMessage;
 
     public MediaLockApplication(
         IMediaSessionCatalog catalog,
@@ -76,7 +79,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
             State = new MediaLockApplicationState(
                 State.Router,
                 PersistenceWarnings,
-                settings);
+                settings,
+                catalogStatus,
+                catalogStatusMessage);
             if (loginStartupManager is not null &&
                 await loginStartupManager.IsEnabledAsync(cancellationToken) !=
                 settings.Desktop!.StartWithWindows)
@@ -100,6 +105,27 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     ErrorMessage = PersistenceWarnings,
                 };
             }
+            else if (settings.DefaultRoutingMode == RoutingMode.SessionLock)
+            {
+                if (loadedRuntimeState.Value is
+                    {
+                        Mode: RoutingMode.SessionLock,
+                        LockedTarget.Fingerprint: { } persistedFingerprint,
+                    })
+                {
+                    startupRestoreFingerprint = ToSessionFingerprint(persistedFingerprint);
+                }
+                else
+                {
+                    runtimeStateLoadWarning =
+                        "Default Session Lock requires a valid persisted Session Lock target; Windows Auto is active.";
+                }
+            }
+        }
+        else if (settings.DefaultRoutingMode == RoutingMode.SessionLock)
+        {
+            runtimeStateLoadWarning =
+                "Default Session Lock requires runtime-state persistence; Windows Auto is active.";
         }
 
         if (settingsRepository is not null)
@@ -108,7 +134,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new RouterIntent.UpdateOptions(new RouterOptions(
                     settings.Recovery!.FallbackPolicy,
                     settings.Recovery.Timeout)),
-                cancellationToken);
+                cancellationToken,
+                persistRuntimeState: startupRestoreFingerprint is null);
         }
 
         var initialized = new TaskCompletionSource(
@@ -217,7 +244,12 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
             settings = updated;
             settingsLoadWarning = null;
-            State = new MediaLockApplicationState(State.Router, PersistenceWarnings, settings);
+            State = new MediaLockApplicationState(
+                State.Router,
+                PersistenceWarnings,
+                settings,
+                catalogStatus,
+                catalogStatusMessage);
             StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
             await TryWriteDiagnosticAsync(
                 new DiagnosticEvent("settings.saved"),
@@ -291,13 +323,26 @@ public sealed class MediaLockApplication : IMediaLockApplication
     {
         try
         {
+            var firstSnapshot = true;
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
                 await DispatchRouterAsync(
                     new RouterIntent.CatalogUpdated(
                         snapshot.Sessions,
                         snapshot.WindowsCurrentSession),
-                    cancellationToken);
+                    cancellationToken,
+                    persistRuntimeState: !firstSnapshot || startupRestoreFingerprint is null,
+                    nextCatalogStatus: snapshot.Status,
+                    nextCatalogStatusMessage: snapshot.StatusMessage);
+                if (firstSnapshot && startupRestoreFingerprint is { } fingerprint)
+                {
+                    await DispatchRouterAsync(
+                        new RouterIntent.RestoreSessionLock(fingerprint),
+                        cancellationToken);
+                    startupRestoreFingerprint = null;
+                }
+
+                firstSnapshot = false;
                 initialized.TrySetResult();
             }
 
@@ -328,7 +373,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private async ValueTask<(RouterResult Result, MediaLockApplicationState State)> DispatchRouterAsync(
         RouterIntent intent,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool persistRuntimeState = true,
+        MediaSessionCatalogStatus? nextCatalogStatus = null,
+        string? nextCatalogStatusMessage = null)
     {
         using var dispatchCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -337,13 +385,34 @@ public sealed class MediaLockApplication : IMediaLockApplication
         try
         {
             var previousRevision = State.Router.Revision;
+            var previousCatalogStatus = catalogStatus;
+            if (nextCatalogStatus is { } status)
+            {
+                catalogStatus = status;
+                catalogStatusMessage = nextCatalogStatusMessage;
+            }
+
             var result = await router.DispatchAsync(intent, dispatchCancellation.Token);
             Apply(result);
-            await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
+            if (persistRuntimeState)
+            {
+                await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
+            }
             await RecordStateTransitionAsync(
                 previousRevision,
                 result.State,
                 dispatchCancellation.Token);
+            if (nextCatalogStatus is not null && catalogStatus != previousCatalogStatus)
+            {
+                await TryWriteDiagnosticAsync(
+                    new DiagnosticEvent(
+                        "catalog.status",
+                        new Dictionary<string, string>
+                        {
+                            ["status"] = catalogStatus.ToString(),
+                        }),
+                    dispatchCancellation.Token);
+            }
             if (intent is RouterIntent.Route routedCommand)
             {
                 await TryWriteDiagnosticAsync(
@@ -475,7 +544,12 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private void Publish(RouterState routerState)
     {
-        State = new MediaLockApplicationState(routerState, PersistenceWarnings, settings);
+        State = new MediaLockApplicationState(
+            routerState,
+            PersistenceWarnings,
+            settings,
+            catalogStatus,
+            catalogStatusMessage);
         StateChanged?.Invoke(
             this,
             new MediaLockApplicationStateChangedEventArgs(State));
@@ -525,6 +599,17 @@ public sealed class MediaLockApplication : IMediaLockApplication
             PublishError($"Runtime state could not be saved: {exception.Message}");
         }
     }
+
+    private static SessionFingerprint ToSessionFingerprint(
+        PersistedSessionFingerprint persisted) => new(
+        new SessionDescriptor(
+            persisted.SourceAppUserModelId,
+            persisted.SessionInstanceHint),
+        persisted.PlaybackStatus,
+        persisted.ObservedAt,
+        persisted.PlaybackType,
+        persisted.Title,
+        persisted.Artist);
 
     private string? PersistenceWarnings =>
         string.Join(
