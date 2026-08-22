@@ -13,6 +13,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly SynchronizationContext? synchronizationContext;
     private readonly AsyncCommand lockCommand;
     private readonly AsyncCommand appLockCommand;
+    private readonly AsyncCommand priorityRulesCommand;
     private readonly AsyncCommand windowsAutoCommand;
     private readonly AsyncCommand[] mediaCommands;
     private SessionItemViewModel? selectedSession;
@@ -42,6 +43,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         appLockCommand = new AsyncCommand(
             LockSelectedApplicationAsync,
             _ => SelectedSession is not null);
+        priorityRulesCommand = new AsyncCommand(
+            _ => DispatchAsync(new ApplicationIntent.UsePriorityRules()),
+            _ => routerState.Mode != RoutingMode.PriorityRules);
         windowsAutoCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.UseWindowsAuto()),
             _ => routerState.Mode != RoutingMode.WindowsAuto);
@@ -62,6 +66,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         ];
         LockCommand = lockCommand;
         AppLockCommand = appLockCommand;
+        PriorityRulesCommand = priorityRulesCommand;
         WindowsAutoCommand = windowsAutoCommand;
         application.StateChanged += OnApplicationStateChanged;
         Apply(application.State);
@@ -96,6 +101,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public IAsyncCommand AppLockCommand { get; }
 
+    public IAsyncCommand PriorityRulesCommand { get; }
+
     public IAsyncCommand WindowsAutoCommand { get; }
 
     public IAsyncCommand PlayCommand { get; }
@@ -115,6 +122,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         MediaSessionCatalogStatus.Available
             when routerState.Mode == RoutingMode.AppLock && routerState.Status == RouterStatus.Locked =>
                 "App Locked",
+        MediaSessionCatalogStatus.Available when routerState.Mode == RoutingMode.PriorityRules =>
+            "Priority Rules",
         MediaSessionCatalogStatus.Available => routerState.Status.ToString(),
         var status => status.ToString(),
     };
@@ -250,6 +259,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));
         windowsAutoCommand.RaiseCanExecuteChanged();
+        priorityRulesCommand.RaiseCanExecuteChanged();
         foreach (var command in mediaCommands)
         {
             command.RaiseCanExecuteChanged();

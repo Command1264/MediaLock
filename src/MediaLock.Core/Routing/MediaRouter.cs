@@ -47,6 +47,29 @@ public sealed class MediaRouter : IMediaRouter
                 options.RecoveryTimeout,
                 "Recovery timeout must be between 0 seconds and 5 minutes.");
         }
+
+        if (options.PriorityRules.IsDefault)
+        {
+            throw new ArgumentException("Priority Rules must be an initialized immutable array.", nameof(options));
+        }
+
+        var sourceApplications = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in options.PriorityRules)
+        {
+            if (rule is null || string.IsNullOrWhiteSpace(rule.SourceAppUserModelId))
+            {
+                throw new ArgumentException(
+                    "Priority Rule source application IDs must not be blank.",
+                    nameof(options));
+            }
+
+            if (!sourceApplications.Add(rule.SourceAppUserModelId))
+            {
+                throw new ArgumentException(
+                    $"Priority Rule source application ID '{rule.SourceAppUserModelId}' is duplicated.",
+                    nameof(options));
+            }
+        }
     }
 
     public ValueTask<RouterResult> DispatchAsync(
@@ -127,6 +150,7 @@ public sealed class MediaRouter : IMediaRouter
             RouterIntent.LockApplication lockApplication => LockApplication(lockApplication.SourceAppUserModelId),
             RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryEpoch),
             RouterIntent.UpdateOptions update => UpdateOptions(update.Options),
+            RouterIntent.UsePriorityRules => UsePriorityRules(),
             RouterIntent.UseWindowsAuto => UseWindowsAuto(),
             RouterIntent.Route route => await RouteAsync(route.Command, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
@@ -140,6 +164,23 @@ public sealed class MediaRouter : IMediaRouter
         return new RouterResult(state, RouteDecision.StateUpdated);
     }
 
+    private RouterResult UsePriorityRules()
+    {
+        var previous = state;
+        state = state with
+        {
+            Mode = RoutingMode.PriorityRules,
+            Status = RouterStatus.Ready,
+            LockedTarget = null,
+            PriorityTarget = SelectPriorityCandidate(state.Sessions, options.PriorityRules)?.Key,
+            ActiveFallback = null,
+            RecoveryEpoch = null,
+            Revision = state.Revision + 1,
+        };
+
+        return StateUpdated(previous);
+    }
+
     private RouterResult UseWindowsAuto()
     {
         var previous = state;
@@ -148,6 +189,7 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.WindowsAuto,
             Status = RouterStatus.Ready,
             LockedTarget = null,
+            PriorityTarget = null,
             ActiveFallback = null,
             RecoveryEpoch = null,
             Revision = state.Revision + 1,
@@ -328,6 +370,9 @@ public sealed class MediaRouter : IMediaRouter
             LockedTarget = lockedTarget,
             ActiveFallback = activeFallback,
             RecoveryEpoch = recoveryEpoch,
+            PriorityTarget = state.Mode == RoutingMode.PriorityRules
+                ? SelectPriorityCandidate(sessions, options.PriorityRules)?.Key
+                : null,
             Revision = nextRevision,
         };
 
@@ -534,6 +579,27 @@ public sealed class MediaRouter : IMediaRouter
         .ThenBy(session => session.Key.Value, StringComparer.Ordinal)
         .FirstOrDefault();
 
+    private static MediaSessionSnapshot? SelectPriorityCandidate(
+        ImmutableArray<MediaSessionSnapshot> sessions,
+        ImmutableArray<PriorityRule> priorityRules)
+    {
+        foreach (var rule in priorityRules)
+        {
+            if (!rule.IsEnabled)
+            {
+                continue;
+            }
+
+            var candidate = SelectApplicationCandidate(sessions, rule.SourceAppUserModelId);
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
     private async ValueTask<RouterResult> RouteAsync(
         MediaCommand command,
         CancellationToken cancellationToken)
@@ -600,6 +666,8 @@ public sealed class MediaRouter : IMediaRouter
                 RouteReason.FallbackSameApplication,
             RoutingMode.SessionLock => RouteReason.LockedSession,
             RoutingMode.AppLock => RouteReason.LockedApplication,
+            RoutingMode.PriorityRules when state.PriorityTarget is not null => RouteReason.PriorityRule,
+            RoutingMode.PriorityRules => RouteReason.PriorityRulesWindowsCurrentSession,
             _ => RouteReason.WindowsCurrentSession,
         };
         var (kind, reason) = controlResult switch

@@ -294,6 +294,62 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task PriorityRulesRouteToTheFirstAvailableEnabledApplication()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(
+            controller,
+            new RouterOptions(
+                FallbackPolicy.SameApplicationThenWindowsCurrentSession,
+                TimeSpan.FromSeconds(15),
+                [
+                    new PriorityRule("preferred", IsEnabled: false),
+                    new PriorityRule("second"),
+                    new PriorityRule("third"),
+                ]));
+        var current = Session("current", "other");
+        var second = Session("second", "second");
+        var third = Session("third", "third");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([third, current, second], current.Key),
+            CancellationToken.None);
+
+        await router.DispatchAsync(new RouterIntent.UsePriorityRules(), CancellationToken.None);
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Mode);
+        Assert.Equal(second.Key, result.State.ActiveTarget);
+        Assert.Equal(second.Key, result.Decision.Target);
+        Assert.Equal(RouteReason.PriorityRule, result.Decision.Reason);
+    }
+
+    [Fact]
+    public async Task PriorityRulesFallBackToWindowsCurrentSessionWhenNoRuleMatches()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(
+            controller,
+            new RouterOptions(
+                FallbackPolicy.SameApplicationThenWindowsCurrentSession,
+                TimeSpan.FromSeconds(15),
+                [new PriorityRule("missing")]));
+        var current = Session("current", "other");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        await router.DispatchAsync(new RouterIntent.UsePriorityRules(), CancellationToken.None);
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.TogglePlayPause),
+            CancellationToken.None);
+
+        Assert.Equal(current.Key, result.Decision.Target);
+        Assert.Equal(RouteReason.PriorityRulesWindowsCurrentSession, result.Decision.Reason);
+    }
+
+    [Fact]
     public async Task RecoveryTimeoutCanFallBackToWindowsCurrentSession()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);
@@ -499,6 +555,23 @@ public sealed class MediaRouterTests
                 new RouterOptions(FallbackPolicy.Wait, TimeSpan.FromMinutes(6))));
 
         Assert.Equal("options", exception.ParamName);
+    }
+
+    [Fact]
+    public void DuplicatePriorityRulesAreRejectedAtComposition()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new MediaRouter(
+                controller,
+                new RouterOptions(
+                    FallbackPolicy.Wait,
+                    TimeSpan.FromSeconds(15),
+                    [new PriorityRule("Brave"), new PriorityRule("Brave")])));
+
+        Assert.Equal("options", exception.ParamName);
+        Assert.Contains("duplicated", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

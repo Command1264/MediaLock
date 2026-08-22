@@ -51,6 +51,11 @@ settings and runtime state, interactive commands submit source application ident
 main/tray ViewModels distinguish `App Locked` from Session Lock. Existing Core tests own the deterministic
 playing/recency/stable-key candidate policy.
 
+Phase 5B tests Priority Rules through the same public seams. Core coverage proves enabled-rule ordering, the
+Windows Current Session fallback and invalid duplicates. Application coverage proves startup without a persisted
+Locked Target and interactive activation. Settings tests cover add, enable/disable, move, remove and schema-v3
+round trips, including v1/v2 migration. Main/tray ViewModels expose the mode explicitly.
+
 ### Integration tests
 
 Cover:
@@ -115,6 +120,17 @@ Recorded production-boundary evidence: [Phase 3 manual smoke — 2026-08-22](pha
    restored without binding a different source application.
 
 Record results in [Phase 5A manual smoke](phase-5/manual-smoke.md).
+
+### Phase 5B Priority Rules smoke test
+
+1. Add the ordinary Brave source below the Brave YouTube Music PWA source, save, restart and activate
+   `Priority Rules`; verify the UI and tray show `Priority Rules`.
+2. With both sources available, route Play/Pause and verify only YouTube Music changes once.
+3. Disable or remove the YouTube Music rule, save and restart; verify ordinary YouTube now receives one command.
+4. Make every enabled rule unavailable while another Windows Current Session exists; verify that current Session
+   receives one command and Media Lock remains in `Priority Rules`.
+
+Record results in [Phase 5B manual smoke](phase-5/priority-rules-smoke.md).
 
 ## 4. Compatibility matrix
 

@@ -107,6 +107,35 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task PriorityRulesCanBeActivatedThroughTheApplicationSeam()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        await viewModel.PriorityRulesCommand.ExecuteAsync(null);
+
+        Assert.IsType<ApplicationIntent.UsePriorityRules>(Assert.Single(application.Intents));
+    }
+
+    [Fact]
+    public void PriorityRulesAreExplicitInTheRoutingStatus()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        application.Publish(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.PriorityRules,
+                Revision = 1,
+            },
+        });
+
+        Assert.Equal("Priority Rules", viewModel.RoutingStatus);
+    }
+
+    [Fact]
     public void CatalogReacquisitionOverridesRoutingStatusWithActionableState()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);

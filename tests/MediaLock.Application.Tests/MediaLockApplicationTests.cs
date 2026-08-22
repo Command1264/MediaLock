@@ -12,6 +12,61 @@ namespace MediaLock.Application.Tests;
 public sealed class MediaLockApplicationTests
 {
     [Fact]
+    public async Task PriorityRulesDefaultActivatesWithoutPersistedLockedTarget()
+    {
+        var preferred = Session("preferred", "music");
+        var current = Session("current", "browser");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([current, preferred], current.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+
+        await application.StartAsync(CancellationToken.None);
+        var routed = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, application.State.Router.Mode);
+        Assert.Equal(preferred.Key, routed.Decision.Target);
+        Assert.Equal(RouteReason.PriorityRule, routed.Decision.Reason);
+    }
+
+    [Fact]
+    public async Task PriorityRulesCanBeActivatedInteractivelyThroughTheApplicationInterface()
+    {
+        var session = Session("music", "music");
+        var settings = MediaLockSettings.Default with
+        {
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager());
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UsePriorityRules(),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
+        Assert.Equal(session.Key, result.State.Router.ActiveTarget);
+    }
+
+    [Fact]
     public async Task LoadedRecoverySettingsConfigureTheRouterBeforeCatalogProcessing()
     {
         var session = Session("music", "Brave");

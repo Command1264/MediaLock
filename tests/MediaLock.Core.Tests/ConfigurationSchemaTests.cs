@@ -9,7 +9,7 @@ public sealed class ConfigurationSchemaTests
     [Fact]
     public void DefaultSettingsEnableCloseToTrayButNotLoginStartup()
     {
-        Assert.Equal(2, MediaLockSettings.CurrentSchemaVersion);
+        Assert.Equal(3, MediaLockSettings.CurrentSchemaVersion);
         Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
         Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
     }
@@ -30,7 +30,7 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 2, but found 99.");
+            issue.Message == "Expected schema version 3, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
@@ -104,6 +104,27 @@ public sealed class ConfigurationSchemaTests
     }
 
     [Fact]
+    public void PriorityRulesRuntimeStateRejectsALockedTarget()
+    {
+        var state = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.PriorityRules,
+            new PersistedLockedTarget(new PersistedSessionFingerprint(
+                "Brave",
+                null,
+                PlaybackStatus.Paused,
+                DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+                MediaPlaybackType.Video,
+                null,
+                null)));
+
+        var issue = Assert.Single(state.Validate());
+
+        Assert.Equal("lockedTarget", issue.Path);
+        Assert.Equal("Priority Rules runtime state must not contain a Locked Target.", issue.Message);
+    }
+
+    [Fact]
     public void MissingRecoverySettingsReturnActionableValidationIssue()
     {
         var settings = new MediaLockSettings(
@@ -132,5 +153,21 @@ public sealed class ConfigurationSchemaTests
 
         Assert.Equal("desktop", issue.Path);
         Assert.Equal("Desktop settings are required.", issue.Message);
+    }
+
+    [Fact]
+    public void DuplicatePriorityRuleApplicationsReturnAnActionableValidationIssue()
+    {
+        var settings = new MediaLockSettings(
+            MediaLockSettings.CurrentSchemaVersion,
+            RoutingMode.PriorityRules,
+            MediaLockSettings.Default.Recovery,
+            MediaLockSettings.Default.Desktop,
+            [new PriorityRule("Brave"), new PriorityRule("Brave", IsEnabled: false)]);
+
+        var issue = Assert.Single(settings.Validate());
+
+        Assert.Equal("priorityRules[1].sourceAppUserModelId", issue.Path);
+        Assert.Equal("Priority Rule source application ID 'Brave' is duplicated.", issue.Message);
     }
 }

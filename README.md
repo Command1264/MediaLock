@@ -7,8 +7,8 @@ Media Lock 是規劃中的 Windows 桌面工具：它位於實體媒體鍵與 Wi
 ## 專案狀態
 
 目前已有可執行的 WPF 桌面殼層與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
-提供媒體控制、常駐通知區域，並保存設定與執行狀態。Phase 4 已加入安全的 Session Lock
-啟動恢復，以及 suspend/resume GSMTC manager reacquisition；實機相容性仍依測試矩陣記錄。
+提供媒體控制、常駐通知區域，並保存設定與執行狀態。Phase 5 已加入 App Lock 與有序的來源應用程式
+Priority Rules；實機相容性仍依測試矩陣記錄。
 
 已驗證的基礎能力包括：
 
@@ -31,7 +31,9 @@ Windows 的用戶端動畫設定。`Save settings` 成功後會關閉設定視�
 使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
 有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。
 
-Recovery timeout、Fallback Policy 與 Default routing mode 會在下次啟動時套用。App Lock 可從主視窗選取
+Recovery timeout、Fallback Policy、Priority Rules 與 Default routing mode 會在下次啟動時套用。Priority
+Rules 依設定順序選擇第一個目前可用且已啟用的來源應用程式，沒有匹配時使用 Windows Current Session；
+同一來源內沿用 App Lock 的確定性候選政策。App Lock 可從主視窗選取
 Session 的來源應用程式，並在該應用程式的候選 Sessions 間依確定性政策切換；它不辨識瀏覽器 URL 或
 保證單一 Session 連續性。Default App Lock 會從有效的 `state.json` 恢復保存的來源應用程式。
 Default Session Lock

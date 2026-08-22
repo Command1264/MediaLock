@@ -93,6 +93,7 @@ state plus an intent/event and returns a new state with effects to execute.
 ```text
 WindowsAuto
    ├─ LockApp ───────────────▶ AppLocked
+   ├─ UsePriorityRules ──────▶ PriorityRules
    └─ LockSession ───────────▶ SessionLocked
                                   │ SessionLost
                                   ▼
@@ -185,6 +186,12 @@ Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most th
 unless a future explicitly disclosed diagnostic mode supplies them.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Saved changes
 take effect on the next process start.
+
+Phase 5B stores ordered `PriorityRule` values in settings schema v3. The router owns rule evaluation behind
+`IMediaRouter.DispatchAsync`: it skips disabled rules, selects the first source application with a current Session,
+and delegates same-application choice to the App Lock candidate policy. With no match, it uses Windows Current
+Session without changing to Windows Auto. Priority Rules have no Locked Target and therefore need no runtime-state
+identity; settings schema v1/v2 migrate to an empty rule list.
 
 ## 9. Composition
 

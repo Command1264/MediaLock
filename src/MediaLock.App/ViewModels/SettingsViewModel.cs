@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MediaLock.Application;
@@ -17,6 +19,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private double recoveryTimeoutSeconds;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
+    private string? selectedAvailableApplication;
     private MediaLockSettings? appliedSettings;
     private bool disposed;
 
@@ -30,17 +33,32 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         this.synchronizationContext = synchronizationContext;
         this.requestClose = requestClose;
         SaveCommand = new AsyncCommand(_ => SaveAsync());
+        AddPriorityRuleCommand = new AsyncCommand(AddPriorityRuleAsync);
+        MovePriorityRuleUpCommand = new AsyncCommand(MovePriorityRuleUpAsync);
+        MovePriorityRuleDownCommand = new AsyncCommand(MovePriorityRuleDownAsync);
+        RemovePriorityRuleCommand = new AsyncCommand(RemovePriorityRuleAsync);
         application.StateChanged += OnApplicationStateChanged;
         Apply(application.State.Settings);
+        RefreshAvailableApplications(application.State);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<RoutingMode> RoutingModes { get; } =
-        [RoutingMode.WindowsAuto, RoutingMode.AppLock, RoutingMode.SessionLock];
+        [RoutingMode.WindowsAuto, RoutingMode.PriorityRules, RoutingMode.AppLock, RoutingMode.SessionLock];
 
     public IReadOnlyList<FallbackPolicy> FallbackPolicies { get; } =
         Enum.GetValues<FallbackPolicy>();
+
+    public ObservableCollection<PriorityRuleItemViewModel> PriorityRules { get; } = [];
+
+    public ObservableCollection<string> AvailableApplications { get; } = [];
+
+    public string? SelectedAvailableApplication
+    {
+        get => selectedAvailableApplication;
+        set => SetField(ref selectedAvailableApplication, value);
+    }
 
     public bool CloseToTray
     {
@@ -74,6 +92,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public IAsyncCommand SaveCommand { get; }
 
+    public IAsyncCommand AddPriorityRuleCommand { get; }
+
+    public IAsyncCommand MovePriorityRuleUpCommand { get; }
+
+    public IAsyncCommand MovePriorityRuleDownCommand { get; }
+
+    public IAsyncCommand RemovePriorityRuleCommand { get; }
+
     public string? ErrorMessage
     {
         get => errorMessage;
@@ -101,7 +127,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 new RecoverySettings(
                     TimeSpan.FromSeconds(RecoveryTimeoutSeconds),
                     FallbackPolicy),
-                new DesktopSettings(CloseToTray, StartWithWindows));
+                new DesktopSettings(CloseToTray, StartWithWindows),
+                PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
@@ -121,10 +148,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {
-            synchronizationContext.Post(_ => ApplyIfChanged(args.State.Settings), null);
+            synchronizationContext.Post(_ =>
+            {
+                RefreshAvailableApplications(args.State);
+                ApplyIfChanged(args.State.Settings);
+            }, null);
             return;
         }
 
+        RefreshAvailableApplications(args.State);
         ApplyIfChanged(args.State.Settings);
     }
 
@@ -146,6 +178,100 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         DefaultRoutingMode = settings.DefaultRoutingMode;
         RecoveryTimeoutSeconds = settings.Recovery!.Timeout.TotalSeconds;
         FallbackPolicy = settings.Recovery.FallbackPolicy;
+        PriorityRules.Clear();
+        foreach (var rule in settings.PriorityRules)
+        {
+            PriorityRules.Add(new PriorityRuleItemViewModel(rule));
+        }
+
+        RefreshAvailableApplications(application.State);
+    }
+
+    private Task AddPriorityRuleAsync(object? parameter)
+    {
+        if (string.IsNullOrWhiteSpace(SelectedAvailableApplication) ||
+            PriorityRules.Any(rule => string.Equals(
+                rule.SourceAppUserModelId,
+                SelectedAvailableApplication,
+                StringComparison.Ordinal)))
+        {
+            return Task.CompletedTask;
+        }
+
+        PriorityRules.Add(new PriorityRuleItemViewModel(
+            new PriorityRule(SelectedAvailableApplication)));
+        SelectedAvailableApplication = null;
+        RefreshAvailableApplications(application.State);
+        return Task.CompletedTask;
+    }
+
+    private Task MovePriorityRuleUpAsync(object? parameter)
+    {
+        if (parameter is PriorityRuleItemViewModel rule)
+        {
+            var index = PriorityRules.IndexOf(rule);
+            if (index > 0)
+            {
+                PriorityRules.Move(index, index - 1);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task MovePriorityRuleDownAsync(object? parameter)
+    {
+        if (parameter is PriorityRuleItemViewModel rule)
+        {
+            var index = PriorityRules.IndexOf(rule);
+            if (index >= 0 && index < PriorityRules.Count - 1)
+            {
+                PriorityRules.Move(index, index + 1);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task RemovePriorityRuleAsync(object? parameter)
+    {
+        if (parameter is PriorityRuleItemViewModel rule)
+        {
+            PriorityRules.Remove(rule);
+            RefreshAvailableApplications(application.State);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void RefreshAvailableApplications(MediaLockApplicationState state)
+    {
+        var available = state.Router.Sessions
+            .Select(session => session.SourceAppUserModelId)
+            .Distinct(StringComparer.Ordinal)
+            .Where(source => !PriorityRules.Any(rule => string.Equals(
+                rule.SourceAppUserModelId,
+                source,
+                StringComparison.Ordinal)))
+            .OrderBy(source => source, StringComparer.Ordinal)
+            .ToArray();
+        if (AvailableApplications.SequenceEqual(available, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        var selected = SelectedAvailableApplication;
+        AvailableApplications.Clear();
+        foreach (var source in available)
+        {
+            AvailableApplications.Add(source);
+        }
+
+        SelectedAvailableApplication = selected is not null && available.Contains(
+            selected,
+            StringComparer.Ordinal)
+                ? selected
+                : null;
     }
 
     private void SetField<T>(

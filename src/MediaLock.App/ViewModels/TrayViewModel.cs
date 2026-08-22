@@ -150,6 +150,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
     {
         RouterStatus.Recovering => "Recovering",
         RouterStatus.Locked when state.Mode == RoutingMode.AppLock => "App Locked",
+        _ when state.Mode == RoutingMode.PriorityRules => "Priority Rules",
         RouterStatus.Locked => "Locked",
         _ when state.Mode == RoutingMode.WindowsAuto => "Windows Auto",
         _ => state.Status.ToString(),

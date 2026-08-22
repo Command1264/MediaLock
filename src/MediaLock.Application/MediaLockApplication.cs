@@ -132,12 +132,18 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 : "Default App Lock requires runtime-state persistence; Windows Auto is active.";
         }
 
+        if (settings.DefaultRoutingMode == RoutingMode.PriorityRules)
+        {
+            startupRestoreIntent = new RouterIntent.UsePriorityRules();
+        }
+
         if (settingsRepository is not null)
         {
             await DispatchRouterAsync(
                 new RouterIntent.UpdateOptions(new RouterOptions(
                     settings.Recovery!.FallbackPolicy,
-                    settings.Recovery.Timeout)),
+                    settings.Recovery.Timeout,
+                    settings.PriorityRules)),
                 cancellationToken,
                 persistRuntimeState: startupRestoreIntent is null);
         }
@@ -170,6 +176,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new RouterIntent.LockSession(lockSession.Session),
             ApplicationIntent.LockApplication lockApplication =>
                 new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId),
+            ApplicationIntent.UsePriorityRules => new RouterIntent.UsePriorityRules(),
             ApplicationIntent.UseWindowsAuto => new RouterIntent.UseWindowsAuto(),
             ApplicationIntent.Route route => new RouterIntent.Route(route.Command),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),

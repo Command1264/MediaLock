@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Media Lock Settings"
         Width="620"
-        Height="500"
+        Height="700"
         MinWidth="520"
-        MinHeight="440"
+        MinHeight="560"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         KeyboardNavigation.TabNavigation="Continue">
@@ -22,7 +22,8 @@
                        Text="Choose how Media Lock behaves on this Windows account." />
         </StackPanel>
 
-        <StackPanel Grid.Row="1">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,8,0">
             <GroupBox Header="General" Padding="14" Margin="0,0,0,14">
                 <StackPanel>
                     <CheckBox Margin="0,0,0,10"
@@ -35,7 +36,7 @@
                 </StackPanel>
             </GroupBox>
 
-            <GroupBox Header="Routing and Recovery" Padding="14">
+            <GroupBox Header="Routing and Recovery" Padding="14" Margin="0,0,0,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="180" />
@@ -68,10 +69,68 @@
                                Margin="0,12,0,0"
                                Foreground="#FF666666"
                                TextWrapping="Wrap"
-                               Text="Changes apply after Media Lock restarts. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match. Otherwise Windows Auto remains active." />
+                               Text="Changes apply after Media Lock restarts. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match." />
                 </Grid>
             </GroupBox>
+
+            <GroupBox Header="Application Priority Rules" Padding="14">
+                <StackPanel>
+                    <TextBlock Margin="0,0,0,10"
+                               Foreground="#FF666666"
+                               TextWrapping="Wrap"
+                               Text="Add source applications from the current media-session list. Rules are evaluated from top to bottom; disabled rules are skipped." />
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" Margin="8,0,0,0" Padding="14,6"
+                                AutomationProperties.Name="Add selected application priority rule"
+                                Command="{Binding AddPriorityRuleCommand}"
+                                Content="Add" />
+                        <ComboBox AutomationProperties.Name="Available source applications"
+                                  ItemsSource="{Binding AvailableApplications}"
+                                  SelectedItem="{Binding SelectedAvailableApplication}"
+                                  MinWidth="280" />
+                    </DockPanel>
+                    <ItemsControl AutomationProperties.Name="Application priority rules"
+                                  ItemsSource="{Binding PriorityRules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" Margin="0,0,10,0"
+                                              VerticalAlignment="Center"
+                                              AutomationProperties.Name="Enable application priority rule"
+                                              IsChecked="{Binding IsEnabled}" />
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                               Text="{Binding SourceAppUserModelId}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="2" Margin="8,0,0,0" Padding="9,4"
+                                            AutomationProperties.Name="Move application priority rule up"
+                                            Command="{Binding DataContext.MovePriorityRuleUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="↑" />
+                                    <Button Grid.Column="3" Margin="4,0,0,0" Padding="9,4"
+                                            AutomationProperties.Name="Move application priority rule down"
+                                            Command="{Binding DataContext.MovePriorityRuleDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="↓" />
+                                    <Button Grid.Column="4" Margin="4,0,0,0" Padding="9,4"
+                                            AutomationProperties.Name="Remove application priority rule"
+                                            Command="{Binding DataContext.RemovePriorityRuleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Content="Remove" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </GroupBox>
         </StackPanel>
+        </ScrollViewer>
 
         <Grid Grid.Row="2" Margin="0,18,0,0">
             <Grid.ColumnDefinitions>

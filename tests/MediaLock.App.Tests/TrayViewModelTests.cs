@@ -98,6 +98,24 @@ public sealed class TrayViewModelTests
         Assert.Equal("App Locked", viewModel.StatusText);
     }
 
+    [Fact]
+    public void PriorityRulesStatusIsExplicit()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new TrayViewModel(application, () => { }, () => { });
+
+        application.Publish(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.PriorityRules,
+                Revision = 1,
+            },
+        });
+
+        Assert.Equal("Priority Rules", viewModel.StatusText);
+    }
+
     private sealed class FakeApplication(MediaLockApplicationState initial) : IMediaLockApplication
     {
         public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;

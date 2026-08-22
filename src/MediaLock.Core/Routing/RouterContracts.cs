@@ -8,6 +8,7 @@ public enum RoutingMode
     WindowsAuto,
     AppLock,
     SessionLock,
+    PriorityRules,
 }
 
 public enum RouteDecisionKind
@@ -36,18 +37,29 @@ public enum FallbackPolicy
     DisableRouting,
 }
 
+public sealed record PriorityRule(
+    string SourceAppUserModelId,
+    bool IsEnabled = true);
+
 public sealed record RouterOptions(
     FallbackPolicy FallbackPolicy,
-    TimeSpan RecoveryTimeout)
+    TimeSpan RecoveryTimeout,
+    ImmutableArray<PriorityRule> PriorityRules)
 {
     public RouterOptions(FallbackPolicy fallbackPolicy)
-        : this(fallbackPolicy, TimeSpan.FromSeconds(15))
+        : this(fallbackPolicy, TimeSpan.FromSeconds(15), [])
+    {
+    }
+
+    public RouterOptions(FallbackPolicy fallbackPolicy, TimeSpan recoveryTimeout)
+        : this(fallbackPolicy, recoveryTimeout, [])
     {
     }
 
     public static RouterOptions Default { get; } = new(
         FallbackPolicy.SameApplicationThenWindowsCurrentSession,
-        TimeSpan.FromSeconds(15));
+        TimeSpan.FromSeconds(15),
+        []);
 }
 
 public enum RouteReason
@@ -56,6 +68,8 @@ public enum RouteReason
     WindowsCurrentSession,
     LockedSession,
     LockedApplication,
+    PriorityRule,
+    PriorityRulesWindowsCurrentSession,
     FallbackWindowsCurrentSession,
     FallbackSameApplication,
     LockedTargetRecovering,
@@ -88,11 +102,14 @@ public sealed record RouterState(
     LockedTarget? LockedTarget,
     FallbackPolicy? ActiveFallback,
     long? RecoveryEpoch,
-    long Revision)
+    long Revision,
+    SessionKey? PriorityTarget)
 {
     public SessionKey? ActiveTarget => Status == RouterStatus.Fallback &&
         ActiveFallback == FallbackPolicy.WindowsCurrentSession
             ? WindowsCurrentSession
+            : Mode == RoutingMode.PriorityRules
+                ? PriorityTarget ?? WindowsCurrentSession
             : Mode is RoutingMode.SessionLock or RoutingMode.AppLock
                 ? LockedTarget?.ResolvedSession
                 : WindowsCurrentSession;
@@ -105,7 +122,8 @@ public sealed record RouterState(
         null,
         null,
         null,
-        0);
+        0,
+        null);
 }
 
 public sealed record LockedTarget(
@@ -164,6 +182,8 @@ public abstract record RouterIntent
     public sealed record RecoveryTimedOut(long RecoveryEpoch) : RouterIntent;
 
     public sealed record UpdateOptions(RouterOptions Options) : RouterIntent;
+
+    public sealed record UsePriorityRules : RouterIntent;
 
     public sealed record UseWindowsAuto : RouterIntent;
 }

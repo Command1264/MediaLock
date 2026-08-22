@@ -34,6 +34,12 @@ public sealed class JsonSettingsRepositoryTests
             Desktop = new DesktopSettings(
                 CloseToTray: false,
                 StartWithWindows: true),
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules =
+            [
+                new PriorityRule("Brave._crx_music"),
+                new PriorityRule("Chrome", IsEnabled: false),
+            ],
         };
 
         await repository.SaveAsync(expected, CancellationToken.None);
@@ -41,7 +47,11 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(expected, result.Value);
+        Assert.Equal(expected.SchemaVersion, result.Value.SchemaVersion);
+        Assert.Equal(expected.DefaultRoutingMode, result.Value.DefaultRoutingMode);
+        Assert.Equal(expected.Recovery, result.Value.Recovery);
+        Assert.Equal(expected.Desktop, result.Value.Desktop);
+        Assert.Equal(expected.PriorityRules.ToArray(), result.Value.PriorityRules.ToArray());
         Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);
     }
@@ -68,10 +78,44 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(2, result.Value.SchemaVersion);
+        Assert.Equal(3, result.Value.SchemaVersion);
         Assert.Equal(TimeSpan.FromSeconds(30), result.Value.Recovery!.Timeout);
         Assert.Equal(FallbackPolicy.Wait, result.Value.Recovery.FallbackPolicy);
         Assert.Equal(MediaLockSettings.Default.Desktop, result.Value.Desktop);
+        Assert.Empty(result.Value.PriorityRules);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public async Task VersionTwoSettingsMigrateToEmptyPriorityRules()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(
+            System.IO.Path.Combine(directory.Path, "settings.json"),
+            """
+            {
+              "schemaVersion": 2,
+              "defaultRoutingMode": "appLock",
+              "recovery": {
+                "timeout": "00:00:15",
+                "fallbackPolicy": "wait"
+              },
+              "desktop": {
+                "closeToTray": false,
+                "startWithWindows": true
+              }
+            }
+            """);
+        ISettingsRepository repository = new JsonSettingsRepository(
+            directory.Path,
+            TimeProvider.System);
+
+        var result = await repository.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(3, result.Value.SchemaVersion);
+        Assert.Equal(RoutingMode.AppLock, result.Value.DefaultRoutingMode);
+        Assert.Equal(new DesktopSettings(false, true), result.Value.Desktop);
+        Assert.Empty(result.Value.PriorityRules);
         Assert.Empty(result.Issues);
     }
 
