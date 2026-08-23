@@ -1,0 +1,125 @@
+name: Bug report / 錯誤回報
+description: Report a reproducible Media Lock defect / 回報可重現的 Media Lock 問題
+title: "[Bug]: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝協助改善 Media Lock。請先搜尋現有 Issue，並移除 log、截圖及設定中的私人資料。
+        Thanks for helping improve Media Lock. Search existing issues first and redact private data from logs, screenshots, and settings.
+
+  - type: input
+    id: version
+    attributes:
+      label: Media Lock version / 版本
+      description: Use the version shown by the downloaded package or executable, for example 0.2.0-rc.2.
+      placeholder: 0.2.0-rc.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: windows
+    attributes:
+      label: Windows environment / Windows 環境
+      description: Include edition, DisplayVersion, full build, and architecture.
+      placeholder: Windows 11 Pro, 24H2, 26100.x, x64
+    validations:
+      required: true
+
+  - type: textarea
+    id: media_source
+    attributes:
+      label: Media source / 媒體來源
+      description: Include the application or browser, its version, and whether this is a browser tab, PWA, or desktop application.
+      placeholder: Brave 1.x, YouTube Music PWA
+    validations:
+      required: true
+
+  - type: input
+    id: source_application
+    attributes:
+      label: Source application shown by Media Lock / 顯示的來源應用程式
+      description: Copy the source identity displayed by Media Lock, not only the browser or product name.
+      placeholder: Brave._crx_cinhimbnkkghhklpknlkffjgod
+    validations:
+      required: true
+
+  - type: dropdown
+    id: routing_mode
+    attributes:
+      label: Routing Mode / 路由模式
+      options:
+        - Session Lock / 鎖定工作階段
+        - App Lock / 鎖定應用程式
+        - Priority Rules / 優先規則
+        - Windows Auto / Windows 自動
+        - Not sure / 不確定
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps / 重現步驟
+      description: State what was playing, which target was selected, and every action needed to reproduce the problem.
+      placeholder: |
+        1. Start ...
+        2. Select ...
+        3. Press ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 預期行為
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / 實際行為
+      description: Include whether the target entered Recovering or Unavailable, and whether another source changed.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency / 發生頻率
+      options:
+        - Every time / 每次
+        - Often / 經常
+        - Sometimes / 偶爾
+        - Once / 僅一次
+    validations:
+      required: true
+
+  - type: textarea
+    id: input_device
+    attributes:
+      label: Input and lifecycle context / 輸入與生命週期情境
+      description: If relevant, include keyboard model and key, plus focus change, startup, lock/unlock, sleep/resume, or Session recreation details.
+      placeholder: ASUS ROG STRIX FLARE; Play/Pause; after sleep/resume
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics / 已清理的診斷資料
+      description: Attach only the relevant log excerpt from %LocalAppData%\MediaLock\logs after checking it. Do not include secrets, account details, media titles, artists, or unrelated settings.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist / 檢查清單
+      options:
+        - label: I searched existing issues and did not find the same report. / 我已搜尋現有 Issue，未找到相同回報。
+          required: true
+        - label: I can reproduce this with the steps above, or clearly marked it as a one-time event. / 我能依上述步驟重現，或已註明僅發生一次。
+          required: true
+        - label: I reviewed every attachment and removed private or unrelated data. / 我已檢查附件並移除私人或無關資料。
+          required: true

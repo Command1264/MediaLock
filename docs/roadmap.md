@@ -255,3 +255,44 @@ for source commit `aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7` and archive SHA-256
 GitHub Release or public artifact is implied by phase completion. A separately approved publication operation later
 created GPG-signed annotated tag `v0.2.0-rc.2` at the candidate source commit and a public GitHub Prerelease containing
 only the verified ZIP asset; the executable remains unsigned.
+
+## Phase 10 — Public feedback and stable-release readiness
+
+### Phase 10A — Feedback foundation
+
+Give prerelease users one trustworthy path from download through verification, update, rollback, removal,
+troubleshooting and structured feedback. Keep support evidence privacy-conscious and compatible with the existing
+GitHub Issues triage roles.
+
+Exit criteria:
+
+- README links directly to the current official GitHub Release, its SHA-256, installation guidance and support entry
+  points without describing the shipped application as merely planned.
+- User documentation covers archive verification, first run, the exact-path effect of login startup, side-by-side
+  update, rollback, portable removal and optional user-data cleanup.
+- Bug and Compatibility Issue Forms collect the exact Media Lock version, Windows build, source application,
+  Routing Mode, reproduction/result data, competing-source behavior and only sanitized diagnostic evidence.
+- Blank issues are disabled; every new report starts in `needs-triage`, with `needs-info`, `ready-for-agent`,
+  `ready-for-human` and `wontfix` available for later classification.
+- Troubleshooting distinguishes Media Lock defects from missing or non-cooperating GSMTC capability and documents
+  safe handling of unsigned downloads and `%LocalAppData%\MediaLock\` data.
+- Relative documentation links and Issue Form YAML pass local validation; the full diff passes Standards and Spec
+  review without relying on GitHub Actions capacity.
+
+Stable-release decision gate:
+
+- Use `0.2.0-rc.3` when any product behavior, packaging contract or persisted behavior changes after the tested
+  `rc.2` artifact and therefore needs another prerelease validation cycle. A new candidate receives its own clean
+  commit, digest, host and Windows Sandbox evidence.
+- A documentation- or repository-metadata-only correction does not mutate the existing `rc.2` artifact, but public
+  instructions must still identify that artifact exactly.
+- A stable `0.2.0` build always receives its own versioned clean commit, archive digest, host evidence and Windows
+  Sandbox evidence; RC evidence does not transfer to the differently versioned stable executable.
+- Publish stable only when the chosen source has no unresolved Critical or High defect, every claimed
+  compatibility row has named evidence, download/hash/install/update/rollback/remove paths are verified, unsigned
+  status remains explicit, and all relevant automated and clean-environment gates pass.
+- Tagging, stable GitHub Release creation and public artifact publication remain separately approved remote operations.
+
+Status: implementation is ready for integration. Public activation remains pending until the canonical triage labels
+exist and these Issue Forms reach the repository's default branch; merging only to a non-default integration branch
+does not satisfy the Phase 10A exit criteria.

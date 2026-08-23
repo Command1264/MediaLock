@@ -1,6 +1,6 @@
 # Media Lock
 
-Media Lock 是規劃中的 Windows 桌面工具：它位於實體媒體鍵與 Windows 媒體工作階段之間，讓使用者
+Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與 Windows 媒體工作階段之間，讓使用者
 將播放、暫停、上一首、下一首與停止命令導向指定播放器，而不是永遠接受 Windows 的
 `CurrentSession` 選擇。
 
@@ -18,7 +18,18 @@ Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸�
 4. 可將命令可靠送往鎖定目標。
 5. Session 消失及重新出現時可恢復。
 
-## 執行桌面程式
+## 下載與安裝
+
+目前公開版本是 unsigned `win-x64` prerelease：
+
+- [下載 Media Lock 0.2.0-rc.2](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2)
+- SHA-256：`0c750e7f2eec132b6b82c4d78f491f961dad76358c4e0b9c49dc3042779ec5e7`
+- [下載、驗證、更新、回復與移除說明](docs/installation.md)
+
+ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。由於執行檔尚未 code signing，
+Windows SmartScreen 或信譽警告仍可能出現；請只從官方 GitHub Release 下載並在執行前比對 SHA-256。
+
+## 從原始碼執行
 
 ```powershell
 dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Release
@@ -48,14 +59,14 @@ Session 的來源應用程式，並在該應用程式的候選 Sessions 間依�
 只在 `state.json` 含有有效的 Session Fingerprint，且目前 catalog 有唯一可接受候選時恢復；缺少、
 損毀、過期或模糊的候選都不會被靜默鎖定。啟動模式為 Windows Auto 時一律忽略先前保存的鎖定。
 
-## 預定技術基底
+## 技術基底
 
 - C#、.NET 10 LTS。
 - WPF 作為 Windows GUI。
 - 展示層使用 MVVM；核心由顯式狀態機與 application services 驅動。
 - Windows GSMTC 作為媒體工作階段資訊與控制邊界。
 - Win32 input backend、system tray 與 startup integration 經由 adapters 隔離。
-- `win-x64` self-contained single-file 為預定發布候選；須以實際相容性測試確認。
+- 公開候選使用 `win-x64` self-contained single-file 封裝；相容性聲明以具名實測結果為準。
 
 ## 建立 Release Candidate
 
@@ -65,11 +76,9 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 & .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.2
 ```
 
-輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。`0.2.0-rc.1` 已在 Windows Sandbox
-通過乾淨環境 smoke test；`0.2.0-rc.2` 納入後續 UX、Now Playing、Seek 與全域媒體鍵攔截成果，必須以
-其自身 source commit 與 archive digest 重新通過相同 gate。正式 `0.2.0-rc.2` 已在 Windows Sandbox
-通過該 gate，可描述為 portable layout。目前僅支援 `win-x64` 且未經 code signing，因此仍是 unsigned
-prerelease。完整驗證、證據與回復流程見
+輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。正式 `0.2.0-rc.2` 已以自身 source
+commit 與 archive digest 通過 Windows Sandbox gate，可描述為 portable layout。目前僅支援 `win-x64`
+且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
 [Release candidate runbook](docs/release-candidate.md)，版本內容見
 [0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。正式候選已透過
 [GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2) 公開 ZIP；Release 頁面
@@ -80,12 +89,24 @@ prerelease。完整驗證、證據與回復流程見
 
 ## 文件
 
+- [下載、安裝、更新與移除](docs/installation.md)
+- [支援與疑難排解](SUPPORT.md)
 - [產品規格](docs/product-spec.md)
 - [架構](docs/architecture.md)
 - [路線圖](docs/roadmap.md)
 - [測試策略](docs/testing.md)
 - [領域詞彙](CONTEXT.md)
 - [架構決策](docs/adr/)
+
+## 回報問題與相容性結果
+
+建立回報前請先閱讀[支援與疑難排解](SUPPORT.md)，並搜尋
+[現有 Issues](https://github.com/Command1264/MediaLock/issues)。請依回報類型使用：
+
+- [Bug report](https://github.com/Command1264/MediaLock/issues/new?template=bug-report.yml)：可重現的 Media Lock 行為缺陷。
+- [Compatibility report](https://github.com/Command1264/MediaLock/issues/new?template=compatibility-report.yml)：特定媒體來源、Windows build 或輸入裝置的成功／失敗結果。
+
+公開 Issue 前請檢查並移除 logs、設定、路徑與截圖中的私人資料。
 
 ## 官方參考
 
