@@ -209,11 +209,12 @@ to Windows without restarting discovery or routing.
 
 ### v0.2
 
-App Lock, ordered application Priority Rules, customizable shortcuts, artwork, timeline/seek, volume and richer Recovery.
+App Lock, ordered application Priority Rules, artwork, timeline/seek, global media-key interception and richer Recovery.
 
-The first packaged candidate is `0.2.0-rc.1` because the current product already includes App Lock and ordered
-Priority Rules. Customizable shortcuts, artwork, timeline/seek, volume and richer Recovery remain separately scoped;
-the candidate version does not imply those unfinished features are present.
+The first packaged candidate was `0.2.0-rc.1`, containing App Lock and ordered Priority Rules. The second candidate,
+`0.2.0-rc.2`, adds the completed localization and visual foundation, routed-target artwork and timeline, absolute Seek,
+and production global media-key interception. Customizable shortcuts and volume remain separately scoped; candidate
+versioning does not imply those unfinished features are present.
 
 ### v0.3
 

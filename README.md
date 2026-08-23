@@ -6,9 +6,9 @@ Media Lock 是規劃中的 Windows 桌面工具：它位於實體媒體鍵與 Wi
 
 ## 專案狀態
 
-目前已有可執行的 WPF 桌面殼層與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
-提供媒體控制、常駐通知區域，並保存設定與執行狀態。Phase 5 已加入 App Lock 與有序的來源應用程式
-Priority Rules；實機相容性仍依測試矩陣記錄。
+目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
+提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
+Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
 
 已驗證的基礎能力包括：
 
@@ -62,13 +62,15 @@ Session 的來源應用程式，並在該應用程式的候選 Sessions 間依�
 Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manifest 與 SHA-256：
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.1
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.2
 ```
 
-輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。正式 `0.2.0-rc.1` 候選已在
-Windows Sandbox 通過乾淨環境 smoke test，可描述為 portable layout；目前僅支援 `win-x64` 且未經
-code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
-[Release candidate runbook](docs/release-candidate.md)。建立 tag、GitHub Release 或公開 artifact 仍需另行核准。
+輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。`0.2.0-rc.1` 已在 Windows Sandbox
+通過乾淨環境 smoke test；`0.2.0-rc.2` 納入後續 UX、Now Playing、Seek 與全域媒體鍵攔截成果，必須以
+其自身 source commit 與 archive digest 重新通過相同 gate，才能描述為 portable layout。目前僅支援
+`win-x64` 且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
+[Release candidate runbook](docs/release-candidate.md)，版本內容見
+[0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。建立 tag、GitHub Release 或公開 artifact 仍需另行核准。
 
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
 並在 .NET 10 持續獲得更新。

@@ -20,9 +20,16 @@ $isolatedSourceRoot = Join-Path $temporaryRoot 'source'
 $artifactOutputRoot = Join-Path $temporaryRoot 'output'
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
 $dirtyMarkerPath = Join-Path $isolatedSourceRoot '.MediaLock-Packaging-Test.tmp'
-$version = '0.2.0-rc.1'
+$version = '0.2.0-rc.2'
 $artifactStem = "MediaLock-$version-win-x64"
 $isolatedWorktreeCreated = $false
+
+$appProjectPath = Join-Path $repositoryRoot 'src\MediaLock.App\MediaLock.App.csproj'
+$appProject = [xml](Get-Content -LiteralPath $appProjectPath -Raw)
+$declaredVersion = $appProject.SelectSingleNode('/Project/PropertyGroup/Version')?.InnerText
+$declaredInformationalVersion = $appProject.SelectSingleNode('/Project/PropertyGroup/InformationalVersion')?.InnerText
+Assert-Condition ($declaredVersion -eq $version) "MediaLock.App Version must be $version."
+Assert-Condition ($declaredInformationalVersion -eq $version) "MediaLock.App InformationalVersion must be $version."
 
 try {
     New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
