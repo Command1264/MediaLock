@@ -1,6 +1,6 @@
 # Phase 7C Now Playing smoke test
 
-Date: 2026-08-23 (automated and initial production-WPF inspection); focused user acceptance pending
+Date: 2026-08-23 (automated, production-WPF inspection and focused user acceptance)
 
 ## Supported scope
 
@@ -12,14 +12,14 @@ Date: 2026-08-23 (automated and initial production-WPF inspection); focused user
 
 | Scenario | Expected | Result |
 | --- | --- | --- |
-| YouTube Music playing | Correct title, artist, artwork and advancing elapsed time | Pending |
-| Pause and resume | Position stops while paused and resumes without jumping outside bounds | Pending |
-| Next and Previous | Artwork/timeline change to the new media without retaining stale content | Pending |
-| Session recreation | Recovering hides stale Now Playing data; recovered target shows current data | Pending |
-| Ordinary YouTube competing | Locked YouTube Music remains the displayed and routed target | Pending |
-| Missing artwork | Neutral placeholder appears and controls continue to work | Pending |
-| Light/Dark and English/Traditional Chinese | Content remains readable at the minimum window size | Pending |
-| Physical Play/Pause | YouTube Music changes exactly once; ordinary YouTube does not change | Pending |
+| YouTube Music playing | Correct title, artist, artwork and advancing elapsed time | Pass in production-WPF inspection and user acceptance |
+| Pause and resume | Position stops while paused and resumes without jumping outside bounds | Pass in production-WPF inspection and user acceptance |
+| Next and Previous | Artwork/timeline change to the new media without retaining stale content | Pass; both previous-track and current-track-to-zero behaviors remain correct |
+| Session recreation | Recovering hides stale Now Playing data; recovered target shows current data | Pass in user refresh acceptance |
+| Ordinary YouTube competing | Locked YouTube Music remains the displayed and routed target | Pass; ordinary YouTube remained unchanged |
+| Missing artwork | Neutral placeholder appears and controls continue to work | Automated malformed/missing-artwork coverage passes; no manual source available |
+| Light/Dark and English/Traditional Chinese | Content remains readable at the minimum window size | Current Traditional Chinese/Dark minimum-size layout passes; remaining appearance pair pending |
+| Physical Play/Pause | YouTube Music changes exactly once; ordinary YouTube does not change | Pass in user acceptance |
 
 ## Seek capability evidence
 
