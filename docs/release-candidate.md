@@ -107,7 +107,8 @@ settings as a routine rollback step. If login startup was enabled, disable it fr
 rollback or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
-approval after all release gates pass.
+approval after all release gates pass. That approval was separately granted for `0.2.0-rc.2`; its signed annotated tag,
+public GitHub Prerelease and ZIP asset are recorded in the Phase 9 evidence. The executable itself remains unsigned.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md). Record `0.2.0-rc.2` results separately; a different version,

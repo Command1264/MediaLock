@@ -77,3 +77,16 @@ Results:
 No crash or unexpected error was observed. This exact unsigned candidate therefore passes the documented clean
 supported Windows gate and may be described as portable in layout. The result does not transfer to another source
 commit or archive digest.
+
+## Public publication — 2026-08-24
+
+- Release: [Media Lock 0.2.0-rc.2](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2).
+- Release state: public Prerelease, not Draft and not Latest.
+- Tag: `v0.2.0-rc.2`; the GPG-signed annotated tag verified successfully and peels to candidate source commit
+  `aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7`.
+- Public assets: exactly one, `MediaLock-0.2.0-rc.2-win-x64.zip` (`78,663,994` bytes).
+- GitHub asset digest: `sha256:0c750e7f2eec132b6b82c4d78f491f961dad76358c4e0b9c49dc3042779ec5e7`.
+- Post-publication download recomputed the same SHA-256 and size: pass.
+
+The manifest and standalone checksum were not uploaded. The tag signature authenticates the Git source reference; it
+does not code-sign `MediaLock.exe`, whose Authenticode status remains `NotSigned`.
