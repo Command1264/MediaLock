@@ -293,6 +293,7 @@ Stable-release decision gate:
   status remains explicit, and all relevant automated and clean-environment gates pass.
 - Tagging, stable GitHub Release creation and public artifact publication remain separately approved remote operations.
 
-Status: implementation is ready for integration. Public activation remains pending until the canonical triage labels
-exist and these Issue Forms reach the repository's default branch; merging only to a non-default integration branch
-does not satisfy the Phase 10A exit criteria.
+Status: complete on 2026-08-24. The four missing canonical triage labels were created, PR #20 integrated the reviewed
+foundation into `develop`, and PR #21 synchronized it to default branch `main`. Authenticated public-surface validation
+confirmed both forms render their required environment, routing and privacy fields, apply the intended labels, link to
+Support, and hide blank issues from non-maintainers. No tag, Release or artifact changed.
