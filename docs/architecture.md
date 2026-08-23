@@ -122,6 +122,22 @@ A consumed input must not also fall through to Windows default processing. Phase
 each candidate backend (`WM_APPCOMMAND`, raw input, hooks or other justified mechanism) rather than assuming event
 observation implies suppression.
 
+Phase 8C promotes the Phase 0 `WH_KEYBOARD_LL` backend into the Windows adapter. Its dedicated message-loop thread
+maps only Play/Pause, Previous, Next and Stop. The hook callback performs no GSMTC, persistence or logging work: it
+asks `MediaInputCoordinator` for a synchronous accept/pass-through decision and caches that decision through repeated
+KeyDown and Key-up messages. Accepted commands enter a bounded single-reader queue; a full queue passes the original
+key through to Windows.
+
+Acceptance snapshots the resolved target and advertised capability. The queued Route intent carries that expected
+Session Key, and the Router skips the command if its Active Target changed before execution. This may intentionally
+drop a consumed command during a target race, but it cannot redirect that command to a competing player. Settings
+schema v6 adds an enabled-by-default interception preference; disabling it changes the callback decision immediately
+without tearing down the hook. Hook startup/runtime failures are diagnostic and degrade to Windows handling rather
+than terminating GSMTC routing or the UI.
+The application publishes each immutable state reference with volatile read/write semantics, and the coordinator
+publishes its stopped state atomically, so the Hook thread observes settings, target and shutdown transitions without
+mixing revisions or retaining a thread-local stale snapshot.
+
 ## 6. Session lifecycle
 
 The Windows adapter obtains `GlobalSystemMediaTransportControlsSessionManager`, enumerates Sessions, and listens to
@@ -221,6 +237,13 @@ an explicit drag region and Cancel/Escape commands that restore the persisted Vi
 `ShowDialog` keeps the owner natively disabled and returns only after Windows has restored owner activation, avoiding
 an intervening third-party foreground window after Alt+Tab. Motion stays in the presentation shell, respects
 `SystemParameters.ClientAreaAnimation` and never delays routing.
+
+The presentation shell's reusable component geometry, semantic states and Windows-owned surface boundaries are
+defined in `docs/ui-design-language.md`. `Themes/Controls.xaml` is the implementation seam for reusable WPF chrome;
+individual Views own composition and domain-specific variants rather than independent native-looking templates.
+
+Phase 8C advances settings to schema v6 with the global-media-key interception preference. Schema v1-v5 documents
+migrate to enabled, preserving the product's established default and every prior desktop preference.
 
 Phase 7C extends the immutable Session snapshot with optional, encoded presentation artwork. The Windows GSMTC
 Session adapter reads only bounded JPEG or PNG thumbnail payloads and caches the result until a media-properties

@@ -11,7 +11,11 @@ using MediaLock.Windows.Gsmtc;
 using MediaLock.Windows.Diagnostics;
 using MediaLock.App.Localization;
 using MediaLock.App.Theming;
+using MediaLock.Application;
 using MediaLock.Core.Configuration;
+using MediaLock.Core.Diagnostics;
+using MediaLock.Core.Input;
+using MediaLock.Windows.Input;
 using Microsoft.Win32;
 
 namespace MediaLock.App;
@@ -30,8 +34,10 @@ public partial class App : System.Windows.Application
     private bool hideAnimationRunning;
     private JsonLinesDiagnosticLog? diagnosticLog;
     private SystemLifecycle? systemLifecycle;
+    private MediaInputCoordinator? mediaInputCoordinator;
     private string activeThemePreference = UiThemePreference.System;
     private bool systemThemeSubscribed;
+    private bool mediaInputFaultReported;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -66,6 +72,30 @@ public partial class App : System.Windows.Application
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
+            Exception? mediaInputStartupFailure = null;
+            mediaInputCoordinator = new MediaInputCoordinator(
+                mediaApplication,
+                new LowLevelMediaKeyInputSource(),
+                diagnosticLog);
+            mediaInputCoordinator.Faulted += OnMediaInputFaulted;
+            try
+            {
+                await mediaInputCoordinator.StartAsync(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                mediaInputStartupFailure = exception;
+                await RecordMediaInputFailureAsync("input.hook.start_failed", exception);
+                mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
+                await mediaInputCoordinator.DisposeAsync();
+                mediaInputCoordinator = null;
+            }
+            if (mediaInputCoordinator is not null)
+            {
+                await TryWriteInputHookStartedDiagnosticAsync(
+                    diagnosticLog,
+                    mediaApplication.State.Settings.Desktop.InterceptMediaKeys);
+            }
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
             systemThemeSubscribed = true;
             mainWindowViewModel = new MainWindowViewModel(
@@ -90,6 +120,16 @@ public partial class App : System.Windows.Application
             if (!e.Args.Contains("--startup", StringComparer.OrdinalIgnoreCase))
             {
                 ShowMainWindow();
+            }
+
+            if (mediaInputStartupFailure is not null)
+            {
+                System.Windows.MessageBox.Show(
+                    window,
+                    $"{UiText.Get("App_MediaInputStartupFailed")}\n\n{mediaInputStartupFailure.Message}",
+                    UiText.Get("App_MediaInputErrorTitle"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
         catch (Exception exception)
@@ -258,6 +298,87 @@ public partial class App : System.Windows.Application
         Dispatcher.InvokeAsync(() => UiTheme.Apply(this, activeThemePreference));
     }
 
+    private async void OnMediaInputFaulted(
+        object? sender,
+        MediaInputSourceFaultedEventArgs args)
+    {
+        if (shutdownStarted)
+        {
+            return;
+        }
+
+        try
+        {
+            await RecordMediaInputFailureAsync("input.hook.faulted", args.Exception);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (mediaInputFaultReported || shutdownStarted)
+                {
+                    return;
+                }
+
+                mediaInputFaultReported = true;
+                System.Windows.MessageBox.Show(
+                    mainWindow,
+                    $"{UiText.Get("App_MediaInputStopped")}\n\n{args.Exception.Message}",
+                    UiText.Get("App_MediaInputErrorTitle"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            });
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError(exception.ToString());
+        }
+    }
+
+    private async ValueTask RecordMediaInputFailureAsync(string name, Exception exception)
+    {
+        if (diagnosticLog is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await diagnosticLog.WriteAsync(
+                new DiagnosticEvent(
+                    name,
+                    new Dictionary<string, string>
+                    {
+                        ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name,
+                        ["message"] = exception.Message,
+                    }),
+                CancellationToken.None);
+        }
+        catch (Exception diagnosticException)
+        {
+            System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
+        }
+    }
+
+    internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
+        IDiagnosticLog diagnosticLog,
+        bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticLog);
+        try
+        {
+            await diagnosticLog.WriteAsync(
+                new DiagnosticEvent(
+                    "input.hook.started",
+                    new Dictionary<string, string>
+                    {
+                        ["enabled"] = enabled.ToString(),
+                    }),
+                CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError(exception.ToString());
+        }
+    }
+
     private async ValueTask ShutdownAsync()
     {
         if (shutdownStarted)
@@ -272,6 +393,21 @@ public partial class App : System.Windows.Application
             systemThemeSubscribed = false;
         }
         var failures = new List<Exception>();
+        if (mediaInputCoordinator is not null)
+        {
+            mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
+            try
+            {
+                await mediaInputCoordinator.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            mediaInputCoordinator = null;
+        }
+
         try
         {
             trayIconHost?.Dispose();

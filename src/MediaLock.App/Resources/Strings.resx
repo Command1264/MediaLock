@@ -95,6 +95,7 @@
   <data name="Settings_StartupMode" xml:space="preserve"><value>Startup routing mode</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>Recovery timeout (seconds)</value></data>
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>Recovery timeout in seconds</value></data>
+  <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>Enter a finite number from 0 to 300.</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>Fallback policy</value></data>
   <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply after Media Lock restarts. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>Application Priority Rules</value></data>
@@ -122,4 +123,9 @@
   <data name="Tray_Settings" xml:space="preserve"><value>Settings…</value></data>
   <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
   <data name="Tray_CommandFailed" xml:space="preserve"><value>Media Lock command failed</value></data>
+  <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>Intercept global media keys</value></data>
+  <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>Route global media keys through Media Lock</value></data>
+  <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>Media key interception unavailable</value></data>
+  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock could not start global media-key interception. Media controls in the app remain available, but physical media keys will be handled by Windows.</value></data>
+  <data name="App_MediaInputStopped" xml:space="preserve"><value>Global media-key interception encountered an error. Physical media keys may be handled by Windows until Media Lock is restarted.</value></data>
 </root>

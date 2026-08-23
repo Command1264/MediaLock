@@ -80,6 +80,11 @@ must exercise Light, Dark and Windows theme in English and Traditional Chinese, 
 main-window minimum-size layout, keyboard focus, Settings scrolling/dragging/Cancel/Escape, owner disablement while
 Settings is open, a direct Alt+Tab-close foreground return, notification-area lifecycle and one routed Play/Pause
 without duplicate action.
+Shared component changes additionally follow the interaction-state and minimum-size verification in
+`docs/ui-design-language.md`; stable geometry and required template parts receive WPF contract coverage where
+practical.
+Settings coverage verifies that Recovery timeout input accepts only finite ordinary decimal values from 0 through
+300, reports invalid input through WPF validation immediately and prevents Save while invalid.
 The four Routing Mode controls must expose exactly one checked state derived from Router Mode; switching and Recovery
 must not resize the controls or remove the selected semantic.
 
@@ -109,6 +114,14 @@ never overridden. WPF coverage also replaces the ephemeral Key of a still-presen
 target enters Recovery. A unique source successor remains selected; missing or ambiguous candidates remain unselected,
 and timeout clears the bookmark without falling back to the first row.
 
+Phase 8C tests the physical-input path below the native callback. Windows coverage proves virtual-key mapping,
+accepted/pass-through decisions, repeat suppression and matching Key-up consumption. Application coverage proves
+capability and Recovery gates, immediate settings disablement, bounded-queue backpressure, fault containment and
+capture-time target preservation. Core coverage proves an input cannot route after the Active Target changes.
+Settings coverage proves schema-v1-v5 migration enables interception and the localized Settings switch round-trips.
+The native hook installation itself remains hardware-assisted because an automated test must not install a global
+keyboard hook into the developer's interactive desktop.
+
 ### Integration tests
 
 Cover:
@@ -123,6 +136,9 @@ Cover:
 
 Run the packaged application with real media sources and physical media keys. Capture application logs, target
 playback state before/after, competing playback state and whether Windows also processed the command.
+
+The Phase 8C production protocol and result table live in
+[Phase 8C global media-key smoke](phase-8/media-key-interception-smoke.md).
 
 ## 3. Critical user paths
 

@@ -1,6 +1,8 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Immutable;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using MediaLock.App.Localization;
 using MediaLock.Application;
@@ -9,20 +11,24 @@ using MediaLock.Core.Routing;
 
 namespace MediaLock.App.ViewModels;
 
-public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
+public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataErrorInfo, IDisposable
 {
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly Action? requestClose;
     private readonly Action<string>? applyLanguage;
     private readonly Action<string>? applyTheme;
+    private readonly AsyncCommand saveCommand;
     private bool closeToTray;
     private bool startWithWindows;
+    private bool interceptMediaKeys;
     private RoutingMode startupRoutingMode;
     private string startupRoutingModeText = UiText.Get("Mode_WindowsAuto");
     private string selectedLanguage = UiLanguagePreference.System;
     private string selectedTheme = UiThemePreference.System;
     private double recoveryTimeoutSeconds;
+    private string recoveryTimeoutText = string.Empty;
+    private string? recoveryTimeoutError;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
     private string? selectedAvailableApplication;
@@ -42,7 +48,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         this.requestClose = requestClose;
         this.applyLanguage = applyLanguage;
         this.applyTheme = applyTheme;
-        SaveCommand = new AsyncCommand(_ => SaveAsync());
+        saveCommand = new AsyncCommand(_ => SaveAsync(), _ => !HasErrors);
+        SaveCommand = saveCommand;
         CancelCommand = new AsyncCommand(_ => CancelAsync());
         AddPriorityRuleCommand = new AsyncCommand(AddPriorityRuleAsync);
         MovePriorityRuleUpCommand = new AsyncCommand(MovePriorityRuleUpAsync);
@@ -56,6 +63,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
 
     public IReadOnlyList<LocalizedOption<FallbackPolicy>> FallbackPolicies { get; private set; } = [];
 
@@ -83,6 +92,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         get => startWithWindows;
         set => SetField(ref startWithWindows, value);
+    }
+
+    public bool InterceptMediaKeys
+    {
+        get => interceptMediaKeys;
+        set => SetField(ref interceptMediaKeys, value);
     }
 
     public string SelectedLanguage
@@ -144,8 +159,27 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public double RecoveryTimeoutSeconds
     {
         get => recoveryTimeoutSeconds;
-        set => SetField(ref recoveryTimeoutSeconds, value);
+        set => RecoveryTimeoutText = value.ToString(UiText.CurrentCulture);
     }
+
+    public string RecoveryTimeoutText
+    {
+        get => recoveryTimeoutText;
+        set
+        {
+            value ??= string.Empty;
+            if (string.Equals(recoveryTimeoutText, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            recoveryTimeoutText = value;
+            OnPropertyChanged();
+            ValidateRecoveryTimeout();
+        }
+    }
+
+    public bool HasErrors => recoveryTimeoutError is not null;
 
     public FallbackPolicy FallbackPolicy
     {
@@ -170,6 +204,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         get => errorMessage;
         private set => SetField(ref errorMessage, value);
     }
+
+    public IEnumerable GetErrors(string? propertyName) =>
+        recoveryTimeoutError is not null &&
+        (string.IsNullOrEmpty(propertyName) ||
+         propertyName == nameof(RecoveryTimeoutText))
+            ? new[] { recoveryTimeoutError }
+            : Array.Empty<string>();
 
     public void Dispose()
     {
@@ -197,7 +238,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                     CloseToTray,
                     StartWithWindows,
                     SelectedLanguage,
-                    SelectedTheme),
+                    SelectedTheme,
+                    InterceptMediaKeys),
                 PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
@@ -236,6 +278,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         RefreshLocalizedOptions();
+        if (HasErrors)
+        {
+            recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
+            ErrorsChanged?.Invoke(
+                this,
+                new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+        }
     }
 
     private void RefreshLocalizedOptions()
@@ -307,6 +356,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         appliedSettings = settings;
         CloseToTray = settings.Desktop!.CloseToTray;
         StartWithWindows = settings.Desktop.StartWithWindows;
+        InterceptMediaKeys = settings.Desktop.InterceptMediaKeys;
         SelectedLanguage = settings.Desktop.Language;
         SelectedTheme = settings.Desktop.Theme;
         ApplyStartupRoutingMode(settings.DefaultRoutingMode);
@@ -325,6 +375,41 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         startupRoutingMode = mode;
         StartupRoutingModeText = UiDescriptions.DescribeRoutingMode(mode);
+    }
+
+    private void ValidateRecoveryTimeout()
+    {
+        const NumberStyles styles =
+            NumberStyles.AllowLeadingWhite |
+            NumberStyles.AllowTrailingWhite |
+            NumberStyles.AllowDecimalPoint;
+        var isValid = decimal.TryParse(
+                RecoveryTimeoutText,
+                styles,
+                UiText.CurrentCulture,
+                out var seconds) &&
+            seconds >= RecoverySettings.MinimumTimeoutSeconds &&
+            seconds <= RecoverySettings.MaximumTimeoutSeconds;
+        var nextError = isValid
+            ? null
+            : UiText.Get("Settings_RecoveryTimeoutValidation");
+
+        if (isValid)
+        {
+            recoveryTimeoutSeconds = (double)seconds;
+            OnPropertyChanged(nameof(RecoveryTimeoutSeconds));
+        }
+
+        if (!string.Equals(recoveryTimeoutError, nextError, StringComparison.Ordinal))
+        {
+            recoveryTimeoutError = nextError;
+            OnPropertyChanged(nameof(HasErrors));
+        }
+
+        ErrorsChanged?.Invoke(
+            this,
+            new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+        saveCommand.RaiseCanExecuteChanged();
     }
 
     private Task AddPriorityRuleAsync(object? parameter)

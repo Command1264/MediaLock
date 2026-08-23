@@ -42,6 +42,28 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task CapturedInputTargetIsPreservedAcrossTheApplicationBoundary()
+    {
+        var captured = Session("captured", "music");
+        var current = Session("current", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([captured, current], current.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.TogglePlayPause, captured.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
+        Assert.Equal(RouteReason.InputTargetChanged, result.Decision.Reason);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
     public async Task ActivatingPriorityRulesPersistsItAsTheStartupRoutingMode()
     {
         var session = Session("music", "music");
@@ -579,6 +601,7 @@ public sealed class MediaLockApplicationTests
         var route = Assert.Single(log.Events, entry => entry.Name == "route.completed");
         var stateChanged = Assert.Single(log.Events, entry => entry.Name == "state.changed");
         Assert.Equal("Routed", route.Properties?["decision"]);
+        Assert.Equal(session.Key.Value, route.Properties?["target"]);
         Assert.Equal("WindowsAuto", stateChanged.Properties?["mode"]);
         Assert.DoesNotContain(log.Events.SelectMany(entry => entry.Properties?.Keys ?? []), key =>
             key.Contains("title", StringComparison.OrdinalIgnoreCase) ||

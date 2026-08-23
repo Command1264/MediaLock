@@ -34,4 +34,4 @@ Date: 2026-08-23
 | English and Traditional Chinese | Accessible text and time presentation remain correct | Pass |
 | Light, Dark and minimum window size | Slider and transport controls remain legible, usable and unclipped | Pass; final Stop-control edge rechecked after safe-inset fix |
 | Four Routing Mode controls | Exactly one mode has a stable accent/check treatment, including Recovery | Pass in Light and Dark; no size shift |
-| Physical Play/Pause | One route to the selected target; competing source unchanged | Fail: the production app does not yet capture the physical key; Windows routed it to the current Session. Phase 8C blocker |
+| Physical Play/Pause | One route to the selected target; competing source unchanged | Pass through Phase 8C production Hook; controlled normal, long-press and rapid-input groups routed without duplicates |

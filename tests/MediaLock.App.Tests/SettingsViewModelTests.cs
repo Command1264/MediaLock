@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -8,6 +9,59 @@ namespace MediaLock.App.Tests;
 
 public sealed class SettingsViewModelTests
 {
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("301")]
+    [InlineData("1e2")]
+    [InlineData("1e309")]
+    [InlineData("∞")]
+    [InlineData("not-a-number")]
+    public async Task InvalidRecoveryTimeoutInputIsReportedImmediatelyAndCannotBeSaved(
+        string input)
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+        var validation = Assert.IsAssignableFrom<INotifyDataErrorInfo>(viewModel);
+        var changedProperties = new List<string?>();
+        validation.ErrorsChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.RecoveryTimeoutText = input;
+
+        Assert.True(validation.HasErrors);
+        Assert.Contains(nameof(SettingsViewModel.RecoveryTimeoutText), changedProperties);
+        Assert.NotEmpty(validation.GetErrors(nameof(SettingsViewModel.RecoveryTimeoutText)).Cast<string>());
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Empty(application.Intents);
+    }
+
+    [Theory]
+    [InlineData("0", 0.0)]
+    [InlineData("0.5", 0.5)]
+    [InlineData("300", 300.0)]
+    public async Task RecoveryTimeoutAcceptsFiniteDecimalValuesAndBoundaries(
+        string input,
+        double expectedSeconds)
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+        var validation = Assert.IsAssignableFrom<INotifyDataErrorInfo>(viewModel);
+
+        viewModel.RecoveryTimeoutText = input;
+
+        Assert.False(validation.HasErrors);
+        Assert.True(viewModel.SaveCommand.CanExecute(null));
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(
+            Assert.Single(application.Intents));
+        Assert.Equal(
+            TimeSpan.FromSeconds(expectedSeconds),
+            intent.Settings.Recovery!.Timeout);
+    }
+
     [Fact]
     public async Task StartupRoutingModeIsReadOnlyAndPreservedWhenSettingsAreSaved()
     {
@@ -75,6 +129,7 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
+        viewModel.InterceptMediaKeys = false;
         viewModel.SelectedLanguageOption = Assert.Single(
             viewModel.Languages,
             option => option.Value == UiLanguagePreference.TraditionalChinese);
@@ -88,6 +143,7 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
+        Assert.False(intent.Settings.Desktop.InterceptMediaKeys);
         Assert.Equal(UiLanguagePreference.TraditionalChinese, intent.Settings.Desktop.Language);
         Assert.Equal(UiThemePreference.Dark, intent.Settings.Desktop.Theme);
         Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);

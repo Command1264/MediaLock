@@ -20,7 +20,9 @@ public abstract record ApplicationIntent
 
     public sealed record UseWindowsAutoForCurrentRun : ApplicationIntent;
 
-    public sealed record Route(MediaCommand Command) : ApplicationIntent;
+    public sealed record Route(
+        MediaCommand Command,
+        SessionKey? ExpectedTarget = null) : ApplicationIntent;
 
     public sealed record UpdateSettings(MediaLockSettings Settings) : ApplicationIntent;
 }

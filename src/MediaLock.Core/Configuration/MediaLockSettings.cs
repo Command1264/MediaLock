@@ -6,13 +6,18 @@ namespace MediaLock.Core.Configuration;
 
 public sealed record RecoverySettings(
     TimeSpan Timeout,
-    FallbackPolicy FallbackPolicy);
+    FallbackPolicy FallbackPolicy)
+{
+    public const int MinimumTimeoutSeconds = 0;
+    public const int MaximumTimeoutSeconds = 300;
+}
 
 public sealed record DesktopSettings(
     bool CloseToTray,
     bool StartWithWindows,
     string Language = UiLanguagePreference.System,
-    string Theme = UiThemePreference.System);
+    string Theme = UiThemePreference.System,
+    bool InterceptMediaKeys = true);
 
 public static class UiLanguagePreference
 {
@@ -50,7 +55,7 @@ public sealed record MediaLockSettings(
     {
     }
 
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -81,7 +86,8 @@ public sealed record MediaLockSettings(
         }
         else
         {
-            if (Recovery.Timeout < TimeSpan.Zero || Recovery.Timeout > TimeSpan.FromMinutes(5))
+            if (Recovery.Timeout < TimeSpan.FromSeconds(RecoverySettings.MinimumTimeoutSeconds) ||
+                Recovery.Timeout > TimeSpan.FromSeconds(RecoverySettings.MaximumTimeoutSeconds))
             {
                 issues.Add(new ConfigurationIssue(
                     "recovery.timeout",

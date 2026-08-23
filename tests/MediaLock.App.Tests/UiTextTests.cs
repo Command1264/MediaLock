@@ -9,6 +9,16 @@ namespace MediaLock.App.Tests;
 public sealed class UiTextTests
 {
     [Theory]
+    [InlineData(UiLanguagePreference.EnglishUnitedStates, "Intercept global media keys")]
+    [InlineData(UiLanguagePreference.TraditionalChinese, "攔截全域媒體鍵")]
+    public void MediaKeyInterceptionSettingIsLocalized(string language, string expected)
+    {
+        UiText.Apply(language);
+
+        Assert.Equal(expected, UiText.Get("Settings_InterceptMediaKeys"));
+    }
+
+    [Theory]
     [InlineData(UiLanguagePreference.EnglishUnitedStates, "zh-TW", "en-US")]
     [InlineData(UiLanguagePreference.TraditionalChinese, "en-US", "zh-TW")]
     [InlineData(UiLanguagePreference.System, "zh-HK", "zh-TW")]

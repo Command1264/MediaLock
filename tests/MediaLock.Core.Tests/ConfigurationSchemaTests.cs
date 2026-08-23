@@ -7,11 +7,12 @@ namespace MediaLock.Core.Tests;
 public sealed class ConfigurationSchemaTests
 {
     [Fact]
-    public void DefaultSettingsEnableCloseToTrayButNotLoginStartup()
+    public void DefaultSettingsEnableCloseToTrayAndMediaKeyInterceptionButNotLoginStartup()
     {
-        Assert.Equal(5, MediaLockSettings.CurrentSchemaVersion);
+        Assert.Equal(6, MediaLockSettings.CurrentSchemaVersion);
         Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
         Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
+        Assert.True(MediaLockSettings.Default.Desktop.InterceptMediaKeys);
         Assert.Equal(UiLanguagePreference.System, MediaLockSettings.Default.Desktop.Language);
         Assert.Equal(UiThemePreference.System, MediaLockSettings.Default.Desktop.Theme);
     }
@@ -32,7 +33,7 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 5, but found 99.");
+            issue.Message == "Expected schema version 6, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
 
 namespace MediaLock.Core.Routing;
@@ -39,8 +40,8 @@ public sealed class MediaRouter : IMediaRouter
                 "Unknown fallback policy.");
         }
 
-        if (options.RecoveryTimeout < TimeSpan.Zero ||
-            options.RecoveryTimeout > TimeSpan.FromMinutes(5))
+        if (options.RecoveryTimeout < TimeSpan.FromSeconds(RecoverySettings.MinimumTimeoutSeconds) ||
+            options.RecoveryTimeout > TimeSpan.FromSeconds(RecoverySettings.MaximumTimeoutSeconds))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
@@ -152,7 +153,10 @@ public sealed class MediaRouter : IMediaRouter
             RouterIntent.UpdateOptions update => UpdateOptions(update.Options),
             RouterIntent.UsePriorityRules => UsePriorityRules(),
             RouterIntent.UseWindowsAuto => UseWindowsAuto(),
-            RouterIntent.Route route => await RouteAsync(route.Command, cancellationToken),
+            RouterIntent.Route route => await RouteAsync(
+                route.Command,
+                route.ExpectedTarget,
+                cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
         };
     }
@@ -617,6 +621,7 @@ public sealed class MediaRouter : IMediaRouter
 
     private async ValueTask<RouterResult> RouteAsync(
         MediaCommand command,
+        SessionKey? expectedTarget,
         CancellationToken cancellationToken)
     {
         if (state.Mode is RoutingMode.SessionLock or RoutingMode.AppLock)
@@ -636,6 +641,11 @@ public sealed class MediaRouter : IMediaRouter
         }
 
         var targetKey = state.ActiveTarget;
+        if (expectedTarget is not null && targetKey != expectedTarget)
+        {
+            return Skipped(command, RouteReason.InputTargetChanged, targetKey);
+        }
+
         if (targetKey is null)
         {
             return Skipped(command, RouteReason.NoWindowsCurrentSession);

@@ -28,6 +28,8 @@ Global System Media Transport Controls（GSMTC）Session。
 - 規劃里程碑或版本範圍前，讀取 `docs/roadmap.md`。
 - 修改核心 routing、recovery、input interception 或發布流程前，讀取
   `docs/testing.md` 並執行相稱驗證。
+- 修改 WPF View、控制項樣式、theme palette 或新增可見元件前，讀取
+  `docs/ui-design-language.md`。
 
 ## Project guardrails
 
