@@ -72,10 +72,27 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <ProgressBar Grid.Row="0" Maximum="1"
-                                         Value="{Binding NowPlayingProgress, Mode=OneWay}"
-                                         IsHitTestVisible="False" Focusable="False"
-                                         AutomationProperties.Name="{loc:Translate Main_PlaybackProgress}" />
+                            <Grid Grid.Row="0"
+                                  PreviewMouseLeftButtonDown="OnPlaybackSeekPointerDown"
+                                  PreviewMouseMove="OnPlaybackSeekPointerMove"
+                                  PreviewMouseLeftButtonUp="OnPlaybackSeekPointerUp"
+                                  LostMouseCapture="OnPlaybackSeekMouseCaptureLost"
+                                  PreviewTouchDown="OnPlaybackSeekTouchDown"
+                                  PreviewTouchMove="OnPlaybackSeekTouchMove"
+                                  PreviewTouchUp="OnPlaybackSeekTouchUp"
+                                  LostTouchCapture="OnPlaybackSeekTouchCaptureLost">
+                                <Slider x:Name="PlaybackSeekSlider"
+                                        Minimum="0" Maximum="{Binding NowPlayingDurationSeconds}"
+                                        Value="{Binding NowPlayingPositionSeconds, Mode=OneWay}"
+                                        SmallChange="5" LargeChange="15" IsMoveToPointEnabled="True"
+                                        IsEnabled="{Binding CanSeek}"
+                                        AutomationProperties.Name="{loc:Translate Main_PlaybackSeek}"
+                                        ToolTip="{loc:Translate Main_PlaybackSeekHelp}"
+                                        ValueChanged="OnPlaybackSeekValueChanged"
+                                        PreviewKeyDown="OnPlaybackSeekKeyDown"
+                                        PreviewKeyUp="OnPlaybackSeekKeyUp"
+                                        LostKeyboardFocus="OnPlaybackSeekLostKeyboardFocus" />
+                            </Grid>
                             <Grid Grid.Row="1" Margin="0,5,0,0">
                                 <TextBlock Style="{StaticResource SecondaryTextStyle}"
                                            FontSize="11" Text="{Binding NowPlayingElapsed}" />
@@ -97,9 +114,23 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <TextBlock AutomationProperties.Name="{loc:Translate Main_Error}"
-                           Foreground="{DynamicResource DangerBrush}" Text="{Binding ErrorMessage}"
-                           TextWrapping="Wrap" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center"
+                               AutomationProperties.Name="{loc:Translate Main_Error}"
+                               Foreground="{DynamicResource DangerBrush}"
+                               Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                    <Button Grid.Column="1" Margin="12,0,0,0" MinWidth="28" MinHeight="28"
+                            Padding="4,0" VerticalAlignment="Center"
+                            Style="{StaticResource CompactButtonStyle}" Content="&#x00D7;"
+                            Foreground="{DynamicResource DangerBrush}"
+                            Command="{Binding DismissErrorCommand}"
+                            AutomationProperties.Name="{loc:Translate Main_DismissError}"
+                            ToolTip="{loc:Translate Main_DismissError}" />
+                </Grid>
             </Border>
         </StackPanel>
 
@@ -111,18 +142,30 @@
             <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}"
                        Text="{loc:Translate Main_MediaSessions}" />
             <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
-                <Button Margin="8,0,0,0"
-                        AutomationProperties.Name="{loc:Translate Main_LockSessionAutomation}"
-                        Command="{Binding LockCommand}"
-                        Content="{loc:Translate Main_LockSession}" />
-                <Button Margin="8,0,0,0"
-                        AutomationProperties.Name="{loc:Translate Main_LockAppAutomation}"
-                        Command="{Binding AppLockCommand}"
-                        Content="{loc:Translate Main_LockApp}" />
-                <Button Margin="8,0,0,0" AutomationProperties.Name="{loc:Translate Main_PriorityRulesAutomation}"
-                        Command="{Binding PriorityRulesCommand}" Content="{loc:Translate Mode_PriorityRules}" />
-                <Button Margin="8,0,0,0" AutomationProperties.Name="{loc:Translate Main_WindowsAutoAutomation}"
-                        Command="{Binding WindowsAutoCommand}" Content="{loc:Translate Mode_WindowsAuto}" />
+                <ToggleButton Margin="8,0,0,0"
+                              Style="{StaticResource RoutingModeToggleStyle}"
+                              IsChecked="{Binding IsSessionLockMode, Mode=OneWay}"
+                              AutomationProperties.Name="{loc:Translate Main_LockSessionAutomation}"
+                              Command="{Binding LockCommand}"
+                              Content="{loc:Translate Main_LockSession}" />
+                <ToggleButton Margin="8,0,0,0"
+                              Style="{StaticResource RoutingModeToggleStyle}"
+                              IsChecked="{Binding IsAppLockMode, Mode=OneWay}"
+                              AutomationProperties.Name="{loc:Translate Main_LockAppAutomation}"
+                              Command="{Binding AppLockCommand}"
+                              Content="{loc:Translate Main_LockApp}" />
+                <ToggleButton Margin="8,0,0,0"
+                              Style="{StaticResource RoutingModeToggleStyle}"
+                              IsChecked="{Binding IsPriorityRulesMode, Mode=OneWay}"
+                              AutomationProperties.Name="{loc:Translate Main_PriorityRulesAutomation}"
+                              Command="{Binding PriorityRulesCommand}"
+                              Content="{loc:Translate Mode_PriorityRules}" />
+                <ToggleButton Margin="8,0,0,0"
+                              Style="{StaticResource RoutingModeToggleStyle}"
+                              IsChecked="{Binding IsWindowsAutoMode, Mode=OneWay}"
+                              AutomationProperties.Name="{loc:Translate Main_WindowsAutoAutomation}"
+                              Command="{Binding WindowsAutoCommand}"
+                              Content="{loc:Translate Mode_WindowsAuto}" />
             </WrapPanel>
         </Grid>
 
@@ -181,7 +224,7 @@
                 <Button Margin="6,0" AutomationProperties.Name="{loc:Translate Command_Pause}" Command="{Binding PauseCommand}" Content="{loc:Translate Command_Pause}" />
                 <Button Margin="6,0" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="{loc:Translate Command_ToggleAutomation}" Command="{Binding TogglePlayPauseCommand}" Content="{loc:Translate Command_Toggle}" />
                 <Button Margin="6,0" AutomationProperties.Name="{loc:Translate Command_Next}" Command="{Binding NextCommand}" Content="{loc:Translate Command_Next}" />
-                <Button Margin="6,0,0,0" AutomationProperties.Name="{loc:Translate Command_Stop}" Command="{Binding StopCommand}" Content="{loc:Translate Command_Stop}" />
+                <Button Margin="6,0,2,0" AutomationProperties.Name="{loc:Translate Command_Stop}" Command="{Binding StopCommand}" Content="{loc:Translate Command_Stop}" />
             </UniformGrid>
         </Border>
     </Grid>

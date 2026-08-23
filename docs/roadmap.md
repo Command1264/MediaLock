@@ -185,3 +185,29 @@ Exit criteria:
 - Session recreation and competing-source isolation are recorded. The production UI remains read-only and Core's
   parameterless `MediaCommand` model remains unchanged.
 - Evidence yields an explicit proceed/limit/reject decision for a separately scoped Phase 8B seek implementation.
+
+### Phase 8B — Routed Seek and interactive timeline
+
+Promote absolute Seek into the production Media Command model and make the routed target's timeline interactive while
+preserving the existing Router, Recovery and GSMTC seams.
+
+Status: Seek implementation and its focused UI matrix are complete. The phase exit remains blocked because the
+production app does not yet integrate the physical-media-key backend proven by the Phase 0 Probe; Windows therefore
+handles physical keys through its Current Session instead of this Router. Phase 8C owns that production integration
+and must pass the physical-key regression row before Phase 8B's full exit criteria can be considered satisfied.
+
+Exit criteria:
+
+- One immutable Media Command value represents both transport actions and an invariant absolute Seek position; Seek
+  uses the same Application and Router dispatch interfaces as every other command.
+- The Router resolves exactly one target through the active Routing Mode, requires advertised Seek capability and a
+  valid current timeline, and rejects out-of-range positions before calling the controller.
+- The Windows adapter maps `IsPlaybackPositionEnabled`, converts the validated absolute position to GSMTC ticks and
+  reports accepted, rejected or failed without treating acceptance as observed movement.
+- The routed target timeline becomes an accessible Light/Dark Slider. Mouse, touch and keyboard interaction preview
+  locally and commit exactly once per completed gesture; unsupported, Recovering and Unavailable targets remain
+  non-interactive.
+- Accepted Seek retains its preview until a later timeline snapshot confirms it. Target changes, rejection, failure or
+  a bounded confirmation timeout restore the authoritative observed position and remain actionable.
+- Brave YouTube Music and ordinary Brave YouTube pass Playing, Paused, competing-source, Session recreation,
+  English/Traditional Chinese, minimum-size and physical-media-key regression checks.

@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MediaLock.App.Converters;
 using MediaLock.Application;
 using MediaLock.Core.Routing;
 
@@ -36,8 +38,24 @@ internal static class WpfTestHost
             TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
-            var app = new App();
-            app.InitializeComponent();
+            var app = new System.Windows.Application
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown,
+            };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/MediaLock;component/Themes/Light.xaml",
+                    UriKind.Absolute),
+            });
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/MediaLock;component/Themes/Controls.xaml",
+                    UriKind.Absolute),
+            });
+            app.Resources["BooleanToVisibilityConverter"] = new BooleanToVisibilityConverter();
+            app.Resources["MediaArtworkImageConverter"] = new MediaArtworkImageConverter();
             ready.SetResult(Dispatcher.CurrentDispatcher);
             Dispatcher.Run();
         })
@@ -53,21 +71,38 @@ internal static class WpfTestHost
 
 internal sealed class FakeMediaLockApplication : IMediaLockApplication
 {
-    public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged
+    public FakeMediaLockApplication(
+        MediaLockApplicationState? state = null,
+        RouteDecision? decision = null)
     {
-        add { }
-        remove { }
+        State = state ?? MediaLockApplicationState.Initial;
+        Decision = decision ?? RouteDecision.StateUpdated;
     }
 
-    public MediaLockApplicationState State { get; } = MediaLockApplicationState.Initial;
+    public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
+
+    public List<ApplicationIntent> Intents { get; } = [];
+
+    public RouteDecision Decision { get; }
+
+    public MediaLockApplicationState State { get; private set; }
 
     public ValueTask StartAsync(CancellationToken cancellationToken) =>
         ValueTask.CompletedTask;
 
     public ValueTask<ApplicationResult> DispatchAsync(
         ApplicationIntent intent,
-        CancellationToken cancellationToken) =>
-        ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
+        CancellationToken cancellationToken)
+    {
+        Intents.Add(intent);
+        return ValueTask.FromResult(new ApplicationResult(State, Decision));
+    }
+
+    public void Publish(MediaLockApplicationState state)
+    {
+        State = state;
+        StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(state));
+    }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

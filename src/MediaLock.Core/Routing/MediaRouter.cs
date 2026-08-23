@@ -652,6 +652,20 @@ public sealed class MediaRouter : IMediaRouter
             return Skipped(command, RouteReason.UnsupportedCommand, target.Key);
         }
 
+        if (command.Kind == MediaCommandKind.SeekAbsolute)
+        {
+            if (target.Timeline is not { } timeline || timeline.End <= timeline.Start)
+            {
+                return Skipped(command, RouteReason.SeekTimelineUnavailable, target.Key);
+            }
+
+            var position = command.AbsolutePosition!.Value;
+            if (position < timeline.Start || position > timeline.End)
+            {
+                return Skipped(command, RouteReason.SeekOutOfRange, target.Key);
+            }
+        }
+
         MediaControlResult controlResult;
         try
         {

@@ -61,6 +61,113 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task AbsoluteSeekUsesTheResolvedTargetAndExistingRouteInterface()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var current = Session(
+            "current",
+            "browser",
+            timeline: new MediaTimeline(
+                TimeSpan.Zero,
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(30),
+                DateTimeOffset.Parse("2026-08-23T00:00:00Z")));
+        var command = MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(command),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
+        Assert.Equal(current.Key, result.Decision.Target);
+        Assert.Equal(command, result.Decision.Command);
+        Assert.Equal([(current.Key, command)], controller.Commands);
+    }
+
+    [Fact]
+    public async Task AbsoluteSeekWithoutAValidTimelineDoesNotCallTheController()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var current = Session("current", "browser");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75))),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
+        Assert.Equal(RouteReason.SeekTimelineUnavailable, result.Decision.Reason);
+        Assert.Equal(current.Key, result.Decision.Target);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Theory]
+    [InlineData(9.999)]
+    [InlineData(180.001)]
+    public async Task AbsoluteSeekOutsideTheCurrentTimelineDoesNotCallTheController(
+        double requestedSeconds)
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var current = Session(
+            "current",
+            "browser",
+            timeline: new MediaTimeline(
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(30),
+                DateTimeOffset.Parse("2026-08-23T00:00:00Z")));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.SeekAbsolute(
+                TimeSpan.FromSeconds(requestedSeconds))),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
+        Assert.Equal(RouteReason.SeekOutOfRange, result.Decision.Reason);
+        Assert.Equal(current.Key, result.Decision.Target);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(180)]
+    public async Task AbsoluteSeekAcceptsInclusiveTimelineEndpoints(double requestedSeconds)
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var current = Session(
+            "current",
+            "browser",
+            timeline: new MediaTimeline(
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(30),
+                DateTimeOffset.Parse("2026-08-23T00:00:00Z")));
+        var command = MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(requestedSeconds));
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(command),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
+        Assert.Equal([(current.Key, command)], controller.Commands);
+    }
+
+    [Fact]
     public async Task SessionLockRoutesToLockedSessionWhenWindowsCurrentChanges()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);
@@ -1195,7 +1302,8 @@ public sealed class MediaRouterTests
         DateTimeOffset? observedAt = null,
         MediaCommandCapabilities capabilities = MediaCommandCapabilities.All,
         MediaMetadata? metadata = null,
-        MediaPlaybackType playbackType = MediaPlaybackType.Unknown) => new(
+        MediaPlaybackType playbackType = MediaPlaybackType.Unknown,
+        MediaTimeline? timeline = null) => new(
         new SessionKey(key),
         source,
         playbackStatus,
@@ -1203,14 +1311,21 @@ public sealed class MediaRouterTests
         observedAt ?? DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
         instanceHint,
         metadata,
+        timeline,
         PlaybackType: playbackType);
 
     private sealed class RecordingMediaController(MediaControlResult result) : IMediaController
     {
+        public List<(SessionKey Target, MediaCommand Command)> Commands { get; } = [];
+
         public ValueTask<MediaControlResult> TryExecuteAsync(
             SessionKey target,
             MediaCommand command,
-            CancellationToken cancellationToken) => ValueTask.FromResult(result);
+            CancellationToken cancellationToken)
+        {
+            Commands.Add((target, command));
+            return ValueTask.FromResult(result);
+        }
     }
 
     private sealed class BlockingMediaController : IMediaController

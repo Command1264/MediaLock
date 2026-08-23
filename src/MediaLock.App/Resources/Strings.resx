@@ -15,9 +15,12 @@
   <data name="Main_CurrentTarget" xml:space="preserve"><value>Current media target</value></data>
   <data name="Main_Artwork" xml:space="preserve"><value>Current media artwork</value></data>
   <data name="Main_PlaybackProgress" xml:space="preserve"><value>Current media playback progress</value></data>
+  <data name="Main_PlaybackSeek" xml:space="preserve"><value>Seek current media playback position</value></data>
+  <data name="Main_PlaybackSeekHelp" xml:space="preserve"><value>Drag or use the keyboard to change the routed media position.</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>Open Media Lock settings</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
+  <data name="Main_DismissError" xml:space="preserve"><value>Dismiss error</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>Media Sessions</value></data>
   <data name="Main_Subtitle" xml:space="preserve"><value>Keep media keys with the player you choose.</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>Lock session</value></data>
@@ -56,6 +59,8 @@
   <data name="Target_RulesUnavailable" xml:space="preserve"><value>No Priority Rule or Windows Current Session is available.</value></data>
   <data name="Target_LockedUnavailable" xml:space="preserve"><value>Locked Target is unavailable.</value></data>
   <data name="Error_CommandNotCompleted" xml:space="preserve"><value>Media command was not completed: {0}.</value></data>
+  <data name="Error_SeekNotConfirmed" xml:space="preserve"><value>The requested playback position was not confirmed.</value></data>
+  <data name="Error_SeekInterrupted" xml:space="preserve"><value>Seeking was interrupted because the media target changed or became unavailable.</value></data>
   <data name="Media_UnknownTitle" xml:space="preserve"><value>Unknown title</value></data>
   <data name="Media_UnknownArtist" xml:space="preserve"><value>Unknown artist</value></data>
   <data name="Playback_Unknown" xml:space="preserve"><value>Unknown</value></data>

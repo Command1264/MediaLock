@@ -773,6 +773,35 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task UiIntentRoutesAnAbsoluteSeekWithoutAParallelApplicationInterface()
+    {
+        var session = Session(
+            "music",
+            "Brave",
+            new MediaTimeline(
+                TimeSpan.Zero,
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(30),
+                DateTimeOffset.Parse("2026-08-23T00:00:00Z")));
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        var command = MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75));
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.Route(command),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
+        Assert.Equal(command, result.Decision.Command);
+        Assert.Equal([(session.Key, command)], controller.Commands);
+    }
+
+    [Fact]
     public async Task UiIntentLocksAnApplicationThroughTheApplicationSeam()
     {
         var session = Session("music", "Brave");
@@ -923,12 +952,16 @@ public sealed class MediaLockApplicationTests
         Assert.True(controller.CancellationObserved);
     }
 
-    private static MediaSessionSnapshot Session(string key, string source) => new(
+    private static MediaSessionSnapshot Session(
+        string key,
+        string source,
+        MediaTimeline? timeline = null) => new(
         new SessionKey(key),
         source,
         PlaybackStatus.Playing,
         MediaCommandCapabilities.All,
-        DateTimeOffset.Parse("2026-08-22T00:00:00Z"));
+        DateTimeOffset.Parse("2026-08-22T00:00:00Z"),
+        Timeline: timeline);
 
     private sealed class InMemoryCatalog(MediaSessionCatalogSnapshot initial) : IMediaSessionCatalog
     {

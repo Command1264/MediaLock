@@ -147,14 +147,16 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var accepted = command switch
+        var accepted = command.Kind switch
         {
-            MediaCommand.Play => await session.TryPlayAsync(),
-            MediaCommand.Pause => await session.TryPauseAsync(),
-            MediaCommand.TogglePlayPause => await session.TryTogglePlayPauseAsync(),
-            MediaCommand.Previous => await session.TrySkipPreviousAsync(),
-            MediaCommand.Next => await session.TrySkipNextAsync(),
-            MediaCommand.Stop => await session.TryStopAsync(),
+            MediaCommandKind.Play => await session.TryPlayAsync(),
+            MediaCommandKind.Pause => await session.TryPauseAsync(),
+            MediaCommandKind.TogglePlayPause => await session.TryTogglePlayPauseAsync(),
+            MediaCommandKind.Previous => await session.TrySkipPreviousAsync(),
+            MediaCommandKind.Next => await session.TrySkipNextAsync(),
+            MediaCommandKind.Stop => await session.TryStopAsync(),
+            MediaCommandKind.SeekAbsolute => await session.TryChangePlaybackPositionAsync(
+                command.AbsolutePosition!.Value.Ticks),
             _ => throw new ArgumentOutOfRangeException(nameof(command)),
         };
         return accepted ? MediaControlResult.Succeeded : MediaControlResult.Rejected;
@@ -200,6 +202,7 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
         capabilities |= controls.IsPreviousEnabled ? MediaCommandCapabilities.Previous : 0;
         capabilities |= controls.IsNextEnabled ? MediaCommandCapabilities.Next : 0;
         capabilities |= controls.IsStopEnabled ? MediaCommandCapabilities.Stop : 0;
+        capabilities |= controls.IsPlaybackPositionEnabled ? MediaCommandCapabilities.SeekAbsolute : 0;
         return capabilities;
     }
 
