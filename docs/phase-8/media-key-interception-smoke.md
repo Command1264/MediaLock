@@ -4,13 +4,14 @@
 
 | Item | Value |
 | --- | --- |
-| Date | 2026-08-23 |
+| Date | 2026-08-23; final revalidation 2026-08-24 |
 | Input device | ASUS ROG STRIX FLARE mechanical keyboard |
 | Media sources | Brave YouTube Music PWA and ordinary Brave YouTube |
 | Backend | `WH_KEYBOARD_LL`, ordinary-user process |
 | Windows | Windows 11 Pro 25H2, build 26200.9168, 64-bit |
 | Branch | `codex/feat/phase-8c-media-key-interception` |
-| Tested commit | `0ce31a9` |
+| Full hardware matrix commit | `0ce31a9` |
+| Final product revalidation commit | `5bbfccc` |
 
 ## Automated evidence
 
@@ -43,8 +44,8 @@ latest `route.completed` diagnostic separately.
 | YouTube Music Recovery | Key passes through while no routable locked target exists; no Media Lock competing-target route | Pass; no input accepted during Recovering, then Locked Session resumed |
 | Lock/unlock | Hook remains functional and routes once after unlock | Pass; restored Session Key routed with no Hook fault |
 | Sleep/resume | Hook remains functional and routes once after resume | Pass across three deliberate cycles; the first wake immediately re-suspended once at the Windows lifecycle boundary, while the later cycles completed normally |
-| Exit | No Media Lock process remains and Windows handles media keys | Pass; process count zero |
-| Cold restart | Schema v6, enabled interception and Session Lock restore before the first key | Pass; one process, Hook enabled, Locked, and physical Play/Pause routed only to YouTube Music |
+| Exit | No Media Lock process remains and Windows handles media keys | Pass; revalidated at `5bbfccc`, process count zero |
+| Cold restart | Schema v6, enabled interception and Session Lock restore before the first key | Pass; revalidated at `5bbfccc`, one process, restored routing state, and physical Play/Pause routed only to the Locked Target |
 
 Any consumed input that changes ordinary YouTube, any duplicate route, or any key consumed without a valid target is
 a blocker. Touch input is unrelated to this phase.
