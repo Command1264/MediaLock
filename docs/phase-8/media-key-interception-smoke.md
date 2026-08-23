@@ -11,7 +11,7 @@
 | Windows | Windows 11 Pro 25H2, build 26200.9168, 64-bit |
 | Branch | `codex/feat/phase-8c-media-key-interception` |
 | Full hardware matrix commit | `0ce31a9` |
-| Final product revalidation commit | `5bbfccc` |
+| Final product revalidation commit | `145e327` |
 
 ## Automated evidence
 
@@ -44,8 +44,8 @@ latest `route.completed` diagnostic separately.
 | YouTube Music Recovery | Key passes through while no routable locked target exists; no Media Lock competing-target route | Pass; no input accepted during Recovering, then Locked Session resumed |
 | Lock/unlock | Hook remains functional and routes once after unlock | Pass; restored Session Key routed with no Hook fault |
 | Sleep/resume | Hook remains functional and routes once after resume | Pass across three deliberate cycles; the first wake immediately re-suspended once at the Windows lifecycle boundary, while the later cycles completed normally |
-| Exit | No Media Lock process remains and Windows handles media keys | Pass; revalidated at `5bbfccc`, process count zero |
-| Cold restart | Schema v6, enabled interception and Session Lock restore before the first key | Pass; revalidated at `5bbfccc`, one process, restored routing state, and physical Play/Pause routed only to the Locked Target |
+| Exit | No Media Lock process remains and Windows handles media keys | Pass; revalidated at `145e327`, process count zero |
+| Cold restart | Schema v6, enabled interception and Session Lock restore before the first key | Pass; revalidated at `145e327`, one process, restored routing state, and physical Play/Pause routed only to the Locked Target |
 
 Any consumed input that changes ordinary YouTube, any duplicate route, or any key consumed without a valid target is
 a blocker. Touch input is unrelated to this phase.
