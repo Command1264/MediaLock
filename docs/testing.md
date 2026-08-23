@@ -88,6 +88,12 @@ YouTube and YouTube Music to verify artwork changes, play/pause timeline behavio
 English/Traditional Chinese and unchanged single-dispatch media-key routing. Seek is recorded only as a separate
 capability probe and is not part of the production UI.
 
+Phase 8A unit tests the Probe's invariant numeric parsing, finite/non-negative validation, 100-nanosecond tick
+conversion, invalid timeline handling and inclusive timeline bounds. Hardware-assisted evidence must not infer
+movement from `TryChangePlaybackPositionAsync` alone: it records capability, return value and observed timeline for
+Brave YouTube Music and ordinary Brave YouTube in Playing and Paused states. Existing physical-key routing is checked
+once to prove the probe-only change did not alter capture or dispatch.
+
 ### Integration tests
 
 Cover:

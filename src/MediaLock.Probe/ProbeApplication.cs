@@ -112,6 +112,16 @@ internal static class ProbeApplication
                         var result = await intentQueue.InvokeAsync(() => sessions.ExecuteAsync(command));
                         LogResult(result);
                         break;
+                    case "seek":
+                        if (!SeekProbeRequest.TryParse(parts, out var request, out var error))
+                        {
+                            ConsoleLog.Error(error!);
+                            break;
+                        }
+
+                        var seekResult = await intentQueue.InvokeAsync(() => sessions.ExecuteSeekAsync(request));
+                        LogResult(seekResult);
+                        break;
                     case "quit":
                     case "exit":
                         cancellation.Cancel();
@@ -234,6 +244,7 @@ internal static class ProbeApplication
               toggle               Toggle play/pause on the selected target
               next | previous      Skip on the selected target
               stop                 Stop the selected target
+              seek <seconds>       Probe an absolute playback-position change
               hook on | hook off   Enable/disable physical media-key interception
               help                 Show this help
               quit | exit          Disable the hook and exit

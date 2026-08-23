@@ -165,3 +165,23 @@ Exit criteria:
   focused desktop smoke test.
 - Seek is not exposed until Brave YouTube and YouTube Music provide separate real-session capability and acceptance
   evidence.
+
+## Phase 8 — Parameterized media controls
+
+### Phase 8A — Seek capability probe
+
+Extend only the disposable Console Probe to measure GSMTC playback-position support before changing the production
+command model or making the timeline interactive.
+
+Exit criteria:
+
+- Session output records `IsPlaybackPositionEnabled` alongside the existing command capabilities.
+- `seek <seconds>` accepts one finite, non-negative invariant-culture value, converts it to `TimeSpan` ticks and
+  rejects requests outside the selected Session's current timeline without invoking GSMTC.
+- The Probe records advertised capability, accepted/rejected result, requested position, prior observation and the
+  immediate post-request observation without treating `accepted` as proof that playback actually moved.
+- Brave YouTube Music and ordinary Brave YouTube are tested separately while both Sessions exist, in Playing and
+  Paused states, with at least two in-range positions and one invalid/out-of-range request.
+- Session recreation and competing-source isolation are recorded. The production UI remains read-only and Core's
+  parameterless `MediaCommand` model remains unchanged.
+- Evidence yields an explicit proceed/limit/reject decision for a separately scoped Phase 8B seek implementation.
