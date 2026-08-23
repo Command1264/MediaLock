@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Windows.Media.Control;
 
 namespace MediaLock.Probe;
@@ -172,22 +173,8 @@ internal sealed class GsmtcSessionService : IDisposable
 
     public async Task<(bool Success, string Message)> ExecuteAsync(string operation)
     {
-        GlobalSystemMediaTransportControlsSession? target;
-        TransientSelectionStatus selectionStatus;
-        lock (sync)
+        if (!TryGetSelectedTarget(out var target, out var reason))
         {
-            target = selection.Current;
-            selectionStatus = selection.Status;
-        }
-
-        if (target is null)
-        {
-            var reason = selectionStatus switch
-            {
-                TransientSelectionStatus.Recovering => "selected session is recovering",
-                TransientSelectionStatus.Unavailable => "locked target is unavailable",
-                _ => "no selected session",
-            };
             return (false, $"Command skipped: {reason}.");
         }
 
@@ -214,22 +201,8 @@ internal sealed class GsmtcSessionService : IDisposable
 
     public async Task<(bool Success, string Message)> ExecuteSeekAsync(SeekProbeRequest request)
     {
-        GlobalSystemMediaTransportControlsSession? target;
-        TransientSelectionStatus selectionStatus;
-        lock (sync)
+        if (!TryGetSelectedTarget(out var target, out var reason))
         {
-            target = selection.Current;
-            selectionStatus = selection.Status;
-        }
-
-        if (target is null)
-        {
-            var reason = selectionStatus switch
-            {
-                TransientSelectionStatus.Recovering => "selected session is recovering",
-                TransientSelectionStatus.Unavailable => "locked target is unavailable",
-                _ => "no selected session",
-            };
             return (false, $"seek skipped: {reason}.");
         }
 
@@ -360,6 +333,30 @@ internal sealed class GsmtcSessionService : IDisposable
         }
 
         return $"controls(toggle={controls.IsPlayPauseToggleEnabled}, next={controls.IsNextEnabled}, previous={controls.IsPreviousEnabled}, stop={controls.IsStopEnabled}, seek={controls.IsPlaybackPositionEnabled})";
+    }
+
+    private bool TryGetSelectedTarget(
+        [NotNullWhen(true)] out GlobalSystemMediaTransportControlsSession? target,
+        out string reason)
+    {
+        lock (sync)
+        {
+            if (selection.Current is { } selected)
+            {
+                target = selected;
+                reason = "selected";
+                return true;
+            }
+
+            target = null;
+            reason = selection.Status switch
+            {
+                TransientSelectionStatus.Recovering => "selected session is recovering",
+                TransientSelectionStatus.Unavailable => "locked target is unavailable",
+                _ => "no selected session",
+            };
+            return false;
+        }
     }
 
     private void SubscribeLifecycle()
