@@ -134,6 +134,9 @@ drop a consumed command during a target race, but it cannot redirect that comman
 schema v6 adds an enabled-by-default interception preference; disabling it changes the callback decision immediately
 without tearing down the hook. Hook startup/runtime failures are diagnostic and degrade to Windows handling rather
 than terminating GSMTC routing or the UI.
+The application publishes each immutable state reference with volatile read/write semantics, and the coordinator
+publishes its stopped state atomically, so the Hook thread observes settings, target and shutdown transitions without
+mixing revisions or retaining a thread-local stale snapshot.
 
 ## 6. Session lifecycle
 

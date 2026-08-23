@@ -18,6 +18,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private readonly Lock recoverySync = new();
     private readonly Dictionary<long, RecoveryDeadline> recoveryDeadlines = [];
     private Task? catalogWorker;
+    private MediaLockApplicationState state = MediaLockApplicationState.Initial;
     private bool disposed;
     private MediaLockSettings settings = MediaLockSettings.Default;
     private string? settingsLoadWarning;
@@ -61,7 +62,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
 
-    public MediaLockApplicationState State { get; private set; } = MediaLockApplicationState.Initial;
+    public MediaLockApplicationState State
+    {
+        get => Volatile.Read(ref state);
+        private set => Volatile.Write(ref state, value);
+    }
 
     public async ValueTask StartAsync(CancellationToken cancellationToken)
     {

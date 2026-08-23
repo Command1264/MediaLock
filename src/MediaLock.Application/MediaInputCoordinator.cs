@@ -15,7 +15,7 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private Task? worker;
     private long nextSequence;
-    private bool disposed;
+    private int disposed;
 
     public MediaInputCoordinator(
         IMediaLockApplication application,
@@ -45,7 +45,7 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
 
     public async ValueTask StartAsync(CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         if (worker is not null)
         {
             throw new InvalidOperationException("The media input coordinator has already started.");
@@ -66,12 +66,11 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (disposed)
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
         {
             return;
         }
 
-        disposed = true;
         var failures = new List<Exception>();
         try
         {
@@ -115,7 +114,7 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
 
     private bool TryAccept(MediaCommand command)
     {
-        if (disposed)
+        if (Volatile.Read(ref disposed) != 0)
         {
             return false;
         }
