@@ -35,6 +35,7 @@ public sealed class SettingsWindowContractTests
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSelectedAppearanceOptions(window, viewModel);
                 AssertMediaKeyInterceptionSwitch(window);
+                AssertRecoveryFieldsAreAligned(window, viewModel);
 
                 UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
@@ -72,6 +73,32 @@ public sealed class SettingsWindowContractTests
                 .ParentBinding.Path.Path == nameof(SettingsViewModel.InterceptMediaKeys));
 
         Assert.True(checkBox.IsChecked);
+    }
+
+    private static void AssertRecoveryFieldsAreAligned(
+        SettingsWindow window,
+        SettingsViewModel viewModel)
+    {
+        var timeout = Assert.Single(
+            WpfTestHost.FindVisualChildren<TextBox>(window),
+            candidate => candidate.GetBindingExpression(TextBox.TextProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.RecoveryTimeoutText));
+        var fallback = Assert.Single(
+            WpfTestHost.FindVisualChildren<ComboBox>(window),
+            comboBox => ReferenceEquals(comboBox.ItemsSource, viewModel.FallbackPolicies));
+
+        Assert.Equal(36, timeout.ActualHeight);
+        Assert.Equal(fallback.ActualHeight, timeout.ActualHeight);
+
+        timeout.Text = "-1";
+        timeout.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+        window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+        Assert.True(Validation.GetHasError(timeout));
+        var chrome = Assert.Single(
+            WpfTestHost.FindVisualChildren<Border>(timeout),
+            candidate => candidate.Name == "Chrome");
+        Assert.Equal(window.FindResource("DangerBrush"), chrome.BorderBrush);
     }
 
 }

@@ -100,6 +100,8 @@ When a Locked Target disappears:
 
 The default product proposal is: wait up to 15 seconds for a suitable successor, then consider a same-application
 Session, then use Windows Current Session. This remains a configurable policy rather than hard-coded behavior.
+The desktop timeout editor accepts finite ordinary decimal values from 0 through 300 seconds. Invalid, negative,
+infinite, scientific-notation or out-of-range input is marked before Save and cannot be persisted.
 
 ## 7. Settings and runtime state
 

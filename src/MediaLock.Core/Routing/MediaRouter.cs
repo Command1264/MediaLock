@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Threading.Channels;
+using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
 
 namespace MediaLock.Core.Routing;
@@ -39,8 +40,8 @@ public sealed class MediaRouter : IMediaRouter
                 "Unknown fallback policy.");
         }
 
-        if (options.RecoveryTimeout < TimeSpan.Zero ||
-            options.RecoveryTimeout > TimeSpan.FromMinutes(5))
+        if (options.RecoveryTimeout < TimeSpan.FromSeconds(RecoverySettings.MinimumTimeoutSeconds) ||
+            options.RecoveryTimeout > TimeSpan.FromSeconds(RecoverySettings.MaximumTimeoutSeconds))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),

@@ -80,6 +80,11 @@ must exercise Light, Dark and Windows theme in English and Traditional Chinese, 
 main-window minimum-size layout, keyboard focus, Settings scrolling/dragging/Cancel/Escape, owner disablement while
 Settings is open, a direct Alt+Tab-close foreground return, notification-area lifecycle and one routed Play/Pause
 without duplicate action.
+Shared component changes additionally follow the interaction-state and minimum-size verification in
+`docs/ui-design-language.md`; stable geometry and required template parts receive WPF contract coverage where
+practical.
+Settings coverage verifies that Recovery timeout input accepts only finite ordinary decimal values from 0 through
+300, reports invalid input through WPF validation immediately and prevents Save while invalid.
 The four Routing Mode controls must expose exactly one checked state derived from Router Mode; switching and Recovery
 must not resize the controls or remove the selected semantic.
 

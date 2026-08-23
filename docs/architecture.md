@@ -235,6 +235,10 @@ an explicit drag region and Cancel/Escape commands that restore the persisted Vi
 an intervening third-party foreground window after Alt+Tab. Motion stays in the presentation shell, respects
 `SystemParameters.ClientAreaAnimation` and never delays routing.
 
+The presentation shell's reusable component geometry, semantic states and Windows-owned surface boundaries are
+defined in `docs/ui-design-language.md`. `Themes/Controls.xaml` is the implementation seam for reusable WPF chrome;
+individual Views own composition and domain-specific variants rather than independent native-looking templates.
+
 Phase 8C advances settings to schema v6 with the global-media-key interception preference. Schema v1-v5 documents
 migrate to enabled, preserving the product's established default and every prior desktop preference.
 
