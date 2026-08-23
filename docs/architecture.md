@@ -234,6 +234,11 @@ non-playing states remain at the observed position, and all values clamp to vali
 timer only requests property refresh; it never writes an estimated position into Core, dispatches routing intents or
 survives the window lifetime. Seek remains outside the command model until separate hardware/player evidence exists.
 
+Phase 8A keeps Seek inside the disposable Probe. A small immutable request parses invariant seconds and validates the
+absolute position against the selected live Session's current timeline before the Probe calls
+`TryChangePlaybackPositionAsync(TimeSpan.Ticks)`. The Probe reports capability, API acceptance and observed position as
+separate facts. No parameterized command crosses into Core, Application, production Windows adapters or WPF.
+
 ## 9. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Windows.Media.Control;
 
 namespace MediaLock.Probe;
@@ -172,22 +173,8 @@ internal sealed class GsmtcSessionService : IDisposable
 
     public async Task<(bool Success, string Message)> ExecuteAsync(string operation)
     {
-        GlobalSystemMediaTransportControlsSession? target;
-        TransientSelectionStatus selectionStatus;
-        lock (sync)
+        if (!TryGetSelectedTarget(out var target, out var reason))
         {
-            target = selection.Current;
-            selectionStatus = selection.Status;
-        }
-
-        if (target is null)
-        {
-            var reason = selectionStatus switch
-            {
-                TransientSelectionStatus.Recovering => "selected session is recovering",
-                TransientSelectionStatus.Unavailable => "locked target is unavailable",
-                _ => "no selected session",
-            };
             return (false, $"Command skipped: {reason}.");
         }
 
@@ -209,6 +196,44 @@ internal sealed class GsmtcSessionService : IDisposable
         catch (Exception exception)
         {
             return (false, $"{operation} -> {target.SourceAppUserModelId}: {exception.Message}");
+        }
+    }
+
+    public async Task<(bool Success, string Message)> ExecuteSeekAsync(SeekProbeRequest request)
+    {
+        if (!TryGetSelectedTarget(out var target, out var reason))
+        {
+            return (false, $"seek skipped: {reason}.");
+        }
+
+        try
+        {
+            var source = target.SourceAppUserModelId;
+            var controls = target.GetPlaybackInfo()?.Controls;
+            if (controls?.IsPlaybackPositionEnabled is not true)
+            {
+                return (false, $"seek -> {source}: skipped; playback-position capability is disabled.");
+            }
+
+            var before = target.GetTimelineProperties();
+            if (!request.TryValidateTimeline(before.StartTime, before.EndTime, out var error))
+            {
+                return (false, $"seek -> {source}: skipped; {error}");
+            }
+
+            var accepted = await target.TryChangePlaybackPositionAsync(request.RequestedTicks);
+            var observed = target.GetTimelineProperties().Position;
+            var observedDelta = observed - request.Position;
+
+            return (
+                accepted,
+                $"seek -> {source}: capability=enabled; API={(accepted ? "accepted" : "rejected")}; " +
+                $"requested={request.Position:c}; before={before.Position:c}; " +
+                $"observed={observed:c}; observed-delta={observedDelta:c}");
+        }
+        catch (Exception exception)
+        {
+            return (false, $"seek -> {target.SourceAppUserModelId}: {exception.Message}");
         }
     }
 
@@ -307,7 +332,31 @@ internal sealed class GsmtcSessionService : IDisposable
             return "controls=unavailable";
         }
 
-        return $"controls(toggle={controls.IsPlayPauseToggleEnabled}, next={controls.IsNextEnabled}, previous={controls.IsPreviousEnabled}, stop={controls.IsStopEnabled})";
+        return $"controls(toggle={controls.IsPlayPauseToggleEnabled}, next={controls.IsNextEnabled}, previous={controls.IsPreviousEnabled}, stop={controls.IsStopEnabled}, seek={controls.IsPlaybackPositionEnabled})";
+    }
+
+    private bool TryGetSelectedTarget(
+        [NotNullWhen(true)] out GlobalSystemMediaTransportControlsSession? target,
+        out string reason)
+    {
+        lock (sync)
+        {
+            if (selection.Current is { } selected)
+            {
+                target = selected;
+                reason = "selected";
+                return true;
+            }
+
+            target = null;
+            reason = selection.Status switch
+            {
+                TransientSelectionStatus.Recovering => "selected session is recovering",
+                TransientSelectionStatus.Unavailable => "locked target is unavailable",
+                _ => "no selected session",
+            };
+            return false;
+        }
     }
 
     private void SubscribeLifecycle()

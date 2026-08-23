@@ -157,6 +157,11 @@ failure falls back to a neutral placeholder and never changes routing state. Tim
 only, clamps to the last observed GSMTC bounds and resets when the routed target disappears or changes. The progress
 indicator is not seekable until player-specific GSMTC capability and acceptance evidence is documented.
 
+Phase 8A may request absolute playback positions only from the disposable Console Probe. It does not add Seek to the
+production router, input backend, persisted settings or WPF interaction model. A Session advertising playback-position
+support and returning `true` are necessary observations, not sufficient evidence of movement; the requested and
+observed timelines must also be compared on each supported player.
+
 ## 9. Non-functional requirements
 
 - Run without administrator privileges in supported scenarios.
