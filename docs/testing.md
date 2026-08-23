@@ -128,6 +128,14 @@ normal build from retaining stale prerelease metadata even when the publish comm
 The formal archive must come from a clean reviewed commit; host and Windows Sandbox results apply only to the source
 commit and SHA-256 recorded for that archive.
 
+Phase 10A validates the public feedback boundary without rebuilding the published executable. Parse every Issue Form
+as YAML, inspect required field identifiers and verify that referenced labels exist before merge. Check repository-
+relative Markdown links from README, support and installation documents. After integration into the repository's
+default branch, preview both forms on GitHub and confirm blank issues are disabled. The forms must request exact
+environment and competing-source evidence while warning reporters to redact media metadata, secrets and unrelated
+settings. Documentation review follows one fresh-download path through digest verification, first run, update,
+rollback and removal. GitHub Actions capacity is not required.
+
 ### Integration tests
 
 Cover:
@@ -259,6 +267,25 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 After committing the reviewed source, produce the provenance-clean candidate with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
+
+For public feedback metadata, additionally run a local YAML parse and relative-link check. Before merging Issue Forms,
+confirm their declared labels exist in the target GitHub repository; label creation is a separate remote write. After
+integration into the default branch, open both GitHub Issue creation URLs and confirm the intended form renders before
+announcing the intake path. A merge into a non-default integration branch does not activate GitHub Issue Forms.
+
+The current local syntax and formatting check is:
+
+```powershell
+Get-Content '.github/ISSUE_TEMPLATE/bug-report.yml' -Raw | npx.cmd --yes yaml@2.8.1 valid
+Get-Content '.github/ISSUE_TEMPLATE/compatibility-report.yml' -Raw | npx.cmd --yes yaml@2.8.1 valid
+Get-Content '.github/ISSUE_TEMPLATE/config.yml' -Raw | npx.cmd --yes yaml@2.8.1 valid
+npx.cmd --yes prettier@3.6.2 --check '.github/ISSUE_TEMPLATE/*.yml'
+git diff --check
+gh label list --limit 100 --json name --jq '.[].name'
+```
+
+Prettier proves that the YAML can be parsed, not that GitHub will apply nonexistent labels. Compare the last command
+against every `labels` entry in the forms and the canonical roles in `docs/agents/triage-labels.md`.
 
 The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08-23. Its exact source commit, archive
 digest, environment and results are preserved in [Phase 6 packaged validation](phase-6/host-smoke.md). The same gate
