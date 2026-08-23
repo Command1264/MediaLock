@@ -18,7 +18,7 @@ Date: 2026-08-23 (automated, production-WPF inspection and focused user acceptan
 | Session recreation | Recovering hides stale Now Playing data; recovered target shows current data | Pass in user refresh acceptance |
 | Ordinary YouTube competing | Locked YouTube Music remains the displayed and routed target | Pass; ordinary YouTube remained unchanged |
 | Missing artwork | Neutral placeholder appears and controls continue to work | Automated malformed/missing-artwork coverage passes; no manual source available |
-| Light/Dark and English/Traditional Chinese | Content remains readable at the minimum window size | Current Traditional Chinese/Dark minimum-size layout passes; remaining appearance pair pending |
+| Light/Dark and English/Traditional Chinese | Content remains readable at the minimum window size | Traditional Chinese/Dark and English/Light minimum-size user acceptance pass; Windows preferences restored |
 | Physical Play/Pause | YouTube Music changes exactly once; ordinary YouTube does not change | Pass in user acceptance |
 
 ## Seek capability evidence
