@@ -12,7 +12,7 @@ namespace MediaLock.App.Tests;
 public sealed class SettingsWindowContractTests
 {
     [Fact]
-    public void DesktopWindowsPreserveSettingsAndNowPlayingContracts()
+    public void SettingsUsesAFixedFramelessSurfaceWithSelectedAppearanceOptions()
     {
         WpfTestHost.Run(() =>
         {
