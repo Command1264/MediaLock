@@ -81,14 +81,6 @@ public partial class App : System.Windows.Application
             try
             {
                 await mediaInputCoordinator.StartAsync(CancellationToken.None);
-                await diagnosticLog.WriteAsync(
-                    new DiagnosticEvent(
-                        "input.hook.started",
-                        new Dictionary<string, string>
-                        {
-                            ["enabled"] = mediaApplication.State.Settings.Desktop.InterceptMediaKeys.ToString(),
-                        }),
-                    CancellationToken.None);
             }
             catch (Exception exception)
             {
@@ -97,6 +89,12 @@ public partial class App : System.Windows.Application
                 mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
                 await mediaInputCoordinator.DisposeAsync();
                 mediaInputCoordinator = null;
+            }
+            if (mediaInputCoordinator is not null)
+            {
+                await TryWriteInputHookStartedDiagnosticAsync(
+                    diagnosticLog,
+                    mediaApplication.State.Settings.Desktop.InterceptMediaKeys);
             }
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
             systemThemeSubscribed = true;
@@ -356,6 +354,28 @@ public partial class App : System.Windows.Application
         catch (Exception diagnosticException)
         {
             System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
+        }
+    }
+
+    internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
+        IDiagnosticLog diagnosticLog,
+        bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticLog);
+        try
+        {
+            await diagnosticLog.WriteAsync(
+                new DiagnosticEvent(
+                    "input.hook.started",
+                    new Dictionary<string, string>
+                    {
+                        ["enabled"] = enabled.ToString(),
+                    }),
+                CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError(exception.ToString());
         }
     }
 

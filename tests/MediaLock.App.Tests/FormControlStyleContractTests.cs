@@ -28,8 +28,12 @@ public sealed class FormControlStyleContractTests
                 var checkMark = Assert.Single(
                     WpfTestHost.FindVisualChildren<ShapePath>(checkBox),
                     candidate => candidate.Name == "CheckMark");
+                var focusRing = Assert.Single(
+                    WpfTestHost.FindVisualChildren<Border>(checkBox),
+                    candidate => candidate.Name == "FocusRing");
                 var originalSize = new Size(indicator.ActualWidth, indicator.ActualHeight);
 
+                Assert.Equal(36, checkBox.MinHeight);
                 Assert.Equal(new Size(18, 18), originalSize);
                 Assert.Equal(new CornerRadius(5), indicator.CornerRadius);
                 Assert.Equal(Visibility.Collapsed, checkMark.Visibility);
@@ -39,6 +43,9 @@ public sealed class FormControlStyleContractTests
 
                 Assert.Equal(originalSize, new Size(indicator.ActualWidth, indicator.ActualHeight));
                 Assert.Equal(Visibility.Visible, checkMark.Visibility);
+                Assert.True(checkBox.Focus());
+                checkBox.UpdateLayout();
+                Assert.Equal(Visibility.Visible, focusRing.Visibility);
             }
             finally
             {
@@ -65,6 +72,7 @@ public sealed class FormControlStyleContractTests
                 Assert.Equal(new CornerRadius(8), chrome.CornerRadius);
                 Assert.Equal(new Thickness(1), originalThickness);
                 Assert.Equal(new Thickness(4, 2, 4, 2), chrome.Padding);
+                Assert.Null(textBox.GetValue(Validation.ErrorTemplateProperty));
 
                 textBox.Focus();
                 textBox.UpdateLayout();

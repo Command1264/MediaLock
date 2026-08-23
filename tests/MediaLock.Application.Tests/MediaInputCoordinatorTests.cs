@@ -46,6 +46,19 @@ public sealed class MediaInputCoordinatorTests
     }
 
     [Fact]
+    public async Task CaptureDecisionReadsOneImmutableApplicationStateSnapshot()
+    {
+        var target = Session("music", MediaCommandCapabilities.All);
+        var application = new StateReadCountingApplication(State(target));
+        await using var source = new FakeInputSource();
+        await using var coordinator = new MediaInputCoordinator(application, source);
+        await coordinator.StartAsync(CancellationToken.None);
+
+        Assert.True(source.Emit(MediaCommand.TogglePlayPause));
+        Assert.Equal(1, application.StateReadCount);
+    }
+
+    [Fact]
     public async Task UnsupportedInputPassesThroughWithoutDispatching()
     {
         var target = Session("music", MediaCommandCapabilities.TogglePlayPause);
@@ -233,6 +246,38 @@ public sealed class MediaInputCoordinatorTests
             NextIntent.TrySetResult(intent);
             return ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
         }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class StateReadCountingApplication(
+        MediaLockApplicationState state) : IMediaLockApplication
+    {
+        private int stateReadCount;
+
+        public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public int StateReadCount => Volatile.Read(ref stateReadCount);
+
+        public MediaLockApplicationState State
+        {
+            get
+            {
+                Interlocked.Increment(ref stateReadCount);
+                return state;
+            }
+        }
+
+        public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask<ApplicationResult> DispatchAsync(
+            ApplicationIntent intent,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ApplicationResult(state, RouteDecision.StateUpdated));
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

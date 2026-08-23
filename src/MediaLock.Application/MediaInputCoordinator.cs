@@ -115,12 +115,18 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
 
     private bool TryAccept(MediaCommand command)
     {
-        if (disposed || application.State.Settings.Desktop?.InterceptMediaKeys != true)
+        if (disposed)
         {
             return false;
         }
 
-        var router = application.State.Router;
+        var state = application.State;
+        if (state.Settings.Desktop?.InterceptMediaKeys != true)
+        {
+            return false;
+        }
+
+        var router = state.Router;
         if (router.Mode is RoutingMode.SessionLock or RoutingMode.AppLock &&
             router.Status is RouterStatus.Recovering or RouterStatus.Unavailable)
         {
