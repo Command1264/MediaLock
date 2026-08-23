@@ -191,8 +191,8 @@ Exit criteria:
 Promote absolute Seek into the production Media Command model and make the routed target's timeline interactive while
 preserving the existing Router, Recovery and GSMTC seams.
 
-Status: complete. Phase 8C integrated the production physical-media-key backend and passed the missing regression row
-with Brave YouTube Music and ordinary Brave YouTube, including normal, long-press and rapid-input groups.
+Status: complete. Routed Seek and the interactive timeline passed their automated and named Brave YouTube Music plus
+ordinary Brave YouTube matrix; Phase 8C subsequently completed the physical-media-key regression row.
 
 Exit criteria:
 
@@ -215,8 +215,8 @@ Exit criteria:
 Promote the Phase 0 low-level keyboard backend into the desktop application and route accepted physical media keys
 through the existing Application and Router boundaries.
 
-Status: implementation, automated coverage and the named hardware-assisted exit matrix are complete. Final code review
-and branch integration remain before the phase is merged.
+Status: complete. The production backend, automated coverage, code review and ASUS ROG STRIX FLARE hardware-assisted
+matrix were integrated on 2026-08-24.
 
 Exit criteria:
 
@@ -228,3 +228,28 @@ Exit criteria:
 - Startup/runtime hook failures are observable and safely degrade to Windows media-key handling.
 - The ASUS ROG STRIX FLARE matrix passes with Brave YouTube Music as Priority Target and ordinary Brave YouTube as
   Windows Current Session, including focus changes, long press, lock/unlock and sleep/resume.
+
+## Phase 9 — `0.2.0-rc.2` release hardening
+
+Produce a second reviewed `win-x64` candidate that consolidates the completed post-`rc.1` UX, localization, Now
+Playing, Seek and physical-media-key work. Preserve the Phase 6 provenance boundary: a candidate is identified by its
+exact source commit and archive digest, and evidence from `rc.1` does not transfer to `rc.2`.
+
+Exit criteria:
+
+- Project defaults, packaging tests, user documentation and release notes consistently identify `0.2.0-rc.2`.
+- Restore, formatting, automated tests, Release build and isolated packaging verification pass locally without relying
+  on GitHub Actions capacity.
+- A clean reviewed commit produces the ZIP, manifest and SHA-256 set; the archive contains exactly one correctly
+  versioned self-contained `MediaLock.exe`, and the independently computed digest matches the manifest.
+- The packaged executable passes host smoke coverage for startup, single-instance activation, Settings, routing,
+  physical-media-key interception, tray lifecycle and explicit Exit.
+- Windows Sandbox repeats cold-start, persistence, startup-registration, Edge GSMTC routing and explicit-Exit checks
+  for the exact `rc.2` source commit and digest.
+- The candidate remains explicitly unsigned. Tagging, GitHub Release creation and public artifact publication remain
+  separate operations requiring explicit approval.
+
+Status: complete on 2026-08-24. Automated gates, clean artifact inspection, local-host smoke and Windows Sandbox passed
+for source commit `aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7` and archive SHA-256
+`0c750e7f2eec132b6b82c4d78f491f961dad76358c4e0b9c49dc3042779ec5e7`. The candidate remains unsigned; no tag,
+GitHub Release or public artifact is implied by phase completion.

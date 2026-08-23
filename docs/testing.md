@@ -122,6 +122,12 @@ Settings coverage proves schema-v1-v5 migration enables interception and the loc
 The native hook installation itself remains hardware-assisted because an automated test must not install a global
 keyboard hook into the developer's interactive desktop.
 
+Phase 9 re-runs the complete local gate and the public packaging test for `0.2.0-rc.2`. Packaging coverage additionally
+requires the App project's default `Version` and `InformationalVersion` to match the candidate version, preventing a
+normal build from retaining stale prerelease metadata even when the publish command overrides MSBuild properties.
+The formal archive must come from a clean reviewed commit; host and Windows Sandbox results apply only to the source
+commit and SHA-256 recorded for that archive.
+
 ### Integration tests
 
 Cover:
@@ -254,9 +260,11 @@ After committing the reviewed source, produce the provenance-clean candidate wit
 `eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
 
-The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08-23. The exact source commit,
-archive digest, environment and results are preserved in
-[Phase 6 packaged validation](phase-6/host-smoke.md); the evidence does not transfer to a different commit or digest.
+The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08-23. Its exact source commit, archive
+digest, environment and results are preserved in [Phase 6 packaged validation](phase-6/host-smoke.md). The same gate
+was completed independently for the formal `0.2.0-rc.2` candidate on 2026-08-24; its exact identity and results are
+preserved in [Phase 9 packaged validation](phase-9/release-candidate-smoke.md). Evidence does not transfer between
+commits or digests.
 
 ## 7. Manual evidence
 
