@@ -4,11 +4,13 @@
 
 | Item | Value |
 | --- | --- |
+| Date | 2026-08-23 |
 | Input device | ASUS ROG STRIX FLARE mechanical keyboard |
 | Media sources | Brave YouTube Music PWA and ordinary Brave YouTube |
 | Backend | `WH_KEYBOARD_LL`, ordinary-user process |
 | Windows | Windows 11 Pro 25H2, build 26200.9168, 64-bit |
 | Branch | `codex/feat/phase-8c-media-key-interception` |
+| Tested commit | `0ce31a9` |
 
 ## Automated evidence
 

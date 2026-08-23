@@ -373,6 +373,21 @@ public partial class App : System.Windows.Application
             systemThemeSubscribed = false;
         }
         var failures = new List<Exception>();
+        if (mediaInputCoordinator is not null)
+        {
+            mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
+            try
+            {
+                await mediaInputCoordinator.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            mediaInputCoordinator = null;
+        }
+
         try
         {
             trayIconHost?.Dispose();
@@ -419,21 +434,6 @@ public partial class App : System.Windows.Application
 
         mainWindowViewModel = null;
         mainWindow = null;
-
-        if (mediaInputCoordinator is not null)
-        {
-            mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
-            try
-            {
-                await mediaInputCoordinator.DisposeAsync();
-            }
-            catch (Exception exception)
-            {
-                failures.Add(exception);
-            }
-
-            mediaInputCoordinator = null;
-        }
 
         if (mediaApplication is not null)
         {
