@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <sys:String x:Key="MediaLockThemeMarker">Light</sys:String>
+
+    <SolidColorBrush x:Key="WindowBrush" Color="#FFF3F3F3" />
+    <SolidColorBrush x:Key="LayerBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="LayerAltBrush" Color="#FFF9F9F9" />
+    <SolidColorBrush x:Key="SubtleBrush" Color="#FFE9E9E9" />
+    <SolidColorBrush x:Key="SubtleHoverBrush" Color="#FFE1E1E1" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="#40000000" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FF1A1A1A" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF616161" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF0067C0" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF1975C5" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#FF005A9E" />
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#FFDCEEFF" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF0F7B0F" />
+    <SolidColorBrush x:Key="SuccessSurfaceBrush" Color="#FFE6F4E6" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#FF8A4F00" />
+    <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#FFFFF4CE" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFC42B1C" />
+    <SolidColorBrush x:Key="DangerSurfaceBrush" Color="#FFFDE7E9" />
+    <SolidColorBrush x:Key="FocusBrush" Color="#FF005FB8" />
+</ResourceDictionary>

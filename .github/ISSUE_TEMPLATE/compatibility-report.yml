@@ -1,0 +1,119 @@
+name: Compatibility report / 相容性回報
+description: Record whether a media source and device work with Media Lock / 記錄媒體來源與裝置的相容性
+title: "[Compatibility]: "
+labels:
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        相容性回報可包含成功或失敗結果；失敗不一定代表 Media Lock 缺陷。請勿貼上私人媒體資訊。
+        Compatibility reports may be passing or failing. A failure is not automatically a Media Lock defect. Do not post private media information.
+
+  - type: input
+    id: version
+    attributes:
+      label: Media Lock version / 版本
+      placeholder: 0.2.0-rc.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: windows
+    attributes:
+      label: Windows environment / Windows 環境
+      description: Include edition, DisplayVersion, full build, and architecture.
+      placeholder: Windows 11 Enterprise, 24H2, 26100.x, x64
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Media source / 媒體來源
+      description: Include application/browser name and version, media service, and tab/PWA/desktop form.
+      placeholder: Microsoft Edge 151.x; YouTube; browser tab
+    validations:
+      required: true
+
+  - type: input
+    id: source_application
+    attributes:
+      label: Source application shown by Media Lock / 顯示的來源應用程式
+      placeholder: MSEdge
+    validations:
+      required: true
+
+  - type: dropdown
+    id: routing_mode
+    attributes:
+      label: Routing Mode / 路由模式
+      options:
+        - Session Lock / 鎖定工作階段
+        - App Lock / 鎖定應用程式
+        - Priority Rules / 優先規則
+        - Windows Auto / Windows 自動
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: capabilities
+    attributes:
+      label: Observed capabilities / 已觀察能力
+      description: Select only operations actually tested.
+      options:
+        - label: Session appears and metadata updates / Session 可見且資料會更新
+        - label: Play and Pause / 播放與暫停
+        - label: Previous / 上一首
+        - label: Next / 下一首
+        - label: Stop / 停止
+        - label: Seek while playing / 播放時跳轉
+        - label: Seek while paused / 暫停時跳轉
+        - label: Session recreation or refresh Recovery / Session 重建或重新整理 Recovery
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Overall result / 整體結果
+      options:
+        - Pass / 通過
+        - Partial / 部分通過
+        - Fail / 未通過
+    validations:
+      required: true
+
+  - type: textarea
+    id: observations
+    attributes:
+      label: Results and observations / 結果與觀察
+      description: Describe expected and actual behavior, including whether a competing media source changed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: device
+    attributes:
+      label: Physical media-key device / 實體媒體鍵裝置
+      description: Include the keyboard/device model and tested keys when physical input was tested.
+
+  - type: textarea
+    id: competing_source
+    attributes:
+      label: Competing media source / 競爭媒體來源
+      description: Identify the other source and state whether it remained unchanged.
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics / 已清理的診斷資料
+      description: Attach only relevant logs after reviewing them. Remove secrets, account details, media titles, artists, and unrelated settings.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist / 檢查清單
+      options:
+        - label: I recorded only operations that I actually tested. / 我只記錄實際測試過的操作。
+          required: true
+        - label: I reviewed every attachment and removed private or unrelated data. / 我已檢查附件並移除私人或無關資料。
+          required: true

@@ -1,0 +1,61 @@
+# 下載、安裝、更新與移除
+
+Media Lock 目前以 unsigned、portable `win-x64` ZIP 發布，沒有安裝程式，也不需要另外安裝 .NET Runtime。
+
+## 系統需求與限制
+
+- 64 位元 Windows 11；Windows 與播放器必須提供 GSMTC。
+- 一般使用者權限即可執行。
+- 執行檔尚未 code signing，Windows SmartScreen 或信譽警告仍可能出現。
+- Chromium 瀏覽器可能讓多個分頁共用來源識別；Media Lock 不會檢查 URL，也不保證能區分同一瀏覽器內的特定分頁。
+
+## 下載與驗證
+
+1. 從 [Media Lock Releases](https://github.com/Command1264/MediaLock/releases) 下載最新版本的
+   `MediaLock-<version>-win-x64.zip`。不要從不明鏡像下載。
+2. 在 PowerShell 將 `<version>` 換成實際版本，以實際檔名計算 SHA-256：
+
+   ```powershell
+   Get-FileHash '.\MediaLock-<version>-win-x64.zip' -Algorithm SHA256
+   ```
+
+3. 將結果與該版本 GitHub Release 說明中的 SHA-256 完整比對。大小寫不影響雜湊值，但每個十六進位字元
+   都必須相同；不相同時不要執行檔案。
+
+## 第一次執行
+
+1. 將 ZIP 解壓縮到不會任意搬動的使用者資料夾，例如 `%LocalAppData%\Programs\MediaLock\<version>\`。
+2. 執行 `MediaLock.exe`。若 Windows 顯示 unsigned publisher 警告，先確認來源與 SHA-256，再自行決定是否繼續。
+3. 選擇媒體 Session 與 Routing Mode；需要實體媒體鍵路由時，確認 Settings 的全域媒體鍵攔截已啟用。
+4. 關閉主視窗預設只會隱藏至通知區域；完整結束請從通知區域選單選擇 `Exit`。
+
+若啟用 `Start with Windows`，登入啟動項會保存當下 `MediaLock.exe` 的完整路徑。因此請先確定最終放置位置，
+再啟用這個選項。
+
+## 更新
+
+1. 保留舊版本資料夾，以便回復。
+2. 下載並驗證新版本 ZIP，解壓縮到新的版本資料夾。
+3. 從舊版本 Settings 停用 `Start with Windows`，再由通知區域選擇 `Exit`。
+4. 執行新版本，確認既有設定與 Session 狀態可以讀取，再重新啟用 `Start with Windows`。
+5. 完成實際播放器與媒體鍵 smoke test 後，才移除舊版本程式資料夾。
+
+使用者設定、狀態與 logs 位於 `%LocalAppData%\MediaLock\`，不在 portable 程式資料夾內，正常更新不需要搬移或刪除。
+
+## 回復舊版本
+
+1. 在目前版本停用 `Start with Windows`，並從通知區域選擇 `Exit`。
+2. 執行先前已驗證且仍保留的 `MediaLock.exe`。
+3. 若要登入啟動，從該舊版本重新啟用，讓登錄值指向正確路徑。
+
+設定 schema 可能隨版本演進。調查問題時先備份 `%LocalAppData%\MediaLock\`，不要把刪除使用者資料當作例行回復步驟。
+
+## 移除
+
+1. 在 Settings 停用 `Start with Windows`。
+2. 從通知區域選單選擇 `Exit`，並確認 `MediaLock.exe` 已結束。
+3. 刪除確切的 Media Lock 程式版本資料夾。
+4. 若確定不再需要偏好設定、恢復狀態與診斷 logs，才另外刪除 `%LocalAppData%\MediaLock\`。
+
+Media Lock 沒有安裝服務、驅動程式或需要系統管理員權限的系統層元件。若啟動項未能由 Settings 移除，請先依
+[支援與疑難排解](../SUPPORT.md) 確認精確登錄值，不要刪除整個 Windows `Run` key。

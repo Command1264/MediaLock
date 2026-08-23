@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and troubleshooting / 支援與疑難排解
+    url: https://github.com/Command1264/MediaLock/blob/main/SUPPORT.md
+    about: Check common solutions and the information needed before opening an issue. / 建立 Issue 前先查看常見解法與所需資料。

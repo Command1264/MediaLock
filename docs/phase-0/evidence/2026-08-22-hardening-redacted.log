@@ -1,0 +1,66 @@
+# Media Lock Phase 0 hardening evidence
+# Date: 2026-08-22 (Asia/Taipei)
+# Device: ASUS ROG STRIX FLARE mechanical keyboard
+# Environment: Windows 11 Pro build 26200; Brave 151.1.93.137; YouTube Music PWA
+# Redaction: media title and artist lines were removed; the Locked Target source was replaced with <LOCKED_SOURCE>.
+# Expected: one target action per consumed press cycle; no rejected route, competing action, or queue error.
+# Baseline observation with hook off: holding Next for about two seconds changed tracks more than ten times.
+# Competing ordinary Brave YouTube Session remained Paused.
+
+[00:31:40.372] GSMTC manager ready; 2 session(s) discovered.
+[00:31:56.456] Selected [2] <LOCKED_SOURCE>.
+[00:32:01.819] Keyboard hook enabled. Routable media keys will be consumed.
+[00:32:05.039] Keyboard hook: on
+
+# Stop: 11 consumed, 11 accepted.
+[00:32:17.208] INPUT Stop; consumed; queued for selected session.
+[00:32:17.217] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:25.561] INPUT Stop; consumed; queued for selected session.
+[00:32:25.565] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:31.539] INPUT Stop; consumed; queued for selected session.
+[00:32:31.541] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:34.819] INPUT Stop; consumed; queued for selected session.
+[00:32:34.819] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:39.908] INPUT Stop; consumed; queued for selected session.
+[00:32:39.908] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:49.852] INPUT Stop; consumed; queued for selected session.
+[00:32:49.852] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:32:57.058] INPUT Stop; consumed; queued for selected session.
+[00:32:57.059] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:33:01.437] INPUT Stop; consumed; queued for selected session.
+[00:33:01.437] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:33:07.277] INPUT Stop; consumed; queued for selected session.
+[00:33:07.277] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:33:12.977] INPUT Stop; consumed; queued for selected session.
+[00:33:12.977] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:33:18.793] INPUT Stop; consumed; queued for selected session.
+[00:33:18.794] ROUTE Stop -> <LOCKED_SOURCE>: accepted
+[00:33:20.814] Recovery window expired for locked target '<LOCKED_SOURCE>'. Target remains unavailable.
+[00:33:21.752] Locked target '<LOCKED_SOURCE>' became available and was reselected.
+
+# Next: two independent captured press cycles; each produced one route. The held cycle changed one track.
+[00:33:33.471] Keyboard hook disabled.
+[00:33:51.063] Keyboard hook enabled. Routable media keys will be consumed.
+[00:33:56.854] Selected [2] <LOCKED_SOURCE>.
+[00:34:02.133] INPUT Next; consumed; queued for selected session.
+[00:34:02.134] ROUTE Next -> <LOCKED_SOURCE>: accepted
+[00:34:05.680] INPUT Next; consumed; queued for selected session.
+[00:34:05.680] ROUTE Next -> <LOCKED_SOURCE>: accepted
+[00:34:40.696] Keyboard hook: on
+
+# Sleep/resume: manager reacquired, target recovered, and the first post-resume command routed once.
+[00:34:58.537] Selected session '<LOCKED_SOURCE>' was lost temporarily; recovering for up to 2 seconds.
+[00:35:00.542] Recovery window expired for locked target '<LOCKED_SOURCE>'. Target remains unavailable.
+[00:35:43.545] GSMTC catalog is unavailable; waiting for system resume.
+[00:35:43.565] Reacquiring GSMTC manager after system resume.
+[00:35:43.660] Locked target '<LOCKED_SOURCE>' became available and was reselected.
+[00:35:44.193] Selected session '<LOCKED_SOURCE>' replaced and recovered.
+[00:35:44.228] Selected session '<LOCKED_SOURCE>' was lost temporarily; recovering for up to 2 seconds.
+[00:35:46.245] Recovery window expired for locked target '<LOCKED_SOURCE>'. Target remains unavailable.
+[00:35:52.324] Locked target '<LOCKED_SOURCE>' became available and was reselected.
+[00:35:52.345] Sessions changed; 2 session(s) available.
+[00:36:29.439] INPUT PlayPause; consumed; queued for selected session.
+[00:36:29.440] ROUTE PlayPause -> <LOCKED_SOURCE>: accepted
+[00:36:38.430] Keyboard hook disabled.
+
+# Transcript summary: Serialized intent failed = 0; rejected route = 0.

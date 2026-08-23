@@ -51,6 +51,10 @@ MediaLock.sln
 - **Probe** is the Phase 0 executable for technical validation, not production UI.
 - **Tests** cover Core deterministically and adapters with integration or hardware-assisted tests.
 
+`MediaLock.Application` is a UI-independent coordination module between Core and presentation. It consumes the
+catalog stream, owns Recovery deadline effects and exposes immutable application state plus application-level
+intents. This keeps both WPF and Windows adapters outside Core without duplicating orchestration in ViewModels.
+
 Dependency direction points inward: App and Windows depend on Core abstractions; Core does not depend on them.
 
 ## 3. Core ports
@@ -71,6 +75,16 @@ public interface ISystemLifecycle;
 Command against a resolved handle and reports supported, succeeded or failed. `IMediaInputSource` emits a command
 only after its backend has determined whether the underlying input was consumed.
 
+Phase 1 exposes routing through the deliberately small `IMediaRouter.DispatchAsync(RouterIntent,
+CancellationToken)` interface. A result contains the new immutable `RouterState`, one `RouteDecision`, and explicit
+deadline effects; callers execute those effects but do not decide when to schedule or cancel Recovery. They also do
+not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
+`IMediaController` is the platform adapter seam used by the router after it has resolved exactly one target.
+
+Phase 2 uses `IMediaSessionCatalog.WatchAsync` as the catalog seam. The production `GsmtcMediaAdapter` implements
+both this interface and `IMediaController`, keeping the ephemeral-key-to-live-Session map local to one deep Windows
+module. The application module is the sole owner of that adapter and of `IMediaRouter` disposal.
+
 ## 4. State model
 
 Routing state is explicit and immutable at the Core boundary. A reducer-like transition function accepts the prior
@@ -79,6 +93,7 @@ state plus an intent/event and returns a new state with effects to execute.
 ```text
 WindowsAuto
    ├─ LockApp ───────────────▶ AppLocked
+   ├─ UsePriorityRules ──────▶ PriorityRules
    └─ LockSession ───────────▶ SessionLocked
                                   │ SessionLost
                                   ▼
@@ -107,6 +122,22 @@ A consumed input must not also fall through to Windows default processing. Phase
 each candidate backend (`WM_APPCOMMAND`, raw input, hooks or other justified mechanism) rather than assuming event
 observation implies suppression.
 
+Phase 8C promotes the Phase 0 `WH_KEYBOARD_LL` backend into the Windows adapter. Its dedicated message-loop thread
+maps only Play/Pause, Previous, Next and Stop. The hook callback performs no GSMTC, persistence or logging work: it
+asks `MediaInputCoordinator` for a synchronous accept/pass-through decision and caches that decision through repeated
+KeyDown and Key-up messages. Accepted commands enter a bounded single-reader queue; a full queue passes the original
+key through to Windows.
+
+Acceptance snapshots the resolved target and advertised capability. The queued Route intent carries that expected
+Session Key, and the Router skips the command if its Active Target changed before execution. This may intentionally
+drop a consumed command during a target race, but it cannot redirect that command to a competing player. Settings
+schema v6 adds an enabled-by-default interception preference; disabling it changes the callback decision immediately
+without tearing down the hook. Hook startup/runtime failures are diagnostic and degrade to Windows handling rather
+than terminating GSMTC routing or the UI.
+The application publishes each immutable state reference with volatile read/write semantics, and the coordinator
+publishes its stopped state atomically, so the Hook thread observes settings, target and shutdown transitions without
+mixing revisions or retaining a thread-local stale snapshot.
+
 ## 6. Session lifecycle
 
 The Windows adapter obtains `GlobalSystemMediaTransportControlsSessionManager`, enumerates Sessions, and listens to
@@ -120,11 +151,36 @@ On suspend/resume or adapter failure:
 3. Reacquire the manager and publish a full snapshot.
 4. Submit recovery evaluation to the serialized router queue.
 
+The adapter publishes `Suspended`, `Reacquiring`, `Available` and `Unavailable` catalog states. Resume performs at
+most three attempts with bounded delays (immediate, 500 ms and 2 s). Each attempt releases partial manager state
+before retrying. Exhaustion does not terminate the catalog stream, so a later resume can reacquire. Application state
+and privacy-safe `catalog.status` diagnostics project these outcomes without retaining title or artist.
+
 ## 7. Concurrency
 
 All router intents are serialized through one application-owned queue or dispatcher. Platform callbacks perform
 minimal work and enqueue events. UI state is projected onto the WPF dispatcher. Cancellation and shutdown are
 explicit; retries are bounded and observable.
+
+The Phase 1 router owns a single-reader intent queue. Submission order is preserved across callers, queued
+cancellation completes promptly without terminating the queue, and disposal cancels in-flight work before draining
+the closed queue. Catalog intents carry an immutable array and identical refreshes are idempotent. A Recovery epoch
+stays stable across unrelated refreshes but is cleared after recovery, so the active deadline remains bounded while
+a stale timeout cannot override a target that has already recovered.
+
+The Phase 2 application dispatcher keeps router dispatch and result/effect projection in the same serialized
+critical section, so asynchronous continuations cannot publish an older revision after a newer one. A terminal
+catalog publishes an empty snapshot before its error, clearing stale live targets and entering normal Recovery.
+The GSMTC adapter uses one refresh worker with a capacity-one coalescing signal; event bursts therefore request at
+most one follow-up refresh instead of creating an unbounded task backlog. Adapter lifetime cancellation interrupts
+an in-flight Session read before shutdown waits for the worker.
+
+Phase 3 keeps desktop lifecycle composition at the WPF application root. A current-user named semaphore identifies
+the primary process and a current-user named pipe activates its window. The primary creates persistence, startup,
+diagnostic, GSMTC, application and presentation components in that order. Explicit shutdown first removes the tray
+surface, then disposes presentation/application resources and finally releases instance coordination.
+The main-window toolbar and tray both open one owned settings window through ViewModel navigation callbacks. WPF
+window transitions use short opacity animations only when Windows client-area animations are enabled.
 
 ## 8. Persistence and diagnostics
 
@@ -135,6 +191,96 @@ migration.
 Structured logs include timestamps, state transitions, anonymizable Session source data, route reasons and control
 outcomes. Normal logs minimize title and artist retention; an explicit diagnostic mode may add metadata with clear
 user disclosure and bounded retention.
+
+Phase 3 stores schema-versioned `settings.json` and `state.json` beneath `%LocalAppData%\MediaLock\` with sibling
+temporary files and replace-on-success writes. A corrupt settings file produces safe defaults and remains untouched;
+if the user later saves replacement settings, the original is first copied to `settings.corrupt.<timestamp>.json`.
+Runtime state is saved after serialized router transitions. Startup restores App Lock by submitting the saved source
+application identity through the same router interface as an interactive App Lock. Session Lock restores only when
+the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
+Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
+unless a future explicitly disclosed diagnostic mode supplies them.
+Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
+fallback and Priority Rule edits take effect on the next process start. A successful explicit main-window Routing
+Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
+corresponding startup setting last inside the same serialized application dispatch. A failed transition or target
+save leaves the prior startup setting intact; a settings save failure keeps the current-run transition observable,
+restores the previously persisted runtime document, retains the prior startup setting and reports an actionable
+error. Tray Windows Auto is a process-lifetime override: runtime-state autosaves remain suppressed until a durable
+main-window mode choice resumes them, so later commands and catalog updates cannot erase the saved lock target.
+Settings projects that startup mode as read-only state instead of exposing a second mode selector; a mode-only state
+update preserves any unsaved Settings edits.
+
+Phase 5B stores ordered `PriorityRule` values in settings schema v3. The router owns rule evaluation behind
+`IMediaRouter.DispatchAsync`: it skips disabled rules, selects the first source application with a current Session,
+and delegates same-application choice to the App Lock candidate policy. With no match, it uses Windows Current
+Session without changing to Windows Auto. Priority Rules have no Locked Target and therefore need no runtime-state
+identity; settings schema v1/v2 migrate to an empty rule list.
+
+Phase 7A advances settings to schema v4 by adding a desktop UI-language preference. Schema v1-v3 documents migrate
+to the Windows-language choice. The App project owns the localization module, culture resolution and WPF markup
+extension; Core stores and validates only the neutral preference values. Presentation strings, enum descriptions,
+accessibility names and notification-area labels resolve through the same resource manager. One culture is selected
+after settings load and before any ViewModel, window or tray surface is created. A successful Settings save publishes
+one App-layer culture change that refreshes existing WPF bindings, ViewModel projections and notification-area menu
+labels without restarting routing, GSMTC discovery or input interception. A failed save does not change culture.
+
+Phase 7B advances settings to schema v5 with a neutral App-owned theme preference; schema v1-v4 documents migrate
+to Windows theme while preserving every previously supported setting. `UiTheme` resolves Windows, Light and Dark
+preferences and swaps one palette resource dictionary beneath a stable shared control-style dictionary. Views consume
+semantic dynamic resources, so a successful Settings save refreshes existing windows without reconstructing
+ViewModels or platform services. When Windows theme is selected, the App composition root observes Windows preference
+changes and reapplies the resolved palette. The main-window frame and notification-area menu remain Windows-owned;
+the presentation shell maps the resolved theme to the supported DWM immersive-dark frame attribute without exposing
+Win32 dependencies outside App. Settings is one fixed-size owned modal WPF surface with transparent rounded chrome,
+an explicit drag region and Cancel/Escape commands that restore the persisted ViewModel projection before closing.
+`ShowDialog` keeps the owner natively disabled and returns only after Windows has restored owner activation, avoiding
+an intervening third-party foreground window after Alt+Tab. Motion stays in the presentation shell, respects
+`SystemParameters.ClientAreaAnimation` and never delays routing.
+
+The presentation shell's reusable component geometry, semantic states and Windows-owned surface boundaries are
+defined in `docs/ui-design-language.md`. `Themes/Controls.xaml` is the implementation seam for reusable WPF chrome;
+individual Views own composition and domain-specific variants rather than independent native-looking templates.
+
+Phase 8C advances settings to schema v6 with the global-media-key interception preference. Schema v1-v5 documents
+migrate to enabled, preserving the product's established default and every prior desktop preference.
+
+Phase 7C extends the immutable Session snapshot with optional, encoded presentation artwork. The Windows GSMTC
+Session adapter reads only bounded JPEG or PNG thumbnail payloads and caches the result until a media-properties
+change; unreadable artwork becomes absent rather than failing the catalog refresh. Core does not decode images and
+artwork does not participate in Session fingerprints or candidate ranking. The App converts the encoded payload to
+a frozen, size-constrained WPF image and otherwise shows a neutral placeholder.
+
+The existing immutable GSMTC timeline remains the single observation boundary. The Main ViewModel derives a
+read-only position from the routed target and a supplied `TimeProvider`: Playing advances by elapsed wall time,
+non-playing states remain at the observed position, and all values clamp to valid Start/End bounds. A presentation
+timer only requests property refresh; it never writes an estimated position into Core, dispatches routing intents or
+survives the window lifetime. Seek remains outside the command model until separate hardware/player evidence exists.
+
+Phase 8A keeps Seek inside the disposable Probe. A small immutable request parses invariant seconds and validates the
+absolute position against the selected live Session's current timeline before the Probe calls
+`TryChangePlaybackPositionAsync(TimeSpan.Ticks)`. The Probe reports capability, API acceptance and observed position as
+separate facts. No parameterized command crosses into Core, Application, production Windows adapters or WPF.
+
+Phase 8B deepens the existing Media Command value instead of adding a parallel Seek interface. Transport actions and
+absolute Seek share `ApplicationIntent.Route`, `RouterIntent.Route` and `IMediaController.TryExecuteAsync`, so target
+resolution, Recovery, capability checks, serialization and Route Decision semantics remain local to the Router module.
+Core validates the live timeline and absolute bounds before the Windows adapter translates the position to GSMTC ticks.
+
+The WPF timeline owns only a gesture preview. One completed mouse, touch or keyboard gesture submits one Media Command.
+An accepted request is pending presentation state, not a new routing state: the preview yields only when a later catalog
+snapshot confirms the requested position. A bounded presentation timeout, target change or command failure restores the
+latest observed timeline. No optimistic position is written into Core or persisted.
+
+The Main ViewModel owns a presentation-only selection bookmark independently from Routing Mode. It first preserves an
+exact selected Session Key. If Windows replaces that ephemeral Key during catalog reconstruction, the presentation
+carries selection forward only when the old source-application identity has exactly one candidate. Missing or ambiguous
+candidates keep the list unselected until the configured Recovery timeout; timeout clears the bookmark without selecting
+the first row. A direct user selection replaces it.
+
+When the bookmarked row was the resolved Locked Target immediately before App Lock or Session Lock entered Recovery,
+the Router's successor Active Target takes precedence over the generic unique-source match. Core Recovery remains the
+sole authority for target identity; the UI bookmark never changes Router state.
 
 ## 9. Composition
 

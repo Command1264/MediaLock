@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="App_StartupFailed" xml:space="preserve"><value>Media Lock could not start.</value></data>
+  <data name="App_StartupErrorTitle" xml:space="preserve"><value>Media Lock startup error</value></data>
+  <data name="App_CleanupAlsoFailed" xml:space="preserve"><value>Cleanup also failed: {0}</value></data>
+  <data name="App_ShutdownFailed" xml:space="preserve"><value>Media Lock could not shut down cleanly.</value></data>
+  <data name="App_ShutdownErrorTitle" xml:space="preserve"><value>Media Lock shutdown error</value></data>
+  <data name="App_ShutdownAggregate" xml:space="preserve"><value>One or more Media Lock resources failed to shut down.</value></data>
+  <data name="Main_RoutingStatus" xml:space="preserve"><value>Routing status</value></data>
+  <data name="Main_StatusFormat" xml:space="preserve"><value>Status: {0}</value></data>
+  <data name="Main_CurrentTarget" xml:space="preserve"><value>Current media target</value></data>
+  <data name="Main_Artwork" xml:space="preserve"><value>Current media artwork</value></data>
+  <data name="Main_PlaybackProgress" xml:space="preserve"><value>Current media playback progress</value></data>
+  <data name="Main_PlaybackSeek" xml:space="preserve"><value>Seek current media playback position</value></data>
+  <data name="Main_PlaybackSeekHelp" xml:space="preserve"><value>Drag or use the keyboard to change the routed media position.</value></data>
+  <data name="Main_OpenSettings" xml:space="preserve"><value>Open Media Lock settings</value></data>
+  <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
+  <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
+  <data name="Main_DismissError" xml:space="preserve"><value>Dismiss error</value></data>
+  <data name="Main_MediaSessions" xml:space="preserve"><value>Media Sessions</value></data>
+  <data name="Main_Subtitle" xml:space="preserve"><value>Keep media keys with the player you choose.</value></data>
+  <data name="Main_LockSession" xml:space="preserve"><value>Lock session</value></data>
+  <data name="Main_LockSessionAutomation" xml:space="preserve"><value>Lock selected Media Session</value></data>
+  <data name="Main_LockApp" xml:space="preserve"><value>Lock app</value></data>
+  <data name="Main_LockAppAutomation" xml:space="preserve"><value>Lock selected source application</value></data>
+  <data name="Main_PriorityRulesAutomation" xml:space="preserve"><value>Use application priority rules</value></data>
+  <data name="Main_WindowsAutoAutomation" xml:space="preserve"><value>Use Windows automatic media target</value></data>
+  <data name="Main_AvailableSessions" xml:space="preserve"><value>Available Media Sessions</value></data>
+  <data name="Main_NoSessions" xml:space="preserve"><value>No Media Sessions</value></data>
+  <data name="Command_Previous" xml:space="preserve"><value>Previous</value></data>
+  <data name="Command_Play" xml:space="preserve"><value>Play</value></data>
+  <data name="Command_Pause" xml:space="preserve"><value>Pause</value></data>
+  <data name="Command_Toggle" xml:space="preserve"><value>Play/Pause</value></data>
+  <data name="Command_ToggleAutomation" xml:space="preserve"><value>Toggle play pause</value></data>
+  <data name="Command_Next" xml:space="preserve"><value>Next</value></data>
+  <data name="Command_Stop" xml:space="preserve"><value>Stop</value></data>
+  <data name="Mode_WindowsAuto" xml:space="preserve"><value>Windows Auto</value></data>
+  <data name="Mode_PriorityRules" xml:space="preserve"><value>Priority Rules</value></data>
+  <data name="Mode_AppLock" xml:space="preserve"><value>App Lock</value></data>
+  <data name="Mode_AppLocked" xml:space="preserve"><value>App Locked</value></data>
+  <data name="Mode_SessionLock" xml:space="preserve"><value>Session Lock</value></data>
+  <data name="Status_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>Locked</value></data>
+  <data name="Status_Recovering" xml:space="preserve"><value>Recovering</value></data>
+  <data name="Status_Fallback" xml:space="preserve"><value>Fallback</value></data>
+  <data name="Status_Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Status_Suspended" xml:space="preserve"><value>Suspended</value></data>
+  <data name="Status_Reacquiring" xml:space="preserve"><value>Reacquiring</value></data>
+  <data name="Empty_Suspended" xml:space="preserve"><value>Media sessions are suspended while Windows sleeps.</value></data>
+  <data name="Empty_Reacquiring" xml:space="preserve"><value>Reacquiring media sessions after Windows resumed.</value></data>
+  <data name="Empty_Unavailable" xml:space="preserve"><value>Media sessions are unavailable. Resume Windows or restart Media Lock to retry.</value></data>
+  <data name="Empty_Recovering" xml:space="preserve"><value>Waiting for the locked Media Session to return.</value></data>
+  <data name="Empty_Default" xml:space="preserve"><value>Start media playback in a supported application.</value></data>
+  <data name="Target_WindowsUnavailable" xml:space="preserve"><value>Windows Current Session is unavailable.</value></data>
+  <data name="Target_RulesUnavailable" xml:space="preserve"><value>No Priority Rule or Windows Current Session is available.</value></data>
+  <data name="Target_LockedUnavailable" xml:space="preserve"><value>Locked Target is unavailable.</value></data>
+  <data name="Error_CommandNotCompleted" xml:space="preserve"><value>Media command was not completed: {0}.</value></data>
+  <data name="Error_SeekNotConfirmed" xml:space="preserve"><value>The requested playback position was not confirmed.</value></data>
+  <data name="Error_SeekInterrupted" xml:space="preserve"><value>Seeking was interrupted because the media target changed or became unavailable.</value></data>
+  <data name="Media_UnknownTitle" xml:space="preserve"><value>Unknown title</value></data>
+  <data name="Media_UnknownArtist" xml:space="preserve"><value>Unknown artist</value></data>
+  <data name="Playback_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Playback_Closed" xml:space="preserve"><value>Closed</value></data>
+  <data name="Playback_Opened" xml:space="preserve"><value>Opened</value></data>
+  <data name="Playback_Changing" xml:space="preserve"><value>Changing</value></data>
+  <data name="Playback_Stopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="Playback_Playing" xml:space="preserve"><value>Playing</value></data>
+  <data name="Playback_Paused" xml:space="preserve"><value>Paused</value></data>
+  <data name="Settings_WindowTitle" xml:space="preserve"><value>Media Lock Settings</value></data>
+  <data name="Settings_Title" xml:space="preserve"><value>Settings</value></data>
+  <data name="Settings_Description" xml:space="preserve"><value>Choose how Media Lock behaves on this Windows account.</value></data>
+  <data name="Settings_General" xml:space="preserve"><value>General</value></data>
+  <data name="Settings_CloseToTray" xml:space="preserve"><value>Close the main window to the notification area</value></data>
+  <data name="Settings_CloseToTrayAutomation" xml:space="preserve"><value>Close window to notification area</value></data>
+  <data name="Settings_StartWithWindows" xml:space="preserve"><value>Start Media Lock when I sign in to Windows</value></data>
+  <data name="Settings_StartWithWindowsAutomation" xml:space="preserve"><value>Start Media Lock with Windows</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>Display language</value></data>
+  <data name="Settings_LanguageAutomation" xml:space="preserve"><value>Media Lock display language</value></data>
+  <data name="Settings_LanguageApply" xml:space="preserve"><value>Language changes apply immediately after settings are saved.</value></data>
+  <data name="Language_System" xml:space="preserve"><value>Use Windows language</value></data>
+  <data name="Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Settings_Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="Settings_Theme" xml:space="preserve"><value>App theme</value></data>
+  <data name="Settings_ThemeAutomation" xml:space="preserve"><value>Media Lock app theme</value></data>
+  <data name="Settings_ThemeApply" xml:space="preserve"><value>Appearance changes apply immediately after settings are saved.</value></data>
+  <data name="Theme_System" xml:space="preserve"><value>Use Windows theme</value></data>
+  <data name="Theme_Light" xml:space="preserve"><value>Light</value></data>
+  <data name="Theme_Dark" xml:space="preserve"><value>Dark</value></data>
+  <data name="Settings_RoutingRecovery" xml:space="preserve"><value>Routing and Recovery</value></data>
+  <data name="Settings_StartupMode" xml:space="preserve"><value>Startup routing mode</value></data>
+  <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>Recovery timeout (seconds)</value></data>
+  <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>Recovery timeout in seconds</value></data>
+  <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>Enter a finite number from 0 to 300.</value></data>
+  <data name="Settings_FallbackPolicy" xml:space="preserve"><value>Fallback policy</value></data>
+  <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply after Media Lock restarts. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
+  <data name="Settings_PriorityRules" xml:space="preserve"><value>Application Priority Rules</value></data>
+  <data name="Settings_PriorityRulesHelp" xml:space="preserve"><value>Add source applications from the current media-session list. Rules are evaluated from top to bottom; disabled rules are skipped.</value></data>
+  <data name="Settings_Add" xml:space="preserve"><value>Add</value></data>
+  <data name="Settings_AddRuleAutomation" xml:space="preserve"><value>Add selected application priority rule</value></data>
+  <data name="Settings_AvailableAppsAutomation" xml:space="preserve"><value>Available source applications</value></data>
+  <data name="Settings_RulesAutomation" xml:space="preserve"><value>Application priority rules</value></data>
+  <data name="Settings_EnableRuleAutomation" xml:space="preserve"><value>Enable application priority rule</value></data>
+  <data name="Settings_MoveRuleUpAutomation" xml:space="preserve"><value>Move application priority rule up</value></data>
+  <data name="Settings_MoveRuleDownAutomation" xml:space="preserve"><value>Move application priority rule down</value></data>
+  <data name="Settings_RemoveRuleAutomation" xml:space="preserve"><value>Remove application priority rule</value></data>
+  <data name="Settings_Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="Settings_ErrorAutomation" xml:space="preserve"><value>Settings error</value></data>
+  <data name="Settings_CancelAutomation" xml:space="preserve"><value>Cancel Media Lock settings changes</value></data>
+  <data name="Settings_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Settings_SaveAutomation" xml:space="preserve"><value>Save Media Lock settings</value></data>
+  <data name="Settings_Save" xml:space="preserve"><value>Save settings</value></data>
+  <data name="Fallback_Wait" xml:space="preserve"><value>Wait</value></data>
+  <data name="Fallback_SameApplication" xml:space="preserve"><value>Same application</value></data>
+  <data name="Fallback_WindowsCurrent" xml:space="preserve"><value>Windows Current Session</value></data>
+  <data name="Fallback_SameApplicationThenWindows" xml:space="preserve"><value>Same application, then Windows Current Session</value></data>
+  <data name="Fallback_DisableRouting" xml:space="preserve"><value>Disable routing</value></data>
+  <data name="Tray_Show" xml:space="preserve"><value>Show Media Lock</value></data>
+  <data name="Tray_Settings" xml:space="preserve"><value>Settings…</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Tray_CommandFailed" xml:space="preserve"><value>Media Lock command failed</value></data>
+  <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>Intercept global media keys</value></data>
+  <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>Route global media keys through Media Lock</value></data>
+  <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>Media key interception unavailable</value></data>
+  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock could not start global media-key interception. Media controls in the app remain available, but physical media keys will be handled by Windows.</value></data>
+  <data name="App_MediaInputStopped" xml:space="preserve"><value>Global media-key interception encountered an error. Physical media keys may be handled by Windows until Media Lock is restarted.</value></data>
+</root>
