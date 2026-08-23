@@ -264,7 +264,7 @@
                                AllowsTransparency="True"
                                IsOpen="{TemplateBinding IsDropDownOpen}"
                                Placement="Bottom"
-                               PopupAnimation="Fade"
+                               PopupAnimation="{x:Static SystemParameters.ComboBoxPopupAnimation}"
                                StaysOpen="False">
                             <Border MinWidth="{Binding ActualWidth, ElementName=ToggleButton}"
                                     MaxHeight="280"

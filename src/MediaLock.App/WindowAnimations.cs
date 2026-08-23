@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Media.Animation;
-using System.Windows.Media;
 
 namespace MediaLock.App;
 
@@ -61,17 +60,6 @@ internal static class WindowAnimations
             {
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
             });
-        if (window.Content is UIElement content)
-        {
-            var translate = content.RenderTransform as TranslateTransform ?? new TranslateTransform();
-            content.RenderTransform = translate;
-            translate.BeginAnimation(
-                TranslateTransform.YProperty,
-                new DoubleAnimation(8, 0, FadeDuration)
-                {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-                });
-        }
     }
 
     public static void HideWithFade(Window window, Action completed)
