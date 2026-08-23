@@ -222,6 +222,18 @@ an explicit drag region and Cancel/Escape commands that restore the persisted Vi
 an intervening third-party foreground window after Alt+Tab. Motion stays in the presentation shell, respects
 `SystemParameters.ClientAreaAnimation` and never delays routing.
 
+Phase 7C extends the immutable Session snapshot with optional, encoded presentation artwork. The Windows GSMTC
+Session adapter reads only bounded JPEG or PNG thumbnail payloads and caches the result until a media-properties
+change; unreadable artwork becomes absent rather than failing the catalog refresh. Core does not decode images and
+artwork does not participate in Session fingerprints or candidate ranking. The App converts the encoded payload to
+a frozen, size-constrained WPF image and otherwise shows a neutral placeholder.
+
+The existing immutable GSMTC timeline remains the single observation boundary. The Main ViewModel derives a
+read-only position from the routed target and a supplied `TimeProvider`: Playing advances by elapsed wall time,
+non-playing states remain at the observed position, and all values clamp to valid Start/End bounds. A presentation
+timer only requests property refresh; it never writes an estimated position into Core, dispatches routing intents or
+survives the window lifetime. Seek remains outside the command model until separate hardware/player evidence exists.
+
 ## 9. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

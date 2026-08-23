@@ -17,6 +17,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncCommand priorityRulesCommand;
     private readonly AsyncCommand windowsAutoCommand;
     private readonly AsyncCommand[] mediaCommands;
+    private readonly TimeProvider timeProvider;
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
@@ -29,11 +30,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         Action? showSettings = null,
         Action? closeSettings = null,
         Action<string>? applyLanguage = null,
-        Action<string>? applyTheme = null)
+        Action<string>? applyTheme = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
+        this.timeProvider = timeProvider ?? TimeProvider.System;
         Settings = new SettingsViewModel(
             application,
             synchronizationContext,
@@ -166,9 +169,52 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    public string NowPlayingTitle => ResolveTarget()?.Title ?? string.Empty;
+
+    public string NowPlayingArtist => ResolveTarget()?.Artist ?? string.Empty;
+
+    public MediaArtwork? NowPlayingArtwork => ResolveTarget()?.Artwork;
+
+    public bool HasNowPlayingTimeline => ResolveTimeline() is not null;
+
+    public double NowPlayingProgress
+    {
+        get
+        {
+            var timeline = ResolveTimeline();
+            return timeline is null
+                ? 0
+                : timeline.Value.Position.TotalSeconds / timeline.Value.Duration.TotalSeconds;
+        }
+    }
+
+    public string NowPlayingElapsed
+    {
+        get
+        {
+            var timeline = ResolveTimeline();
+            return timeline is null ? string.Empty : FormatTime(timeline.Value.Position);
+        }
+    }
+
+    public string NowPlayingDuration
+    {
+        get
+        {
+            var timeline = ResolveTimeline();
+            return timeline is null ? string.Empty : FormatTime(timeline.Value.Duration);
+        }
+    }
+
     public bool HasError => errorMessage is not null;
 
     public string? ErrorMessage => errorMessage;
+
+    public void RefreshTimeline()
+    {
+        OnPropertyChanged(nameof(NowPlayingProgress));
+        OnPropertyChanged(nameof(NowPlayingElapsed));
+    }
 
     public void Dispose()
     {
@@ -296,6 +342,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(RoutingStatus));
         OnPropertyChanged(nameof(RoutingStatusLine));
         OnPropertyChanged(nameof(TargetDescription));
+        OnPropertyChanged(nameof(NowPlayingTitle));
+        OnPropertyChanged(nameof(NowPlayingArtist));
+        OnPropertyChanged(nameof(NowPlayingArtwork));
+        OnPropertyChanged(nameof(HasNowPlayingTimeline));
+        OnPropertyChanged(nameof(NowPlayingProgress));
+        OnPropertyChanged(nameof(NowPlayingElapsed));
+        OnPropertyChanged(nameof(NowPlayingDuration));
     }
 
     private SessionItemViewModel? ResolveTarget()
@@ -304,6 +357,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             ? Sessions.FirstOrDefault(session => session.Key == target)
             : null;
     }
+
+    private (TimeSpan Position, TimeSpan Duration)? ResolveTimeline()
+    {
+        var target = ResolveTarget();
+        var timeline = target?.Timeline;
+        if (timeline is null || timeline.End <= timeline.Start)
+        {
+            return null;
+        }
+
+        var duration = timeline.End - timeline.Start;
+        var position = timeline.Position - timeline.Start;
+        if (target!.PlaybackState == PlaybackStatus.Playing)
+        {
+            var elapsed = timeProvider.GetUtcNow() - timeline.LastUpdatedAt;
+            if (elapsed > TimeSpan.Zero)
+            {
+                position += elapsed;
+            }
+        }
+
+        return (TimeSpan.FromTicks(Math.Clamp(position.Ticks, 0, duration.Ticks)), duration);
+    }
+
+    private static string FormatTime(TimeSpan value) => value.TotalHours >= 1
+        ? $"{(int)value.TotalHours}:{value.Minutes:00}:{value.Seconds:00}"
+        : $"{(int)value.TotalMinutes}:{value.Seconds:00}";
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

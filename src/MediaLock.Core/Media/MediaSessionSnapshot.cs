@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace MediaLock.Core.Media;
 
 public readonly record struct SessionKey(string Value)
@@ -33,7 +35,8 @@ public sealed record MediaSessionSnapshot(
     string? SessionInstanceHint = null,
     MediaMetadata? Metadata = null,
     MediaTimeline? Timeline = null,
-    MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown)
+    MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
+    MediaArtwork? Artwork = null)
 {
     public SessionDescriptor Descriptor => new(
         SourceAppUserModelId,
@@ -55,6 +58,49 @@ public sealed record MediaTimeline(
     TimeSpan End,
     TimeSpan Position,
     DateTimeOffset LastUpdatedAt);
+
+public sealed record MediaArtwork
+{
+    public const int MaximumEncodedByteCount = 5 * 1024 * 1024;
+
+    private static readonly byte[] PngSignature =
+        [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+    private MediaArtwork(ImmutableArray<byte> bytes, string contentType)
+    {
+        Bytes = bytes;
+        ContentType = contentType;
+    }
+
+    public ImmutableArray<byte> Bytes { get; }
+
+    public string ContentType { get; }
+
+    public static bool TryCreate(ReadOnlySpan<byte> encoded, out MediaArtwork? artwork)
+    {
+        artwork = null;
+        if (encoded.IsEmpty || encoded.Length > MaximumEncodedByteCount)
+        {
+            return false;
+        }
+
+        var contentType = encoded.StartsWith(PngSignature)
+            ? "image/png"
+            : encoded.Length >= 3 &&
+                encoded[0] == 0xFF &&
+                encoded[1] == 0xD8 &&
+                encoded[2] == 0xFF
+                ? "image/jpeg"
+                : null;
+        if (contentType is null)
+        {
+            return false;
+        }
+
+        artwork = new MediaArtwork(ImmutableArray.CreateRange(encoded.ToArray()), contentType);
+        return true;
+    }
+}
 
 public sealed record SessionFingerprint(
     SessionDescriptor Descriptor,

@@ -9,7 +9,10 @@ public sealed record SessionItemViewModel(
     string Title,
     string Artist,
     string PlaybackStatus,
-    MediaCommandCapabilities Capabilities)
+    MediaCommandCapabilities Capabilities,
+    PlaybackStatus PlaybackState,
+    MediaTimeline? Timeline,
+    MediaArtwork? Artwork)
 {
     internal static SessionItemViewModel From(MediaSessionSnapshot session) => new(
         session.Key,
@@ -17,5 +20,8 @@ public sealed record SessionItemViewModel(
         session.Metadata?.Title ?? UiText.Get("Media_UnknownTitle"),
         session.Metadata?.Artist ?? UiText.Get("Media_UnknownArtist"),
         UiDescriptions.DescribePlaybackStatus(session.PlaybackStatus),
-        session.Capabilities);
+        session.Capabilities,
+        session.PlaybackStatus,
+        session.Timeline,
+        session.Artwork);
 }
