@@ -64,7 +64,8 @@ Results:
 4. A second launch activated the existing window and left exactly one Media Lock process: pass.
 5. English plus Light applied immediately after Save and persisted when Settings reopened. Windows language/theme were
    then restored successfully: pass.
-6. Enabling login startup created the exact current-user command `"MediaLock.exe" --startup` and persisted the enabled
+6. Enabling login startup created the exact current-user command
+   `"C:\Users\WDAGUtilityAccount\Desktop\MediaLock-RC2\extracted\MediaLock.exe" --startup` and persisted the enabled
    setting. Disabling it removed the registry value and persisted `false`: pass.
 7. Edge exposed a Session as `MSEdge`. Session Lock succeeded; title, artwork and timeline were correct; Play and Pause
    controlled Edge; one Playing Seek and one Paused Seek each moved once to the requested position: pass.
