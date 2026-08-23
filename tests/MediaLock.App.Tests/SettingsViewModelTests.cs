@@ -75,7 +75,12 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
-        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
+        viewModel.SelectedLanguageOption = Assert.Single(
+            viewModel.Languages,
+            option => option.Value == UiLanguagePreference.TraditionalChinese);
+        viewModel.SelectedThemeOption = Assert.Single(
+            viewModel.Themes,
+            option => option.Value == UiThemePreference.Dark);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
@@ -84,6 +89,7 @@ public sealed class SettingsViewModelTests
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
         Assert.Equal(UiLanguagePreference.TraditionalChinese, intent.Settings.Desktop.Language);
+        Assert.Equal(UiThemePreference.Dark, intent.Settings.Desktop.Theme);
         Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);
     }
 
@@ -103,11 +109,23 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void ThemeChoicesIncludeSystemLightAndDark()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application);
+
+        Assert.Equal(
+            [UiThemePreference.System, UiThemePreference.Light, UiThemePreference.Dark],
+            viewModel.Themes.Select(option => option.Value));
+    }
+
+    [Fact]
     public async Task SuccessfulSaveRequestsSettingsClose()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
         var callbacks = new List<string>();
         string? appliedLanguage = null;
+        string? appliedTheme = null;
         using var viewModel = new SettingsViewModel(
             application,
             requestClose: () => callbacks.Add("close"),
@@ -115,13 +133,39 @@ public sealed class SettingsViewModelTests
             {
                 appliedLanguage = language;
                 callbacks.Add("apply");
+            },
+            applyTheme: theme =>
+            {
+                appliedTheme = theme;
+                callbacks.Add("theme");
             });
         viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
+        viewModel.SelectedTheme = UiThemePreference.Dark;
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
-        Assert.Equal(["apply", "close"], callbacks);
+        Assert.Equal(["apply", "theme", "close"], callbacks);
         Assert.Equal(UiLanguagePreference.TraditionalChinese, appliedLanguage);
+        Assert.Equal(UiThemePreference.Dark, appliedTheme);
+    }
+
+    [Fact]
+    public async Task CancelDiscardsUnsavedEditsWithoutSavingAndRequestsClose()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        var closeRequests = 0;
+        using var viewModel = new SettingsViewModel(
+            application,
+            requestClose: () => closeRequests++);
+        viewModel.CloseToTray = false;
+        viewModel.RecoveryTimeoutSeconds = 42;
+
+        await viewModel.CancelCommand.ExecuteAsync(null);
+
+        Assert.Empty(application.Intents);
+        Assert.True(viewModel.CloseToTray);
+        Assert.Equal(15, viewModel.RecoveryTimeoutSeconds);
+        Assert.Equal(1, closeRequests);
     }
 
     [Fact]
@@ -133,15 +177,18 @@ public sealed class SettingsViewModelTests
         };
         var closeRequests = 0;
         var languageApplyRequests = 0;
+        var themeApplyRequests = 0;
         using var viewModel = new SettingsViewModel(
             application,
             requestClose: () => closeRequests++,
-            applyLanguage: _ => languageApplyRequests++);
+            applyLanguage: _ => languageApplyRequests++,
+            applyTheme: _ => themeApplyRequests++);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         Assert.Equal(0, closeRequests);
         Assert.Equal(0, languageApplyRequests);
+        Assert.Equal(0, themeApplyRequests);
         Assert.Equal("Settings could not be saved.", viewModel.ErrorMessage);
     }
 

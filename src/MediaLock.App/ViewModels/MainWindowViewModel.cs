@@ -28,7 +28,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         SynchronizationContext? synchronizationContext = null,
         Action? showSettings = null,
         Action? closeSettings = null,
-        Action<string>? applyLanguage = null)
+        Action<string>? applyLanguage = null,
+        Action<string>? applyTheme = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
@@ -37,7 +38,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             application,
             synchronizationContext,
             closeSettings,
-            applyLanguage);
+            applyLanguage,
+            applyTheme);
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();

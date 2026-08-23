@@ -11,7 +11,8 @@ public sealed record RecoverySettings(
 public sealed record DesktopSettings(
     bool CloseToTray,
     bool StartWithWindows,
-    string Language = UiLanguagePreference.System);
+    string Language = UiLanguagePreference.System,
+    string Theme = UiThemePreference.System);
 
 public static class UiLanguagePreference
 {
@@ -21,6 +22,15 @@ public static class UiLanguagePreference
 
     public static bool IsSupported(string? value) => value is
         System or EnglishUnitedStates or TraditionalChinese;
+}
+
+public static class UiThemePreference
+{
+    public const string System = "system";
+    public const string Light = "light";
+    public const string Dark = "dark";
+
+    public static bool IsSupported(string? value) => value is System or Light or Dark;
 }
 
 [method: JsonConstructor]
@@ -40,7 +50,7 @@ public sealed record MediaLockSettings(
     {
     }
 
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -99,11 +109,21 @@ public sealed record MediaLockSettings(
                 "desktop",
                 "Desktop settings are required."));
         }
-        else if (!UiLanguagePreference.IsSupported(Desktop.Language))
+        else
         {
-            issues.Add(new ConfigurationIssue(
-                "desktop.language",
-                $"Unsupported UI language preference '{Desktop.Language}'."));
+            if (!UiLanguagePreference.IsSupported(Desktop.Language))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "desktop.language",
+                    $"Unsupported UI language preference '{Desktop.Language}'."));
+            }
+
+            if (!UiThemePreference.IsSupported(Desktop.Theme))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "desktop.theme",
+                    $"Unsupported UI theme preference '{Desktop.Theme}'."));
+            }
         }
 
         if (PriorityRules.IsDefault)

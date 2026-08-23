@@ -134,6 +134,21 @@ Exit criteria:
 Apply a coherent Windows 11-inspired WPF visual system, theme support, clearer state hierarchy and restrained motion
 without changing the established Core/Application seams.
 
+Exit criteria:
+
+- Main and Settings share semantic Light and Dark palettes plus consistent cards, controls, typography and focus states.
+- Settings is a fixed-size, rounded, frameless modal surface; its owner stays disabled, Cancel/Escape discard unsaved
+  edits and closing returns directly to the main window after application switching.
+- Settings offers Windows theme, Light and Dark, applies a successful save immediately and preserves the current theme
+  when save fails; schema v1-v4 migration preserves existing settings.
+- Windows-theme preference follows the current Windows app theme without restarting routing, GSMTC discovery or input.
+- The Windows-owned main caption follows the resolved Light or Dark theme on supported Windows 11 builds.
+- Routing status, current target, Session selection and primary media controls retain keyboard and accessibility behavior
+  at the supported minimum window sizes in English and Traditional Chinese.
+- Window motion is restrained and disabled when Windows client-area animation is disabled.
+- Automated theme/settings/cancel/window-contract coverage and a repeatable Light/Dark desktop smoke test pass without
+  routing regressions.
+
 ### Phase 7C — Now Playing artwork and timeline
 
 Evaluate artwork and timeline presentation first; seek remains separately gated on real GSMTC capability evidence.

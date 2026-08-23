@@ -7,6 +7,27 @@ internal static class WindowAnimations
 {
     private static readonly Duration FadeDuration = new(TimeSpan.FromMilliseconds(170));
 
+    public static bool? ShowDialogWithFade(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        window.BeginAnimation(UIElement.OpacityProperty, null);
+        if (!SystemParameters.ClientAreaAnimation)
+        {
+            window.Opacity = 1;
+            return window.ShowDialog();
+        }
+
+        window.Opacity = 0;
+        RoutedEventHandler? onLoaded = null;
+        onLoaded = (_, _) =>
+        {
+            window.Loaded -= onLoaded;
+            BeginShowAnimations(window);
+        };
+        window.Loaded += onLoaded;
+        return window.ShowDialog();
+    }
+
     public static void ShowWithFade(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -28,6 +49,11 @@ internal static class WindowAnimations
             window.Show();
         }
 
+        BeginShowAnimations(window);
+    }
+
+    private static void BeginShowAnimations(Window window)
+    {
         window.BeginAnimation(
             UIElement.OpacityProperty,
             new DoubleAnimation(0, 1, FadeDuration)

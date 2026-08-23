@@ -73,6 +73,14 @@ choices, language-native choice names, successful-save application and failed-sa
 must confirm that main-window text, Settings, playback/status labels, accessibility names and notification-area
 commands switch immediately after Save without restarting routing or duplicating a media command.
 
+Phase 7B tests theme-preference validation, schema-v4 migration, Windows-theme and DWM-frame mapping, Settings choices,
+successful-save application, failed-save suppression, Cancel discard behavior and the fixed frameless Settings
+contract. Build-time XAML compilation covers both palette and shared control dictionaries. A manual WPF smoke test
+must exercise Light, Dark and Windows theme in English and Traditional Chinese, verify the native title-bar theme,
+main-window minimum-size layout, keyboard focus, Settings scrolling/dragging/Cancel/Escape, owner disablement while
+Settings is open, a direct Alt+Tab-close foreground return, notification-area lifecycle and one routed Play/Pause
+without duplicate action.
+
 ### Integration tests
 
 Cover:

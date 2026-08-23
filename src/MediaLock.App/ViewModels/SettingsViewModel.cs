@@ -15,11 +15,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly SynchronizationContext? synchronizationContext;
     private readonly Action? requestClose;
     private readonly Action<string>? applyLanguage;
+    private readonly Action<string>? applyTheme;
     private bool closeToTray;
     private bool startWithWindows;
     private RoutingMode startupRoutingMode;
     private string startupRoutingModeText = UiText.Get("Mode_WindowsAuto");
     private string selectedLanguage = UiLanguagePreference.System;
+    private string selectedTheme = UiThemePreference.System;
     private double recoveryTimeoutSeconds;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
@@ -31,14 +33,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         IMediaLockApplication application,
         SynchronizationContext? synchronizationContext = null,
         Action? requestClose = null,
-        Action<string>? applyLanguage = null)
+        Action<string>? applyLanguage = null,
+        Action<string>? applyTheme = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
         this.requestClose = requestClose;
         this.applyLanguage = applyLanguage;
+        this.applyTheme = applyTheme;
         SaveCommand = new AsyncCommand(_ => SaveAsync());
+        CancelCommand = new AsyncCommand(_ => CancelAsync());
         AddPriorityRuleCommand = new AsyncCommand(AddPriorityRuleAsync);
         MovePriorityRuleUpCommand = new AsyncCommand(MovePriorityRuleUpAsync);
         MovePriorityRuleDownCommand = new AsyncCommand(MovePriorityRuleDownAsync);
@@ -55,6 +60,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public IReadOnlyList<LocalizedOption<FallbackPolicy>> FallbackPolicies { get; private set; } = [];
 
     public IReadOnlyList<LocalizedOption<string>> Languages { get; private set; } = [];
+
+    public IReadOnlyList<LocalizedOption<string>> Themes { get; private set; } = [];
 
     public ObservableCollection<PriorityRuleItemViewModel> PriorityRules { get; } = [];
 
@@ -81,7 +88,51 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public string SelectedLanguage
     {
         get => selectedLanguage;
-        set => SetField(ref selectedLanguage, value);
+        set
+        {
+            if (selectedLanguage != value)
+            {
+                SetField(ref selectedLanguage, value);
+                OnPropertyChanged(nameof(SelectedLanguageOption));
+            }
+        }
+    }
+
+    public LocalizedOption<string>? SelectedLanguageOption
+    {
+        get => Languages.FirstOrDefault(option => option.Value == SelectedLanguage);
+        set
+        {
+            if (value is not null)
+            {
+                SelectedLanguage = value.Value;
+            }
+        }
+    }
+
+    public string SelectedTheme
+    {
+        get => selectedTheme;
+        set
+        {
+            if (selectedTheme != value)
+            {
+                SetField(ref selectedTheme, value);
+                OnPropertyChanged(nameof(SelectedThemeOption));
+            }
+        }
+    }
+
+    public LocalizedOption<string>? SelectedThemeOption
+    {
+        get => Themes.FirstOrDefault(option => option.Value == SelectedTheme);
+        set
+        {
+            if (value is not null)
+            {
+                SelectedTheme = value.Value;
+            }
+        }
     }
 
     public string StartupRoutingModeText
@@ -103,6 +154,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public IAsyncCommand SaveCommand { get; }
+
+    public IAsyncCommand CancelCommand { get; }
 
     public IAsyncCommand AddPriorityRuleCommand { get; }
 
@@ -140,12 +193,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 new RecoverySettings(
                     TimeSpan.FromSeconds(RecoveryTimeoutSeconds),
                     FallbackPolicy),
-                new DesktopSettings(CloseToTray, StartWithWindows, SelectedLanguage),
+                new DesktopSettings(
+                    CloseToTray,
+                    StartWithWindows,
+                    SelectedLanguage,
+                    SelectedTheme),
                 PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
             applyLanguage?.Invoke(SelectedLanguage);
+            applyTheme?.Invoke(SelectedTheme);
             ErrorMessage = null;
             requestClose?.Invoke();
         }
@@ -153,6 +211,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             ErrorMessage = exception.Message;
         }
+    }
+
+    private Task CancelAsync()
+    {
+        DiscardChanges();
+        requestClose?.Invoke();
+        return Task.CompletedTask;
+    }
+
+    internal void DiscardChanges()
+    {
+        Apply(application.State.Settings);
+        ErrorMessage = null;
     }
 
     private void OnCultureChanged(object? sender, EventArgs args)
@@ -180,8 +251,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             new(UiLanguagePreference.EnglishUnitedStates, UiText.Get("Language_English")),
             new(UiLanguagePreference.TraditionalChinese, UiText.Get("Language_TraditionalChinese")),
         ];
+        Themes =
+        [
+            new(UiThemePreference.System, UiText.Get("Theme_System")),
+            new(UiThemePreference.Light, UiText.Get("Theme_Light")),
+            new(UiThemePreference.Dark, UiText.Get("Theme_Dark")),
+        ];
         OnPropertyChanged(nameof(FallbackPolicies));
         OnPropertyChanged(nameof(Languages));
+        OnPropertyChanged(nameof(Themes));
+        OnPropertyChanged(nameof(SelectedLanguageOption));
+        OnPropertyChanged(nameof(SelectedThemeOption));
         ApplyStartupRoutingMode(startupRoutingMode);
     }
 
@@ -228,6 +308,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         CloseToTray = settings.Desktop!.CloseToTray;
         StartWithWindows = settings.Desktop.StartWithWindows;
         SelectedLanguage = settings.Desktop.Language;
+        SelectedTheme = settings.Desktop.Theme;
         ApplyStartupRoutingMode(settings.DefaultRoutingMode);
         RecoveryTimeoutSeconds = settings.Recovery!.Timeout.TotalSeconds;
         FallbackPolicy = settings.Recovery.FallbackPolicy;
