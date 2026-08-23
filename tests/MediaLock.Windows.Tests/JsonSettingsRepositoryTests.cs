@@ -78,7 +78,7 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(5, result.Value.SchemaVersion);
+        Assert.Equal(6, result.Value.SchemaVersion);
         Assert.Equal(TimeSpan.FromSeconds(30), result.Value.Recovery!.Timeout);
         Assert.Equal(FallbackPolicy.Wait, result.Value.Recovery.FallbackPolicy);
         Assert.Equal(MediaLockSettings.Default.Desktop, result.Value.Desktop);
@@ -112,7 +112,7 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(5, result.Value.SchemaVersion);
+        Assert.Equal(6, result.Value.SchemaVersion);
         Assert.Equal(RoutingMode.AppLock, result.Value.DefaultRoutingMode);
         Assert.Equal(
             new DesktopSettings(
@@ -156,7 +156,7 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(5, result.Value.SchemaVersion);
+        Assert.Equal(6, result.Value.SchemaVersion);
         Assert.Equal(
             new DesktopSettings(
                 false,
@@ -198,7 +198,7 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(5, result.Value.SchemaVersion);
+        Assert.Equal(6, result.Value.SchemaVersion);
         Assert.Equal(
             new DesktopSettings(
                 true,
@@ -207,6 +207,42 @@ public sealed class JsonSettingsRepositoryTests
                 UiThemePreference.System),
             result.Value.Desktop);
         Assert.Equal(RoutingMode.PriorityRules, result.Value.DefaultRoutingMode);
+        Assert.False(result.UsedDefaults);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public async Task VersionFiveSettingsEnableMediaKeyInterceptionDuringMigration()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(
+            System.IO.Path.Combine(directory.Path, "settings.json"),
+            """
+            {
+              "schemaVersion": 5,
+              "defaultRoutingMode": "priorityRules",
+              "recovery": {
+                "timeout": "00:00:15",
+                "fallbackPolicy": "sameApplicationThenWindowsCurrentSession"
+              },
+              "desktop": {
+                "closeToTray": true,
+                "startWithWindows": false,
+                "language": "zh-TW",
+                "theme": "dark"
+              },
+              "priorityRules": []
+            }
+            """);
+
+        var result = await new JsonSettingsRepository(
+            directory.Path,
+            TimeProvider.System).LoadAsync(CancellationToken.None);
+
+        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.True(result.Value.Desktop!.InterceptMediaKeys);
+        Assert.Equal(UiLanguagePreference.TraditionalChinese, result.Value.Desktop.Language);
+        Assert.Equal(UiThemePreference.Dark, result.Value.Desktop.Theme);
         Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);
     }

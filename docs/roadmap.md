@@ -191,10 +191,8 @@ Exit criteria:
 Promote absolute Seek into the production Media Command model and make the routed target's timeline interactive while
 preserving the existing Router, Recovery and GSMTC seams.
 
-Status: Seek implementation and its focused UI matrix are complete. The phase exit remains blocked because the
-production app does not yet integrate the physical-media-key backend proven by the Phase 0 Probe; Windows therefore
-handles physical keys through its Current Session instead of this Router. Phase 8C owns that production integration
-and must pass the physical-key regression row before Phase 8B's full exit criteria can be considered satisfied.
+Status: complete. Phase 8C integrated the production physical-media-key backend and passed the missing regression row
+with Brave YouTube Music and ordinary Brave YouTube, including normal, long-press and rapid-input groups.
 
 Exit criteria:
 
@@ -211,3 +209,22 @@ Exit criteria:
   a bounded confirmation timeout restore the authoritative observed position and remain actionable.
 - Brave YouTube Music and ordinary Brave YouTube pass Playing, Paused, competing-source, Session recreation,
   English/Traditional Chinese, minimum-size and physical-media-key regression checks.
+
+### Phase 8C — Production global media-key interception
+
+Promote the Phase 0 low-level keyboard backend into the desktop application and route accepted physical media keys
+through the existing Application and Router boundaries.
+
+Status: implementation, automated coverage and the named hardware-assisted exit matrix are complete. Final code review
+and branch integration remain before the phase is merged.
+
+Exit criteria:
+
+- Play/Pause, Previous, Next and Stop are captured without elevation and routed once to the resolved target.
+- Accepted KeyDown repeats and the matching Key-up are consumed consistently; unsupported, disabled, unavailable or
+  backpressured input passes through to Windows.
+- Capture-time target identity prevents a queued command from being redirected after a catalog or routing change.
+- Settings schema v6 persists an enabled-by-default interception switch that takes effect immediately.
+- Startup/runtime hook failures are observable and safely degrade to Windows media-key handling.
+- The ASUS ROG STRIX FLARE matrix passes with Brave YouTube Music as Priority Target and ordinary Brave YouTube as
+  Windows Current Session, including focus changes, long press, lock/unlock and sleep/resume.

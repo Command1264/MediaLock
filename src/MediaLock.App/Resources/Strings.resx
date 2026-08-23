@@ -122,4 +122,9 @@
   <data name="Tray_Settings" xml:space="preserve"><value>Settings…</value></data>
   <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
   <data name="Tray_CommandFailed" xml:space="preserve"><value>Media Lock command failed</value></data>
+  <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>Intercept global media keys</value></data>
+  <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>Route global media keys through Media Lock</value></data>
+  <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>Media key interception unavailable</value></data>
+  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock could not start global media-key interception. Media controls in the app remain available, but physical media keys will be handled by Windows.</value></data>
+  <data name="App_MediaInputStopped" xml:space="preserve"><value>Global media-key interception encountered an error. Physical media keys may be handled by Windows until Media Lock is restarted.</value></data>
 </root>

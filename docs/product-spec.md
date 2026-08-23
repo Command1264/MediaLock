@@ -182,6 +182,10 @@ Pressing an empty point on the timeline may continue directly into a captured dr
 previewed position.
 The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer.
 
+The desktop settings persist whether Media Lock intercepts global media keys. It defaults to enabled so the installed
+application fulfils its routing promise; disabling it takes effect immediately and passes physical media keys through
+to Windows without restarting discovery or routing.
+
 ## 9. Non-functional requirements
 
 - Run without administrator privileges in supported scenarios.
@@ -195,7 +199,7 @@ The main-window error card provides an explicit dismiss action; errors do not di
 
 - Reliably identifying a browser tab URL such as `music.youtube.com`.
 - Browser DevTools Protocol or extension integration.
-- Volume, mute, artwork, seek UI and metadata/URL-based rule conditions.
+- Volume, mute, customizable shortcuts and metadata/URL-based rule conditions.
 - Cross-platform operation.
 - Requiring elevation to broaden interception coverage without a separate reviewed decision.
 

@@ -12,7 +12,8 @@ public sealed record DesktopSettings(
     bool CloseToTray,
     bool StartWithWindows,
     string Language = UiLanguagePreference.System,
-    string Theme = UiThemePreference.System);
+    string Theme = UiThemePreference.System,
+    bool InterceptMediaKeys = true);
 
 public static class UiLanguagePreference
 {
@@ -50,7 +51,7 @@ public sealed record MediaLockSettings(
     {
     }
 
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,

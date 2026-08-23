@@ -34,6 +34,7 @@ public sealed class SettingsWindowContractTests
             {
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSelectedAppearanceOptions(window, viewModel);
+                AssertMediaKeyInterceptionSwitch(window);
 
                 UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
@@ -61,6 +62,16 @@ public sealed class SettingsWindowContractTests
         var selectedTheme = Assert.IsType<LocalizedOption<string>>(theme.SelectedItem);
         Assert.Equal(viewModel.SelectedLanguage, selectedLanguage.Value);
         Assert.Equal(viewModel.SelectedTheme, selectedTheme.Value);
+    }
+
+    private static void AssertMediaKeyInterceptionSwitch(SettingsWindow window)
+    {
+        var checkBox = Assert.Single(
+            WpfTestHost.FindVisualChildren<CheckBox>(window),
+            candidate => candidate.GetBindingExpression(CheckBox.IsCheckedProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.InterceptMediaKeys));
+
+        Assert.True(checkBox.IsChecked);
     }
 
 }

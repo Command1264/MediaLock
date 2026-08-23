@@ -122,4 +122,9 @@
   <data name="Tray_Settings" xml:space="preserve"><value>設定…</value></data>
   <data name="Tray_Exit" xml:space="preserve"><value>結束</value></data>
   <data name="Tray_CommandFailed" xml:space="preserve"><value>Media Lock 命令失敗</value></data>
+  <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>攔截全域媒體鍵</value></data>
+  <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>透過 Media Lock 路由全域媒體鍵</value></data>
+  <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>無法使用媒體鍵攔截</value></data>
+  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock 無法啟動全域媒體鍵攔截。應用程式內的媒體控制仍可使用，但實體媒體鍵將交由 Windows 處理。</value></data>
+  <data name="App_MediaInputStopped" xml:space="preserve"><value>全域媒體鍵攔截發生錯誤。在重新啟動 Media Lock 前，實體媒體鍵可能會交由 Windows 處理。</value></data>
 </root>

@@ -152,7 +152,10 @@ public sealed class MediaRouter : IMediaRouter
             RouterIntent.UpdateOptions update => UpdateOptions(update.Options),
             RouterIntent.UsePriorityRules => UsePriorityRules(),
             RouterIntent.UseWindowsAuto => UseWindowsAuto(),
-            RouterIntent.Route route => await RouteAsync(route.Command, cancellationToken),
+            RouterIntent.Route route => await RouteAsync(
+                route.Command,
+                route.ExpectedTarget,
+                cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(intent)),
         };
     }
@@ -617,6 +620,7 @@ public sealed class MediaRouter : IMediaRouter
 
     private async ValueTask<RouterResult> RouteAsync(
         MediaCommand command,
+        SessionKey? expectedTarget,
         CancellationToken cancellationToken)
     {
         if (state.Mode is RoutingMode.SessionLock or RoutingMode.AppLock)
@@ -636,6 +640,11 @@ public sealed class MediaRouter : IMediaRouter
         }
 
         var targetKey = state.ActiveTarget;
+        if (expectedTarget is not null && targetKey != expectedTarget)
+        {
+            return Skipped(command, RouteReason.InputTargetChanged, targetKey);
+        }
+
         if (targetKey is null)
         {
             return Skipped(command, RouteReason.NoWindowsCurrentSession);

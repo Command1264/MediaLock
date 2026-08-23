@@ -81,6 +81,7 @@ public enum RouteReason
     SeekOutOfRange,
     ControlRejected,
     ControlFailed,
+    InputTargetChanged,
 }
 
 public sealed record RouteDecision(
@@ -173,7 +174,9 @@ public abstract record RouterIntent
         ImmutableArray<MediaSessionSnapshot> Sessions,
         SessionKey? WindowsCurrentSession) : RouterIntent;
 
-    public sealed record Route(MediaCommand Command) : RouterIntent;
+    public sealed record Route(
+        MediaCommand Command,
+        SessionKey? ExpectedTarget = null) : RouterIntent;
 
     public sealed record LockSession(SessionKey Session) : RouterIntent;
 

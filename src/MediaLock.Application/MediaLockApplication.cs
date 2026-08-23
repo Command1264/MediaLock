@@ -191,7 +191,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 ApplicationIntent.UseWindowsAutoForCurrentRun =>
                     ((RouterIntent)new RouterIntent.UseWindowsAuto(), (RoutingMode?)null, false),
                 ApplicationIntent.Route route =>
-                    ((RouterIntent)new RouterIntent.Route(route.Command), (RoutingMode?)null, true),
+                    ((RouterIntent)new RouterIntent.Route(route.Command, route.ExpectedTarget), (RoutingMode?)null, true),
                 _ => throw new ArgumentOutOfRangeException(nameof(intent)),
             };
         var dispatch = await DispatchRouterAsync(
@@ -488,6 +488,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                             ["command"] = routedCommand.Command.ToString(),
                             ["decision"] = result.Decision.Kind.ToString(),
                             ["reason"] = result.Decision.Reason.ToString(),
+                            ["target"] = result.Decision.Target?.Value ?? string.Empty,
                         }),
                     dispatchCancellation.Token);
             }

@@ -25,12 +25,12 @@ dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Rele
 ```
 
 關閉視窗預設只會隱藏至 Windows 通知區域；從托盤選單按 `Exit` 才會結束程式。設定頁可切換
-close-to-tray 與目前使用者的 Windows 登入啟動，也可設定 Recovery timeout、Fallback Policy 與
+close-to-tray、全域媒體鍵攔截與目前使用者的 Windows 登入啟動，也可設定 Recovery timeout、Fallback Policy 與
 Priority Rules，並可選擇跟隨 Windows、英文或繁體中文介面，以及跟隨 Windows、淺色或深色主題。
 成功儲存後會立即切換語言與外觀。
-主畫面的目前媒體目標會顯示該實際路由 Session 的可用封面，以及唯讀的播放時間與進度；封面缺失
-或無法解碼時使用中性 placeholder，不影響媒體鍵路由。進度目前不可拖曳，Seek 仍須另行完成
-YouTube 與 YouTube Music 的 GSMTC 實機能力驗證。
+主畫面的目前媒體目標會顯示該實際路由 Session 的可用封面、播放時間與進度；封面缺失或無法解碼時
+使用中性 placeholder，不影響媒體鍵路由。支援 Seek 的 Session 可直接點擊或拖曳進度條，放開時只
+提交一次跳轉。
 設定可由主視窗右上角或托盤選單開啟為固定尺寸的圓角無框模態視窗；設定開啟時主視窗會停用，
 短淡入／隱藏動畫會遵循 Windows 的用戶端動畫設定。`Save settings` 成功後會關閉設定視窗；
 `Cancel` 或 `Esc` 會捨棄尚未儲存的修改。儲存失敗則保留視窗與錯誤訊息，設定關閉後主視窗會

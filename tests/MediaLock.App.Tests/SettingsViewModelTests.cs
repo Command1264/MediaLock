@@ -75,6 +75,7 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
+        viewModel.InterceptMediaKeys = false;
         viewModel.SelectedLanguageOption = Assert.Single(
             viewModel.Languages,
             option => option.Value == UiLanguagePreference.TraditionalChinese);
@@ -88,6 +89,7 @@ public sealed class SettingsViewModelTests
             Assert.Single(application.Intents));
         Assert.False(intent.Settings.Desktop!.CloseToTray);
         Assert.True(intent.Settings.Desktop.StartWithWindows);
+        Assert.False(intent.Settings.Desktop.InterceptMediaKeys);
         Assert.Equal(UiLanguagePreference.TraditionalChinese, intent.Settings.Desktop.Language);
         Assert.Equal(UiThemePreference.Dark, intent.Settings.Desktop.Theme);
         Assert.Equal(RoutingMode.WindowsAuto, intent.Settings.DefaultRoutingMode);

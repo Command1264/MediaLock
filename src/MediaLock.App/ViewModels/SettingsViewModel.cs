@@ -18,6 +18,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly Action<string>? applyTheme;
     private bool closeToTray;
     private bool startWithWindows;
+    private bool interceptMediaKeys;
     private RoutingMode startupRoutingMode;
     private string startupRoutingModeText = UiText.Get("Mode_WindowsAuto");
     private string selectedLanguage = UiLanguagePreference.System;
@@ -83,6 +84,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         get => startWithWindows;
         set => SetField(ref startWithWindows, value);
+    }
+
+    public bool InterceptMediaKeys
+    {
+        get => interceptMediaKeys;
+        set => SetField(ref interceptMediaKeys, value);
     }
 
     public string SelectedLanguage
@@ -197,7 +204,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                     CloseToTray,
                     StartWithWindows,
                     SelectedLanguage,
-                    SelectedTheme),
+                    SelectedTheme,
+                    InterceptMediaKeys),
                 PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
@@ -307,6 +315,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         appliedSettings = settings;
         CloseToTray = settings.Desktop!.CloseToTray;
         StartWithWindows = settings.Desktop.StartWithWindows;
+        InterceptMediaKeys = settings.Desktop.InterceptMediaKeys;
         SelectedLanguage = settings.Desktop.Language;
         SelectedTheme = settings.Desktop.Theme;
         ApplyStartupRoutingMode(settings.DefaultRoutingMode);

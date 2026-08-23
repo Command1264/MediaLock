@@ -61,6 +61,26 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task CapturedInputDoesNotRouteWhenTheTargetChangedBeforeDispatch()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var captured = Session("captured", "music");
+        var current = Session("current", "browser");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([captured, current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.TogglePlayPause, captured.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
+        Assert.Equal(RouteReason.InputTargetChanged, result.Decision.Reason);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
     public async Task AbsoluteSeekUsesTheResolvedTargetAndExistingRouteInterface()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);
