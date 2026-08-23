@@ -249,5 +249,7 @@ Exit criteria:
 - The candidate remains explicitly unsigned. Tagging, GitHub Release creation and public artifact publication remain
   separate operations requiring explicit approval.
 
-Status: in progress. Automated gates, clean artifact inspection and local-host smoke passed for source commit
-`aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7`; the Windows Sandbox gate remains pending.
+Status: complete on 2026-08-24. Automated gates, clean artifact inspection, local-host smoke and Windows Sandbox passed
+for source commit `aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7` and archive SHA-256
+`0c750e7f2eec132b6b82c4d78f491f961dad76358c4e0b9c49dc3042779ec5e7`. The candidate remains unsigned; no tag,
+GitHub Release or public artifact is implied by phase completion.

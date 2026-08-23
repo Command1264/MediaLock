@@ -67,8 +67,9 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 
 輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。`0.2.0-rc.1` 已在 Windows Sandbox
 通過乾淨環境 smoke test；`0.2.0-rc.2` 納入後續 UX、Now Playing、Seek 與全域媒體鍵攔截成果，必須以
-其自身 source commit 與 archive digest 重新通過相同 gate，才能描述為 portable layout。目前僅支援
-`win-x64` 且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
+其自身 source commit 與 archive digest 重新通過相同 gate。正式 `0.2.0-rc.2` 已在 Windows Sandbox
+通過該 gate，可描述為 portable layout。目前僅支援 `win-x64` 且未經 code signing，因此仍是 unsigned
+prerelease。完整驗證、證據與回復流程見
 [Release candidate runbook](docs/release-candidate.md)，版本內容見
 [0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。建立 tag、GitHub Release 或公開 artifact 仍需另行核准。
 

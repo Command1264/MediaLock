@@ -262,7 +262,9 @@ not assumed by this gate.
 
 The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08-23. Its exact source commit, archive
 digest, environment and results are preserved in [Phase 6 packaged validation](phase-6/host-smoke.md). The same gate
-must be completed independently for `0.2.0-rc.2`; evidence does not transfer between commits or digests.
+was completed independently for the formal `0.2.0-rc.2` candidate on 2026-08-24; its exact identity and results are
+preserved in [Phase 9 packaged validation](phase-9/release-candidate-smoke.md). Evidence does not transfer between
+commits or digests.
 
 ## 7. Manual evidence
 

@@ -11,7 +11,8 @@ The candidate is unsigned. Its manifest records `signed: false`; Windows may the
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. The earlier formal
 `0.2.0-rc.1` candidate from source commit `a2e85007ec570344ab91518f0b1de918605be8a0` passed the clean-environment
 gate on 2026-08-23. That evidence does not transfer to `0.2.0-rc.2`; the new candidate may be described as portable
-in layout only after its exact source commit and archive digest pass the same gate.
+in layout only after its exact source commit and archive digest pass the same gate. The formal `0.2.0-rc.2` candidate
+identified in the Phase 9 evidence passed that clean-environment gate on 2026-08-24.
 
 Single-file publication embeds native libraries for extraction. On Windows, .NET can extract bundled files beneath
 `%TEMP%\.net` while the program runs. Trimming and ReadyToRun are disabled for this candidate.

@@ -44,6 +44,35 @@ No crash, duplicate command or competing-source change was observed.
 
 ## Windows Sandbox gate
 
-Status: pending. Transfer the ZIP, manifest and checksum only. The Sandbox result must independently verify this exact
-source commit and SHA-256 before recording cold-start, settings, startup registration, tray, Edge GSMTC routing and
-explicit-Exit evidence. Local-host results do not satisfy the clean-environment gate.
+Status: passed on 2026-08-24 for the exact candidate identified above.
+
+Environment:
+
+- Fresh Windows Sandbox session.
+- Windows 11 Enterprise 24H2, build `26100.9168`, x64.
+- Only the ZIP, manifest and checksum were transferred before extraction.
+
+Results:
+
+1. The independently computed SHA-256 matched both the manifest and checksum file; manifest source commit matched
+   `aca17b40f3b6300ca4e2eeeca2590dfbbf7287a7`, with `sourceDirty: false`: pass.
+2. Extraction yielded exactly one `MediaLock.exe`, reporting ProductVersion `0.2.0-rc.2`, FileVersion `0.2.0.0` and
+   Authenticode status `NotSigned`: pass.
+3. Cold start required neither a separately installed .NET runtime nor a security-warning bypass. The main window and
+   notification-area icon appeared with Windows Auto, Windows language/theme and global media-key interception enabled
+   by default: pass.
+4. A second launch activated the existing window and left exactly one Media Lock process: pass.
+5. English plus Light applied immediately after Save and persisted when Settings reopened. Windows language/theme were
+   then restored successfully: pass.
+6. Enabling login startup created the exact current-user command `"MediaLock.exe" --startup` and persisted the enabled
+   setting. Disabling it removed the registry value and persisted `false`: pass.
+7. Edge exposed a Session as `MSEdge`. Session Lock succeeded; title, artwork and timeline were correct; Play and Pause
+   controlled Edge; one Playing Seek and one Paused Seek each moved once to the requested position: pass.
+8. Closing the main window retained the process and tray icon. `Show Media Lock` restored the window, and tray `Exit`
+   removed the icon and left zero processes: pass.
+9. `settings.json` and `state.json` parsed successfully. One bounded JSONL log existed with zero invalid lines and zero
+   Error/Critical entries: pass.
+
+No crash or unexpected error was observed. This exact unsigned candidate therefore passes the documented clean
+supported Windows gate and may be described as portable in layout. The result does not transfer to another source
+commit or archive digest.
