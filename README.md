@@ -71,7 +71,9 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 通過該 gate，可描述為 portable layout。目前僅支援 `win-x64` 且未經 code signing，因此仍是 unsigned
 prerelease。完整驗證、證據與回復流程見
 [Release candidate runbook](docs/release-candidate.md)，版本內容見
-[0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。建立 tag、GitHub Release 或公開 artifact 仍需另行核准。
+[0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。正式候選已透過
+[GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2) 公開 ZIP；Release 頁面
+列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
 並在 .NET 10 持續獲得更新。
