@@ -209,6 +209,19 @@ after settings load and before any ViewModel, window or tray surface is created.
 one App-layer culture change that refreshes existing WPF bindings, ViewModel projections and notification-area menu
 labels without restarting routing, GSMTC discovery or input interception. A failed save does not change culture.
 
+Phase 7B advances settings to schema v5 with a neutral App-owned theme preference; schema v1-v4 documents migrate
+to Windows theme while preserving every previously supported setting. `UiTheme` resolves Windows, Light and Dark
+preferences and swaps one palette resource dictionary beneath a stable shared control-style dictionary. Views consume
+semantic dynamic resources, so a successful Settings save refreshes existing windows without reconstructing
+ViewModels or platform services. When Windows theme is selected, the App composition root observes Windows preference
+changes and reapplies the resolved palette. The main-window frame and notification-area menu remain Windows-owned;
+the presentation shell maps the resolved theme to the supported DWM immersive-dark frame attribute without exposing
+Win32 dependencies outside App. Settings is one fixed-size owned modal WPF surface with transparent rounded chrome,
+an explicit drag region and Cancel/Escape commands that restore the persisted ViewModel projection before closing.
+`ShowDialog` keeps the owner natively disabled and returns only after Windows has restored owner activation, avoiding
+an intervening third-party foreground window after Alt+Tab. Motion stays in the presentation shell, respects
+`SystemParameters.ClientAreaAnimation` and never delays routing.
+
 ## 9. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

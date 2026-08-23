@@ -58,7 +58,7 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                 stream,
                 SerializerOptions,
                 cancellationToken);
-            if (settings?.SchemaVersion is >= 1 and <= 3)
+            if (settings?.SchemaVersion is >= 1 and <= 4)
             {
                 var sourceVersion = settings.SchemaVersion;
                 settings = settings with
@@ -70,7 +70,10 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                             ? null
                             : settings.Desktop with
                             {
-                                Language = UiLanguagePreference.System,
+                                Language = sourceVersion <= 3
+                                    ? UiLanguagePreference.System
+                                    : settings.Desktop.Language,
+                                Theme = UiThemePreference.System,
                             },
                     PriorityRules = sourceVersion <= 2 ? [] : settings.PriorityRules,
                 };

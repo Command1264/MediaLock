@@ -41,6 +41,12 @@ public sealed class UiTextTests
         Assert.Equal(
             "繁體中文",
             UiText.Get("Language_TraditionalChinese", CultureInfo.GetCultureInfo("en-US")));
+        Assert.Equal(
+            "取消",
+            UiText.Get("Settings_Cancel", CultureInfo.GetCultureInfo("zh-TW")));
+        Assert.Equal(
+            "Cancel",
+            UiText.Get("Settings_Cancel", CultureInfo.GetCultureInfo("en-US")));
     }
 
     [Fact]

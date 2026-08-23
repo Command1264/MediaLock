@@ -9,10 +9,11 @@ public sealed class ConfigurationSchemaTests
     [Fact]
     public void DefaultSettingsEnableCloseToTrayButNotLoginStartup()
     {
-        Assert.Equal(4, MediaLockSettings.CurrentSchemaVersion);
+        Assert.Equal(5, MediaLockSettings.CurrentSchemaVersion);
         Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
         Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
         Assert.Equal(UiLanguagePreference.System, MediaLockSettings.Default.Desktop.Language);
+        Assert.Equal(UiThemePreference.System, MediaLockSettings.Default.Desktop.Theme);
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 4, but found 99.");
+            issue.Message == "Expected schema version 5, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
@@ -49,6 +50,20 @@ public sealed class ConfigurationSchemaTests
 
         Assert.Equal("desktop.language", issue.Path);
         Assert.Contains("fr-FR", issue.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnsupportedThemeReturnsAnActionableValidationIssue()
+    {
+        var settings = MediaLockSettings.Default with
+        {
+            Desktop = MediaLockSettings.Default.Desktop! with { Theme = "neon" },
+        };
+
+        var issue = Assert.Single(settings.Validate());
+
+        Assert.Equal("desktop.theme", issue.Path);
+        Assert.Contains("neon", issue.Message, StringComparison.Ordinal);
     }
 
     [Fact]

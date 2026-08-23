@@ -118,6 +118,15 @@ Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English
 successful Settings save across the existing WPF windows, notification-area surface and presentation projections.
 Language choices display `English` and `繁體中文` as language-native names regardless of the current UI culture.
 
+The desktop settings also persist a WPF client-area theme preference: Windows theme, Light or Dark. Windows-theme
+selection reads the current Windows app-theme preference at startup and reacts to later Windows preference changes.
+A successful Settings save applies the selected theme immediately; a failed save leaves the current theme unchanged.
+The main-window frame remains Windows-owned and its caption follows the resolved Light or Dark client theme on
+supported Windows 11 builds. Settings uses a fixed-size, owned, modal, frameless rounded surface with an explicit
+draggable header; it has no minimize, maximize or native close actions, and its owner cannot be manipulated while it
+is open. Cancel and Escape discard unsaved edits, while a successful save closes the surface. Closing Settings
+returns focus directly to the main window even after the user has switched applications.
+
 Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
 remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
@@ -137,6 +146,10 @@ The main window shows the current target, routing status, media controls, discov
 Closing the window hides it when close-to-tray is enabled; only an explicit Exit command terminates the process.
 Tray state distinguishes Windows Auto, Locked, Recovering, Suspended, Reacquiring and Unavailable, and provides
 essential controls without opening the window.
+
+The WPF client area uses one shared semantic visual system for Light and Dark themes. Routing status, current target,
+Session selection and primary media action have distinct visual hierarchy without changing their command semantics.
+Motion is short, non-blocking and disabled when Windows client-area animation is disabled.
 
 ## 9. Non-functional requirements
 

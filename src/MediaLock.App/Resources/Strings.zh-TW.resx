@@ -17,6 +17,7 @@
   <data name="Main_Settings" xml:space="preserve"><value>⚙ 設定</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>媒體工作階段</value></data>
+  <data name="Main_Subtitle" xml:space="preserve"><value>讓媒體鍵固定控制你選擇的播放器。</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>鎖定工作階段</value></data>
   <data name="Main_LockSessionAutomation" xml:space="preserve"><value>鎖定選取的媒體工作階段</value></data>
   <data name="Main_LockApp" xml:space="preserve"><value>鎖定應用程式</value></data>
@@ -76,6 +77,13 @@
   <data name="Language_System" xml:space="preserve"><value>使用 Windows 語言</value></data>
   <data name="Language_English" xml:space="preserve"><value>English</value></data>
   <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Settings_Appearance" xml:space="preserve"><value>外觀</value></data>
+  <data name="Settings_Theme" xml:space="preserve"><value>應用程式主題</value></data>
+  <data name="Settings_ThemeAutomation" xml:space="preserve"><value>Media Lock 應用程式主題</value></data>
+  <data name="Settings_ThemeApply" xml:space="preserve"><value>儲存設定後會立即套用外觀變更。</value></data>
+  <data name="Theme_System" xml:space="preserve"><value>使用 Windows 主題</value></data>
+  <data name="Theme_Light" xml:space="preserve"><value>淺色</value></data>
+  <data name="Theme_Dark" xml:space="preserve"><value>深色</value></data>
   <data name="Settings_RoutingRecovery" xml:space="preserve"><value>路由與復原</value></data>
   <data name="Settings_StartupMode" xml:space="preserve"><value>啟動時路由模式</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>復原逾時（秒）</value></data>
@@ -94,6 +102,8 @@
   <data name="Settings_RemoveRuleAutomation" xml:space="preserve"><value>移除應用程式優先規則</value></data>
   <data name="Settings_Remove" xml:space="preserve"><value>移除</value></data>
   <data name="Settings_ErrorAutomation" xml:space="preserve"><value>設定錯誤</value></data>
+  <data name="Settings_CancelAutomation" xml:space="preserve"><value>取消 Media Lock 設定變更</value></data>
+  <data name="Settings_Cancel" xml:space="preserve"><value>取消</value></data>
   <data name="Settings_SaveAutomation" xml:space="preserve"><value>儲存 Media Lock 設定</value></data>
   <data name="Settings_Save" xml:space="preserve"><value>儲存設定</value></data>
   <data name="Fallback_Wait" xml:space="preserve"><value>等待</value></data>

@@ -10,7 +10,9 @@ using MediaLock.Windows.Startup;
 using MediaLock.Windows.Gsmtc;
 using MediaLock.Windows.Diagnostics;
 using MediaLock.App.Localization;
+using MediaLock.App.Theming;
 using MediaLock.Core.Configuration;
+using Microsoft.Win32;
 
 namespace MediaLock.App;
 
@@ -28,11 +30,14 @@ public partial class App : System.Windows.Application
     private bool hideAnimationRunning;
     private JsonLinesDiagnosticLog? diagnosticLog;
     private SystemLifecycle? systemLifecycle;
+    private string activeThemePreference = UiThemePreference.System;
+    private bool systemThemeSubscribed;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         UiText.Apply(UiLanguagePreference.System);
+        ApplyTheme(UiThemePreference.System);
 
         try
         {
@@ -60,12 +65,16 @@ public partial class App : System.Windows.Application
                 diagnosticLog);
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
+            ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            systemThemeSubscribed = true;
             mainWindowViewModel = new MainWindowViewModel(
                 mediaApplication,
                 SynchronizationContext.Current,
                 ShowSettingsWindow,
                 CloseSettingsWindow,
-                UiText.Apply);
+                UiText.Apply,
+                ApplyTheme);
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -181,26 +190,35 @@ public partial class App : System.Windows.Application
 
         ShowMainWindow();
 
-        if (settingsWindow is null)
+        if (settingsWindow is not null)
         {
-            settingsWindow = new SettingsWindow(mainWindowViewModel.Settings)
+            settingsWindow.Activate();
+            return;
+        }
+
+        var window = new SettingsWindow(mainWindowViewModel.Settings)
+        {
+            Owner = mainWindow,
+        };
+        settingsWindow = window;
+        window.Closed += OnSettingsWindowClosed;
+        try
+        {
+            WindowAnimations.ShowDialogWithFade(window);
+        }
+        finally
+        {
+            if (ReferenceEquals(settingsWindow, window))
             {
-                Owner = mainWindow,
-            };
-            settingsWindow.Closed += OnSettingsWindowClosed;
-        }
+                window.Closed -= OnSettingsWindowClosed;
+                settingsWindow = null;
+            }
 
-        if (!settingsWindow.IsVisible)
-        {
-            WindowAnimations.ShowWithFade(settingsWindow);
+            if (!shutdownStarted)
+            {
+                ShowMainWindow();
+            }
         }
-
-        if (settingsWindow.WindowState == WindowState.Minimized)
-        {
-            settingsWindow.WindowState = WindowState.Normal;
-        }
-
-        settingsWindow.Activate();
     }
 
     private void OnSettingsWindowClosed(object? sender, EventArgs e)
@@ -224,6 +242,22 @@ public partial class App : System.Windows.Application
     private void OnActivationRequested(object? sender, EventArgs e) =>
         Dispatcher.InvokeAsync(ShowMainWindow);
 
+    private void ApplyTheme(string preference)
+    {
+        activeThemePreference = preference;
+        UiTheme.Apply(this, preference);
+    }
+
+    private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs args)
+    {
+        if (activeThemePreference != UiThemePreference.System)
+        {
+            return;
+        }
+
+        Dispatcher.InvokeAsync(() => UiTheme.Apply(this, activeThemePreference));
+    }
+
     private async ValueTask ShutdownAsync()
     {
         if (shutdownStarted)
@@ -232,6 +266,11 @@ public partial class App : System.Windows.Application
         }
 
         shutdownStarted = true;
+        if (systemThemeSubscribed)
+        {
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            systemThemeSubscribed = false;
+        }
         var failures = new List<Exception>();
         try
         {

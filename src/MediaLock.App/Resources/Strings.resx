@@ -17,6 +17,7 @@
   <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>Media Sessions</value></data>
+  <data name="Main_Subtitle" xml:space="preserve"><value>Keep media keys with the player you choose.</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>Lock session</value></data>
   <data name="Main_LockSessionAutomation" xml:space="preserve"><value>Lock selected Media Session</value></data>
   <data name="Main_LockApp" xml:space="preserve"><value>Lock app</value></data>
@@ -76,6 +77,13 @@
   <data name="Language_System" xml:space="preserve"><value>Use Windows language</value></data>
   <data name="Language_English" xml:space="preserve"><value>English</value></data>
   <data name="Language_TraditionalChinese" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="Settings_Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="Settings_Theme" xml:space="preserve"><value>App theme</value></data>
+  <data name="Settings_ThemeAutomation" xml:space="preserve"><value>Media Lock app theme</value></data>
+  <data name="Settings_ThemeApply" xml:space="preserve"><value>Appearance changes apply immediately after settings are saved.</value></data>
+  <data name="Theme_System" xml:space="preserve"><value>Use Windows theme</value></data>
+  <data name="Theme_Light" xml:space="preserve"><value>Light</value></data>
+  <data name="Theme_Dark" xml:space="preserve"><value>Dark</value></data>
   <data name="Settings_RoutingRecovery" xml:space="preserve"><value>Routing and Recovery</value></data>
   <data name="Settings_StartupMode" xml:space="preserve"><value>Startup routing mode</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>Recovery timeout (seconds)</value></data>
@@ -94,6 +102,8 @@
   <data name="Settings_RemoveRuleAutomation" xml:space="preserve"><value>Remove application priority rule</value></data>
   <data name="Settings_Remove" xml:space="preserve"><value>Remove</value></data>
   <data name="Settings_ErrorAutomation" xml:space="preserve"><value>Settings error</value></data>
+  <data name="Settings_CancelAutomation" xml:space="preserve"><value>Cancel Media Lock settings changes</value></data>
+  <data name="Settings_Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="Settings_SaveAutomation" xml:space="preserve"><value>Save Media Lock settings</value></data>
   <data name="Settings_Save" xml:space="preserve"><value>Save settings</value></data>
   <data name="Fallback_Wait" xml:space="preserve"><value>Wait</value></data>

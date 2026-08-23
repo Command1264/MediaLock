@@ -2,15 +2,14 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:MediaLock.App.Localization"
-        Title="Media Lock"
-        Width="840"
-        Height="620"
-        MinWidth="680"
-        MinHeight="480"
-        WindowStartupLocation="CenterScreen"
-        KeyboardNavigation.TabNavigation="Continue">
-    <Grid Margin="24">
+        Title="Media Lock" Width="920" Height="700" MinWidth="720" MinHeight="560"
+        WindowStartupLocation="CenterScreen" KeyboardNavigation.TabNavigation="Continue"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Background="{DynamicResource WindowBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    <Grid Margin="28,24,28,26">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -22,31 +21,36 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0" Grid.Column="0">
-                <TextBlock FontSize="28" FontWeight="SemiBold" Text="Media Lock" />
-                <TextBlock Margin="0,8,0,0"
-                           AutomationProperties.Name="{loc:Translate Main_RoutingStatus}"
-                           Text="{Binding RoutingStatusLine}" />
-                <TextBlock Margin="0,4,0,0"
-                           AutomationProperties.Name="{loc:Translate Main_CurrentTarget}"
-                           Text="{Binding TargetDescription}" />
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Media Lock" />
+                <TextBlock Margin="1,5,0,0" Style="{StaticResource SecondaryTextStyle}"
+                           Text="{loc:Translate Main_Subtitle}" />
             </StackPanel>
-            <Button Grid.Row="0" Grid.Column="1"
-                    MinWidth="104"
-                    Margin="16,0,0,0"
-                    Padding="12,7"
-                    VerticalAlignment="Top"
-                    AutomationProperties.Name="{loc:Translate Main_OpenSettings}"
-                    Command="{Binding SettingsCommand}"
-                    Content="{loc:Translate Main_Settings}" />
-            <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                    Margin="0,12,0,0" Padding="12" Background="#FFFFE5E5">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Border Margin="0,0,10,0" VerticalAlignment="Center"
+                        Style="{StaticResource StatusPillStyle}">
+                    <TextBlock AutomationProperties.Name="{loc:Translate Main_RoutingStatus}"
+                               FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                               Text="{Binding RoutingStatusLine}" />
+                </Border>
+                <Button MinWidth="104" AutomationProperties.Name="{loc:Translate Main_OpenSettings}"
+                        Command="{Binding SettingsCommand}" Content="{loc:Translate Main_Settings}" />
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="1">
+            <Border Margin="0,0,0,12" Style="{StaticResource CardStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                               Text="{loc:Translate Main_CurrentTarget}" />
+                    <TextBlock Margin="0,5,0,0" FontFamily="Segoe UI Variable Display, Segoe UI"
+                               FontSize="21" FontWeight="SemiBold" Text="{Binding TargetDescription}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+            <Border Margin="0,0,0,12">
                 <Border.Style>
-                    <Style TargetType="Border">
+                    <Style TargetType="Border" BasedOn="{StaticResource ErrorCardStyle}">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding HasError}" Value="True">
@@ -56,72 +60,67 @@
                     </Style>
                 </Border.Style>
                 <TextBlock AutomationProperties.Name="{loc:Translate Main_Error}"
-                           Foreground="#FF8B0000"
-                           TextWrapping="Wrap"
-                           Text="{Binding ErrorMessage}" />
+                           Foreground="{DynamicResource DangerBrush}" Text="{Binding ErrorMessage}"
+                           TextWrapping="Wrap" />
             </Border>
-        </Grid>
+        </StackPanel>
 
-        <DockPanel Grid.Row="1" Margin="0,0,0,12">
-            <TextBlock VerticalAlignment="Center"
-                       FontSize="18"
-                       FontWeight="SemiBold"
+        <Grid Grid.Row="2" Margin="0,2,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}"
                        Text="{loc:Translate Main_MediaSessions}" />
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
                 <Button Margin="8,0,0,0"
-                        Padding="14,7"
                         AutomationProperties.Name="{loc:Translate Main_LockSessionAutomation}"
                         Command="{Binding LockCommand}"
                         Content="{loc:Translate Main_LockSession}" />
                 <Button Margin="8,0,0,0"
-                        Padding="14,7"
                         AutomationProperties.Name="{loc:Translate Main_LockAppAutomation}"
                         Command="{Binding AppLockCommand}"
                         Content="{loc:Translate Main_LockApp}" />
-                <Button Margin="8,0,0,0"
-                        Padding="14,7"
-                        AutomationProperties.Name="{loc:Translate Main_PriorityRulesAutomation}"
-                        Command="{Binding PriorityRulesCommand}"
-                        Content="{loc:Translate Mode_PriorityRules}" />
-                <Button Margin="8,0,0,0"
-                        Padding="14,7"
-                        AutomationProperties.Name="{loc:Translate Main_WindowsAutoAutomation}"
-                        Command="{Binding WindowsAutoCommand}"
-                        Content="{loc:Translate Mode_WindowsAuto}" />
-            </StackPanel>
-        </DockPanel>
+                <Button Margin="8,0,0,0" AutomationProperties.Name="{loc:Translate Main_PriorityRulesAutomation}"
+                        Command="{Binding PriorityRulesCommand}" Content="{loc:Translate Mode_PriorityRules}" />
+                <Button Margin="8,0,0,0" AutomationProperties.Name="{loc:Translate Main_WindowsAutoAutomation}"
+                        Command="{Binding WindowsAutoCommand}" Content="{loc:Translate Mode_WindowsAuto}" />
+            </WrapPanel>
+        </Grid>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <ListBox AutomationProperties.Name="{loc:Translate Main_AvailableSessions}"
-                     ItemsSource="{Binding Sessions}"
-                     SelectedItem="{Binding SelectedSession}"
+                     ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}"
                      KeyboardNavigation.DirectionalNavigation="Contained">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Grid Margin="8">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="2*" />
                                 <ColumnDefinition Width="3*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" FontWeight="SemiBold" Text="{Binding SourceApplication}" />
-                            <StackPanel Grid.Column="1" Margin="12,0">
-                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Foreground="#FF666666" Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Text="{Binding SourceApplication}" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center">
+                                <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding Title}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Margin="0,3,0,0" Style="{StaticResource SecondaryTextStyle}"
+                                           Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding PlaybackStatus}" />
+                            <Border Grid.Column="2" Padding="10,4" VerticalAlignment="Center"
+                                    Background="{DynamicResource SubtleBrush}" CornerRadius="10">
+                                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding PlaybackStatus}" />
+                            </Border>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <TextBlock HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       AutomationProperties.Name="{loc:Translate Main_NoSessions}"
-                       FontSize="16"
-                       Foreground="#FF666666"
-                       Text="{Binding EmptyStateText}">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
+            <Border Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="12">
+                <Border.Style>
+                    <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding HasSessions}" Value="False">
@@ -129,17 +128,23 @@
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </TextBlock.Style>
-            </TextBlock>
+                </Border.Style>
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="28"
+                           AutomationProperties.Name="{loc:Translate Main_NoSessions}"
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="15"
+                           Text="{Binding EmptyStateText}" TextAlignment="Center" TextWrapping="Wrap" />
+            </Border>
         </Grid>
 
-        <UniformGrid Grid.Row="3" Margin="0,18,0,0" Columns="6">
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_Previous}" Command="{Binding PreviousCommand}" Content="{loc:Translate Command_Previous}" />
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_Play}" Command="{Binding PlayCommand}" Content="{loc:Translate Command_Play}" />
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_Pause}" Command="{Binding PauseCommand}" Content="{loc:Translate Command_Pause}" />
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_ToggleAutomation}" Command="{Binding TogglePlayPauseCommand}" Content="{loc:Translate Command_Toggle}" />
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_Next}" Command="{Binding NextCommand}" Content="{loc:Translate Command_Next}" />
-            <Button Margin="4" Padding="10,8" AutomationProperties.Name="{loc:Translate Command_Stop}" Command="{Binding StopCommand}" Content="{loc:Translate Command_Stop}" />
-        </UniformGrid>
+        <Border Grid.Row="4" Margin="0,14,0,0" Style="{StaticResource CardStyle}">
+            <UniformGrid Columns="6">
+                <Button Margin="0,0,6,0" AutomationProperties.Name="{loc:Translate Command_Previous}" Command="{Binding PreviousCommand}" Content="{loc:Translate Command_Previous}" />
+                <Button Margin="6,0" AutomationProperties.Name="{loc:Translate Command_Play}" Command="{Binding PlayCommand}" Content="{loc:Translate Command_Play}" />
+                <Button Margin="6,0" AutomationProperties.Name="{loc:Translate Command_Pause}" Command="{Binding PauseCommand}" Content="{loc:Translate Command_Pause}" />
+                <Button Margin="6,0" Style="{StaticResource PrimaryButtonStyle}" AutomationProperties.Name="{loc:Translate Command_ToggleAutomation}" Command="{Binding TogglePlayPauseCommand}" Content="{loc:Translate Command_Toggle}" />
+                <Button Margin="6,0" AutomationProperties.Name="{loc:Translate Command_Next}" Command="{Binding NextCommand}" Content="{loc:Translate Command_Next}" />
+                <Button Margin="6,0,0,0" AutomationProperties.Name="{loc:Translate Command_Stop}" Command="{Binding StopCommand}" Content="{loc:Translate Command_Stop}" />
+            </UniformGrid>
+        </Border>
     </Grid>
 </Window>
