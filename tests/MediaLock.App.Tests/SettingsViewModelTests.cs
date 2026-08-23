@@ -75,8 +75,12 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(application);
         viewModel.CloseToTray = false;
         viewModel.StartWithWindows = true;
-        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
-        viewModel.SelectedTheme = UiThemePreference.Dark;
+        viewModel.SelectedLanguageOption = Assert.Single(
+            viewModel.Languages,
+            option => option.Value == UiLanguagePreference.TraditionalChinese);
+        viewModel.SelectedThemeOption = Assert.Single(
+            viewModel.Themes,
+            option => option.Value == UiThemePreference.Dark);
 
         await viewModel.SaveCommand.ExecuteAsync(null);
 

@@ -28,16 +28,17 @@ Date: 2026-08-23
 | Shared visual system | Main and Settings use consistent cards, spacing, typography and controls | Pass in initial production-WPF inspection |
 | Light client area | Text, cards, selection, disabled controls and focus remain readable | Pass in initial production-WPF inspection |
 | Dark client area | Root background, text, cards, ComboBoxes, accent-button text and selection remain readable | Pass in production-WPF inspection and user acceptance |
-| Theme persistence | Windows, Light and Dark persist through schema v5 | Automated coverage passes; manual restart pending |
-| Immediate theme switch | Successful Save refreshes existing windows; failed Save does not switch | Automated seam coverage passes; manual check pending |
-| English and Traditional Chinese | Both languages remain usable without blocked or clipped controls | Pending |
-| Main minimum size and Settings scrolling | Main remains usable at 720×560; fixed 680×720 Settings remains scrollable | Settings slim scrollbar passed user acceptance; Main pending |
+| Theme persistence | Windows, Light and Dark persist through schema v5 | Automated coverage and Dark production-WPF restart pass |
+| Immediate theme switch | Successful Save refreshes existing windows; failed Save does not switch | Automated seam coverage and Light/Dark user acceptance pass |
+| English and Traditional Chinese | Both languages remain usable without blocked or clipped controls | English minimum-size Main/Settings and Traditional Chinese user acceptance pass |
+| Main minimum size and Settings scrolling | Main remains usable at 720×560; fixed 680×720 Settings remains scrollable | Minimum-size Main and slim Settings scrollbar pass user acceptance |
 | Settings window contract | Fixed, non-resizable, frameless and rounded; header drags; Cancel/Escape discard edits | Automated contract/cancel checks and user acceptance pass |
 | Modal owner | Main cannot be manipulated while Settings is open | Native `IsWindowEnabled` production-WPF check and user acceptance pass |
 | Alt+Tab close return | Closing Settings after application switching returns directly to the main window | One-millisecond foreground sampling shows Settings → Main with no third-party transition; user acceptance reports no flash |
 | Native title bar | Main caption follows the resolved Light or Dark theme | DWM attribute reports Dark=1 and Light=0; both appearances and user acceptance pass |
+| Appearance selection stability | Opening Settings and rebuilding localized options preserve non-empty language/theme selections | WPF regression test was RED before the fix and passes 10/10 after binding complete option objects; user acceptance passed ten opens plus English/Light save and reopen |
 | Routing regression | Play/Pause changes the intended media exactly once | User acceptance passes; ordinary YouTube remains unchanged |
-| Lifecycle | Explicit Exit leaves no Media Lock process | Pending |
+| Lifecycle | Explicit Exit leaves no Media Lock process | User completed notification-area Exit; process count verified as zero |
 
 The visual inspection found and corrected Dark-theme root-background, ComboBox and accent-button text inheritance
 issues before manual acceptance. Views bind their root foreground/background directly to dynamic palette resources;
@@ -46,4 +47,8 @@ no focus-induced layout shift, readable Dark Main/Settings/dropdowns and the sli
 acceptance also passed the fixed frameless window, rounded corners, header drag, Cancel/Escape restore and the original
 Alt+Tab foreground return. The later modal owner, direct foreground return and Light/Dark native-title-bar changes also
 pass focused user acceptance without routing regression. The preferred language and theme must be restored at the end
-of the remaining smoke test.
+of the smoke test. The user later found that language or theme could open with an empty selection. A deterministic
+WPF regression reproduced the issue: string `SelectedValue` binding lost its match while the localized option source
+was initialized or replaced. Binding the complete localized option now preserves the durable value and reselects the
+matching replacement item. Focused user acceptance passed ten consecutive opens without an empty value, then saved
+and reopened English/Light successfully before restoring the preferred settings.

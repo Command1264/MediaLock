@@ -88,13 +88,51 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public string SelectedLanguage
     {
         get => selectedLanguage;
-        set => SetField(ref selectedLanguage, value);
+        set
+        {
+            if (selectedLanguage != value)
+            {
+                SetField(ref selectedLanguage, value);
+                OnPropertyChanged(nameof(SelectedLanguageOption));
+            }
+        }
+    }
+
+    public LocalizedOption<string>? SelectedLanguageOption
+    {
+        get => Languages.FirstOrDefault(option => option.Value == SelectedLanguage);
+        set
+        {
+            if (value is not null)
+            {
+                SelectedLanguage = value.Value;
+            }
+        }
     }
 
     public string SelectedTheme
     {
         get => selectedTheme;
-        set => SetField(ref selectedTheme, value);
+        set
+        {
+            if (selectedTheme != value)
+            {
+                SetField(ref selectedTheme, value);
+                OnPropertyChanged(nameof(SelectedThemeOption));
+            }
+        }
+    }
+
+    public LocalizedOption<string>? SelectedThemeOption
+    {
+        get => Themes.FirstOrDefault(option => option.Value == SelectedTheme);
+        set
+        {
+            if (value is not null)
+            {
+                SelectedTheme = value.Value;
+            }
+        }
     }
 
     public string StartupRoutingModeText
@@ -222,6 +260,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(FallbackPolicies));
         OnPropertyChanged(nameof(Languages));
         OnPropertyChanged(nameof(Themes));
+        OnPropertyChanged(nameof(SelectedLanguageOption));
+        OnPropertyChanged(nameof(SelectedThemeOption));
         ApplyStartupRoutingMode(startupRoutingMode);
     }
 
