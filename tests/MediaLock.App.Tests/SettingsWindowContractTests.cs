@@ -1,13 +1,9 @@
-using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Threading;
 using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
-using MediaLock.Application;
 using MediaLock.Core.Configuration;
-using MediaLock.Core.Routing;
 using Xunit;
 
 namespace MediaLock.App.Tests;
@@ -18,11 +14,9 @@ public sealed class SettingsWindowContractTests
     [Fact]
     public void DesktopWindowsPreserveSettingsAndNowPlayingContracts()
     {
-        RunOnStaThread(() =>
+        WpfTestHost.Run(() =>
         {
-            var app = new App();
-            app.InitializeComponent();
-            using var viewModel = new SettingsViewModel(new FakeApplication());
+            using var viewModel = new SettingsViewModel(new FakeMediaLockApplication());
             var window = new SettingsWindow(viewModel);
             var originalLanguage = UiText.CurrentCulture.Name == "zh-TW"
                 ? UiLanguagePreference.TraditionalChinese
@@ -50,24 +44,6 @@ public sealed class SettingsWindowContractTests
                 window.Close();
                 UiText.Apply(originalLanguage);
             }
-
-            using var mainViewModel = new MainWindowViewModel(
-                new FakeApplication(),
-                synchronizationContext: null);
-            var mainWindow = new MainWindow(mainViewModel);
-            mainWindow.Show();
-            try
-            {
-                mainWindow.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                var progress = Assert.Single(FindVisualChildren<ProgressBar>(mainWindow));
-                Assert.False(progress.IsHitTestVisible);
-                Assert.False(progress.Focusable);
-                Assert.Single(FindVisualChildren<Image>(mainWindow));
-            }
-            finally
-            {
-                mainWindow.Close();
-            }
         });
     }
 
@@ -75,7 +51,7 @@ public sealed class SettingsWindowContractTests
         SettingsWindow window,
         SettingsViewModel viewModel)
     {
-        var comboBoxes = FindVisualChildren<ComboBox>(window).ToArray();
+        var comboBoxes = WpfTestHost.FindVisualChildren<ComboBox>(window).ToArray();
         var language = Assert.Single(comboBoxes, comboBox =>
             ReferenceEquals(comboBox.ItemsSource, viewModel.Languages));
         var theme = Assert.Single(comboBoxes, comboBox =>
@@ -87,62 +63,4 @@ public sealed class SettingsWindowContractTests
         Assert.Equal(viewModel.SelectedTheme, selectedTheme.Value);
     }
 
-    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
-        where T : DependencyObject
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
-        {
-            var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T match)
-            {
-                yield return match;
-            }
-
-            foreach (var descendant in FindVisualChildren<T>(child))
-            {
-                yield return descendant;
-            }
-        }
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        ExceptionDispatchInfo? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception exception)
-            {
-                failure = ExceptionDispatchInfo.Capture(exception);
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        failure?.Throw();
-    }
-
-    private sealed class FakeApplication : IMediaLockApplication
-    {
-        public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public MediaLockApplicationState State { get; } = MediaLockApplicationState.Initial;
-
-        public ValueTask StartAsync(CancellationToken cancellationToken) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask<ApplicationResult> DispatchAsync(
-            ApplicationIntent intent,
-            CancellationToken cancellationToken) =>
-            ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
 }

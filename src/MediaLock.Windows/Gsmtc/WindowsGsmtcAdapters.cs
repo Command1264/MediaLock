@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using MediaLock.Core.Media;
 using Windows.Media;
 using Windows.Media.Control;
@@ -242,9 +243,12 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
             reader.ReadBytes(bytes);
             return MediaArtwork.TryCreate(bytes, out var result) ? result : null;
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (
+            !cancellationToken.IsCancellationRequested &&
+            exception is COMException or IOException or UnauthorizedAccessException)
         {
-            // Artwork is optional presentation data and must not fail Session discovery or routing.
+            // Known external thumbnail-stream failures degrade to absent presentation data.
+            // Unexpected failures propagate into the adapter's observable recovery path.
             return null;
         }
     }
