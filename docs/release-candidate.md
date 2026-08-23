@@ -110,4 +110,5 @@ approval after all release gates pass.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md). Record `0.2.0-rc.2` results separately; a different version,
-source commit or archive digest always requires new evidence.
+source commit or archive digest always requires new evidence. Current `0.2.0-rc.2` progress is recorded in
+[Phase 9 packaged validation](phase-9/release-candidate-smoke.md).
