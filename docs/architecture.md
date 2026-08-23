@@ -239,6 +239,26 @@ absolute position against the selected live Session's current timeline before th
 `TryChangePlaybackPositionAsync(TimeSpan.Ticks)`. The Probe reports capability, API acceptance and observed position as
 separate facts. No parameterized command crosses into Core, Application, production Windows adapters or WPF.
 
+Phase 8B deepens the existing Media Command value instead of adding a parallel Seek interface. Transport actions and
+absolute Seek share `ApplicationIntent.Route`, `RouterIntent.Route` and `IMediaController.TryExecuteAsync`, so target
+resolution, Recovery, capability checks, serialization and Route Decision semantics remain local to the Router module.
+Core validates the live timeline and absolute bounds before the Windows adapter translates the position to GSMTC ticks.
+
+The WPF timeline owns only a gesture preview. One completed mouse, touch or keyboard gesture submits one Media Command.
+An accepted request is pending presentation state, not a new routing state: the preview yields only when a later catalog
+snapshot confirms the requested position. A bounded presentation timeout, target change or command failure restores the
+latest observed timeline. No optimistic position is written into Core or persisted.
+
+The Main ViewModel owns a presentation-only selection bookmark independently from Routing Mode. It first preserves an
+exact selected Session Key. If Windows replaces that ephemeral Key during catalog reconstruction, the presentation
+carries selection forward only when the old source-application identity has exactly one candidate. Missing or ambiguous
+candidates keep the list unselected until the configured Recovery timeout; timeout clears the bookmark without selecting
+the first row. A direct user selection replaces it.
+
+When the bookmarked row was the resolved Locked Target immediately before App Lock or Session Lock entered Recovery,
+the Router's successor Active Target takes precedence over the generic unique-source match. Core Recovery remains the
+sole authority for target identity; the UI bookmark never changes Router state.
+
 ## 9. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

@@ -142,7 +142,18 @@ expired or ambiguous state remains safely unbound and observable rather than sel
 
 ## 8. UI and tray behavior
 
-The main window shows the current target, routing status, media controls, discovered Sessions and lock actions.
+The main window shows the current target, routing status, media controls, discovered Sessions and lock actions. Its
+four Routing Mode actions expose exactly one checked mode with a fixed-size marker, accent border and themed selection
+surface; the status line remains the detailed Ready, Recovery or Unavailable signal.
+If the selected list item was the Locked Target when Recovery began, the list remains unselected while that target is
+absent and selects the Router-resolved successor when it returns. An explicit user selection during Recovery cancels
+that presentation-only selection recovery.
+Independently of Routing Mode, the list keeps a presentation-only bookmark for its last explicit or initial selection.
+The row remains selected across catalog reconstruction when its Session Key is unchanged or when exactly one replacement
+has the same source-application identity. While no successor exists the list remains unselected; a successor returning
+within the configured Recovery timeout restores selection. An explicit selection replaces the bookmark. Timeout or
+ambiguous same-application replacements leave the list unselected rather than choosing the first row. This presentation
+continuity does not change the Locked Target or routing target.
 Closing the window hides it when close-to-tray is enabled; only an explicit Exit command terminates the process.
 Tray state distinguishes Windows Auto, Locked, Recovering, Suspended, Reacquiring and Unavailable, and provides
 essential controls without opening the window.
@@ -161,6 +172,15 @@ Phase 8A may request absolute playback positions only from the disposable Consol
 production router, input backend, persisted settings or WPF interaction model. A Session advertising playback-position
 support and returning `true` are necessary observations, not sufficient evidence of movement; the requested and
 observed timelines must also be compared on each supported player.
+
+Phase 8B makes the routed target's valid timeline seekable when that Media Session advertises playback-position
+support. A completed pointer or keyboard gesture submits one absolute-position Media Command through the same Router
+as transport commands. Dragging is local preview only. GSMTC acceptance retains the preview temporarily, while a later
+timeline snapshot remains authoritative; rejection, failure, target loss or confirmation timeout restores the observed
+position with an actionable error. Seek adds no physical-key binding, setting or persisted state.
+Pressing an empty point on the timeline may continue directly into a captured drag; only release commits the final
+previewed position.
+The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer.
 
 ## 9. Non-functional requirements
 

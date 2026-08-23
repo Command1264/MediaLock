@@ -80,6 +80,8 @@ must exercise Light, Dark and Windows theme in English and Traditional Chinese, 
 main-window minimum-size layout, keyboard focus, Settings scrolling/dragging/Cancel/Escape, owner disablement while
 Settings is open, a direct Alt+Tab-close foreground return, notification-area lifecycle and one routed Play/Pause
 without duplicate action.
+The four Routing Mode controls must expose exactly one checked state derived from Router Mode; switching and Recovery
+must not resize the controls or remove the selected semantic.
 
 Phase 7C tests bounded artwork validation independently from WinRT, target-owned artwork/timeline projection and
 deterministic playing-position interpolation with a fake `TimeProvider`. WPF coverage verifies that the current-target
@@ -93,6 +95,19 @@ conversion, invalid timeline handling and inclusive timeline bounds. Hardware-as
 movement from `TryChangePlaybackPositionAsync` alone: it records capability, return value and observed timeline for
 Brave YouTube Music and ordinary Brave YouTube in Playing and Paused states. Existing physical-key routing is checked
 once to prove the probe-only change did not alter capture or dispatch.
+
+Phase 8B tests the production interfaces in vertical slices. Core coverage proves the parameterized Media Command
+invariant, Seek capability, target resolution, inclusive timeline bounds and no controller call for unsupported,
+missing or out-of-range requests. Application coverage proves the exact command stays serialized and observable.
+Windows adapter coverage proves capability mapping and ticks translation. ViewModel and WPF coverage proves local
+preview, one commit per gesture, asynchronous timeline confirmation, bounded rollback, target-change cancellation,
+disabled states, localization, theme and accessibility without adding a Seek media-key mapping.
+WPF and ViewModel coverage also verifies that the localized error card has an explicit dismiss action.
+Selection-bookmark coverage publishes repeated catalog and Recovery snapshots across all four Routing Modes. It replaces
+the locked Session Key, verifies both lock modes select the Router-resolved successor, and proves explicit selections are
+never overridden. WPF coverage also replaces the ephemeral Key of a still-present, unrelated selected row while another
+target enters Recovery. A unique source successor remains selected; missing or ambiguous candidates remain unselected,
+and timeout clears the bookmark without falling back to the first row.
 
 ### Integration tests
 

@@ -165,6 +165,26 @@ public sealed class GsmtcMediaAdapterTests
     }
 
     [Fact]
+    public async Task AbsoluteSeekUsesTheSameLiveSessionControlSeam()
+    {
+        var session = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var manager = new FakeManager(session);
+        await using var adapter = new GsmtcMediaAdapter(
+            new FakeManagerFactory(manager),
+            TimeProvider.System);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+        var target = Assert.Single(snapshots.Current.Sessions).Key;
+        var command = MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75));
+
+        var result = await adapter.TryExecuteAsync(target, command, cancellation.Token);
+
+        Assert.Equal(MediaControlResult.Succeeded, result);
+        Assert.Equal([command], session.Commands);
+    }
+
+    [Fact]
     public async Task SessionChangePublishesUpdatedSnapshotWithoutChangingLiveKey()
     {
         var session = new FakeSession("Brave", MediaControlResult.Succeeded);

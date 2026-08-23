@@ -77,6 +77,8 @@ public enum RouteReason
     RoutingDisabled,
     NoWindowsCurrentSession,
     UnsupportedCommand,
+    SeekTimelineUnavailable,
+    SeekOutOfRange,
     ControlRejected,
     ControlFailed,
 }

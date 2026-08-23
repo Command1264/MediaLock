@@ -15,9 +15,12 @@
   <data name="Main_CurrentTarget" xml:space="preserve"><value>目前媒體目標</value></data>
   <data name="Main_Artwork" xml:space="preserve"><value>目前媒體封面</value></data>
   <data name="Main_PlaybackProgress" xml:space="preserve"><value>目前媒體播放進度</value></data>
+  <data name="Main_PlaybackSeek" xml:space="preserve"><value>定位目前媒體的播放位置</value></data>
+  <data name="Main_PlaybackSeekHelp" xml:space="preserve"><value>拖曳或使用鍵盤變更路由媒體的播放位置。</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>開啟 Media Lock 設定</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ 設定</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>
+  <data name="Main_DismissError" xml:space="preserve"><value>關閉錯誤提示</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>媒體工作階段</value></data>
   <data name="Main_Subtitle" xml:space="preserve"><value>讓媒體鍵固定控制你選擇的播放器。</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>鎖定工作階段</value></data>
@@ -56,6 +59,8 @@
   <data name="Target_RulesUnavailable" xml:space="preserve"><value>沒有可用的優先規則或 Windows 目前工作階段。</value></data>
   <data name="Target_LockedUnavailable" xml:space="preserve"><value>鎖定目標無法使用。</value></data>
   <data name="Error_CommandNotCompleted" xml:space="preserve"><value>媒體命令未完成：{0}。</value></data>
+  <data name="Error_SeekNotConfirmed" xml:space="preserve"><value>無法確認要求的播放位置。</value></data>
+  <data name="Error_SeekInterrupted" xml:space="preserve"><value>媒體目標已變更或無法使用，因此已中斷跳轉。</value></data>
   <data name="Media_UnknownTitle" xml:space="preserve"><value>未知標題</value></data>
   <data name="Media_UnknownArtist" xml:space="preserve"><value>未知演出者</value></data>
   <data name="Playback_Unknown" xml:space="preserve"><value>未知</value></data>

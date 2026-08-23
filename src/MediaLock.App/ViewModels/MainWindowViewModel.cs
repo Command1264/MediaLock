@@ -10,6 +10,9 @@ namespace MediaLock.App.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
+    private static readonly TimeSpan SeekConfirmationTolerance = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan SeekConfirmationTimeout = TimeSpan.FromSeconds(2);
+
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly AsyncCommand lockCommand;
@@ -21,6 +24,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
+    private SeekPreview? seekPreview;
+    private PendingSeek? pendingSeek;
+    private SelectionBookmark? selectionBookmark;
+    private TimeSpan selectionBookmarkTimeout = TimeSpan.FromSeconds(15);
+    private bool selectionInitialized;
+    private bool selectionRecoveryPending;
+    private bool projectingSelection;
     private string? errorMessage;
     private bool disposed;
 
@@ -46,6 +56,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();
+            return Task.CompletedTask;
+        });
+        DismissErrorCommand = new AsyncCommand(_ =>
+        {
+            errorMessage = null;
+            OnPropertyChanged(nameof(HasError));
+            OnPropertyChanged(nameof(ErrorMessage));
             return Task.CompletedTask;
         });
         lockCommand = new AsyncCommand(
@@ -92,6 +109,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public IAsyncCommand SettingsCommand { get; }
 
+    public IAsyncCommand DismissErrorCommand { get; }
+
     public SessionItemViewModel? SelectedSession
     {
         get => selectedSession;
@@ -103,6 +122,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             }
 
             selectedSession = value;
+            if (!projectingSelection)
+            {
+                selectionRecoveryPending = false;
+                selectionInitialized = true;
+                selectionBookmark = value is null
+                    ? null
+                    : SelectionBookmark.From(value);
+            }
+
             OnPropertyChanged();
             lockCommand.RaiseCanExecuteChanged();
             appLockCommand.RaiseCanExecuteChanged();
@@ -128,6 +156,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncCommand NextCommand { get; }
 
     public IAsyncCommand StopCommand { get; }
+
+    public bool IsWindowsAutoMode => routerState.Mode == RoutingMode.WindowsAuto;
+
+    public bool IsPriorityRulesMode => routerState.Mode == RoutingMode.PriorityRules;
+
+    public bool IsAppLockMode => routerState.Mode == RoutingMode.AppLock;
+
+    public bool IsSessionLockMode => routerState.Mode == RoutingMode.SessionLock;
 
     public string RoutingStatus => catalogStatus switch
     {
@@ -177,6 +213,26 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public bool HasNowPlayingTimeline => ResolveTimeline() is not null;
 
+    public bool CanSeek
+    {
+        get
+        {
+            var target = ResolveTarget();
+            var timeline = target?.Timeline;
+            return catalogStatus == MediaSessionCatalogStatus.Available &&
+                routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable &&
+                target is not null &&
+                (target.Capabilities & MediaCommandCapabilities.SeekAbsolute) != 0 &&
+                timeline is not null &&
+                timeline.Start >= TimeSpan.Zero &&
+                timeline.End > timeline.Start;
+        }
+    }
+
+    public double NowPlayingPositionSeconds => ResolveTimeline()?.Position.TotalSeconds ?? 0;
+
+    public double NowPlayingDurationSeconds => ResolveTimeline()?.Duration.TotalSeconds ?? 0;
+
     public double NowPlayingProgress
     {
         get
@@ -212,8 +268,104 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public void RefreshTimeline()
     {
+        ExpireSelectionBookmarkIfNeeded();
+        if (pendingSeek is { } pending &&
+            timeProvider.GetUtcNow() - pending.RequestedAt >= SeekConfirmationTimeout)
+        {
+            pendingSeek = null;
+            SetError(UiText.Get("Error_SeekNotConfirmed"));
+        }
+
         OnPropertyChanged(nameof(NowPlayingProgress));
+        OnPropertyChanged(nameof(NowPlayingPositionSeconds));
         OnPropertyChanged(nameof(NowPlayingElapsed));
+    }
+
+    public void BeginSeekPreview()
+    {
+        if (!CanSeek)
+        {
+            return;
+        }
+
+        var target = ResolveTarget();
+        var timeline = target?.Timeline;
+        if (target is null || timeline is null)
+        {
+            return;
+        }
+
+        seekPreview = new SeekPreview(
+            target.Key,
+            timeline.Start,
+            timeline.End - timeline.Start,
+            TimeSpan.FromTicks(Math.Clamp(
+                (timeline.Position - timeline.Start).Ticks,
+                0,
+                (timeline.End - timeline.Start).Ticks)));
+        pendingSeek = null;
+        RefreshTimeline();
+    }
+
+    public void PreviewSeek(TimeSpan elapsed)
+    {
+        if (seekPreview is not { } preview)
+        {
+            return;
+        }
+
+        seekPreview = preview with
+        {
+            Elapsed = TimeSpan.FromTicks(Math.Clamp(elapsed.Ticks, 0, preview.Duration.Ticks)),
+        };
+        RefreshTimeline();
+    }
+
+    public async Task CommitSeekPreviewAsync()
+    {
+        if (seekPreview is not { } preview)
+        {
+            return;
+        }
+
+        seekPreview = null;
+        pendingSeek = new PendingSeek(
+            preview.Target,
+            preview.Start + preview.Elapsed,
+            preview.Duration,
+            preview.Elapsed,
+            routerState.Revision,
+            ResolveTarget()?.Timeline?.LastUpdatedAt,
+            timeProvider.GetUtcNow());
+        RefreshTimeline();
+        var result = await DispatchAsync(new ApplicationIntent.Route(
+            MediaLock.Core.Media.MediaCommand.SeekAbsolute(preview.Start + preview.Elapsed)));
+        if (result?.Decision.Kind != RouteDecisionKind.Routed)
+        {
+            pendingSeek = null;
+            if (result is
+                {
+                    Decision.Kind: RouteDecisionKind.Skipped,
+                    Decision.Reason: not RouteReason.ControlRejected,
+                })
+            {
+                SetError(result.Decision.Error ??
+                    UiText.Format("Error_CommandNotCompleted", result.Decision.Reason));
+            }
+
+            RefreshTimeline();
+        }
+    }
+
+    public void CancelSeekPreview()
+    {
+        if (seekPreview is null)
+        {
+            return;
+        }
+
+        seekPreview = null;
+        RefreshTimeline();
     }
 
     public void Dispose()
@@ -254,7 +406,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         _ => ResolveTarget()?.Capabilities.Supports(command) is true &&
             routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable);
 
-    private async Task DispatchAsync(ApplicationIntent intent)
+    private async Task<ApplicationResult?> DispatchAsync(ApplicationIntent intent)
     {
         try
         {
@@ -265,10 +417,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                 SetError(result.Decision.Error ??
                     UiText.Format("Error_CommandNotCompleted", result.Decision.Reason));
             }
+
+            return result;
         }
         catch (Exception exception)
         {
             SetError(exception.Message);
+            return null;
         }
     }
 
@@ -307,8 +462,21 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void Apply(MediaLockApplicationState state)
     {
+        if (SelectedSession is { } selected)
+        {
+            RememberSelection(selected);
+            if (routerState.Mode is RoutingMode.AppLock or RoutingMode.SessionLock &&
+                state.Router.Mode == routerState.Mode &&
+                routerState.LockedTarget?.ResolvedSession == selected.Key &&
+                state.Router.ActiveTarget != selected.Key)
+            {
+                selectionRecoveryPending = true;
+            }
+        }
+
         routerState = state.Router;
         catalogStatus = state.CatalogStatus;
+        selectionBookmarkTimeout = state.Settings.Recovery?.Timeout ?? TimeSpan.FromSeconds(15);
         errorMessage = state.ErrorMessage ??
             (state.CatalogStatus == MediaSessionCatalogStatus.Unavailable
                 ? state.CatalogStatusMessage
@@ -326,27 +494,42 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void RefreshLocalizedProjection()
     {
-        var selectedKey = SelectedSession?.Key;
-        Sessions.Clear();
-        foreach (var session in routerState.Sessions)
+        projectingSelection = true;
+        try
         {
-            Sessions.Add(SessionItemViewModel.From(session));
+            Sessions.Clear();
+            foreach (var session in routerState.Sessions)
+            {
+                Sessions.Add(SessionItemViewModel.From(session));
+            }
+
+            var nextSelection = ResolveSelection();
+            SelectedSession = nextSelection;
+        }
+        finally
+        {
+            projectingSelection = false;
         }
 
-        SelectedSession = selectedKey is { } key
-            ? Sessions.FirstOrDefault(session => session.Key == key)
-            : Sessions.FirstOrDefault();
+        ReconcileSeekState();
         OnPropertyChanged(nameof(Sessions));
         OnPropertyChanged(nameof(HasSessions));
         OnPropertyChanged(nameof(EmptyStateText));
         OnPropertyChanged(nameof(RoutingStatus));
         OnPropertyChanged(nameof(RoutingStatusLine));
+        OnPropertyChanged(nameof(IsWindowsAutoMode));
+        OnPropertyChanged(nameof(IsPriorityRulesMode));
+        OnPropertyChanged(nameof(IsAppLockMode));
+        OnPropertyChanged(nameof(IsSessionLockMode));
         OnPropertyChanged(nameof(TargetDescription));
         OnPropertyChanged(nameof(NowPlayingTitle));
         OnPropertyChanged(nameof(NowPlayingArtist));
         OnPropertyChanged(nameof(NowPlayingArtwork));
         OnPropertyChanged(nameof(HasNowPlayingTimeline));
+        OnPropertyChanged(nameof(CanSeek));
         OnPropertyChanged(nameof(NowPlayingProgress));
+        OnPropertyChanged(nameof(NowPlayingPositionSeconds));
+        OnPropertyChanged(nameof(NowPlayingDurationSeconds));
         OnPropertyChanged(nameof(NowPlayingElapsed));
         OnPropertyChanged(nameof(NowPlayingDuration));
     }
@@ -361,6 +544,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private (TimeSpan Position, TimeSpan Duration)? ResolveTimeline()
     {
         var target = ResolveTarget();
+        if (target is not null &&
+            seekPreview is { } preview &&
+            preview.Target == target.Key)
+        {
+            return (preview.Elapsed, preview.Duration);
+        }
+
+        if (target is not null &&
+            pendingSeek is { } pending &&
+            pending.Target == target.Key)
+        {
+            return (pending.Elapsed, pending.Duration);
+        }
+
         var timeline = target?.Timeline;
         if (timeline is null || timeline.End <= timeline.Start)
         {
@@ -387,4 +584,163 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private void ReconcileSeekState()
+    {
+        var target = ResolveTarget();
+        if (target is null ||
+            catalogStatus != MediaSessionCatalogStatus.Available ||
+            routerState.Status is RouterStatus.Recovering or RouterStatus.Unavailable)
+        {
+            var seekWasInterrupted = seekPreview is not null || pendingSeek is not null;
+            seekPreview = null;
+            pendingSeek = null;
+            if (seekWasInterrupted)
+            {
+                SetError(UiText.Get("Error_SeekInterrupted"));
+            }
+
+            return;
+        }
+
+        if (seekPreview is { } preview && preview.Target != target.Key)
+        {
+            seekPreview = null;
+            SetError(UiText.Get("Error_SeekInterrupted"));
+        }
+
+        if (pendingSeek is not { } pending)
+        {
+            return;
+        }
+
+        if (pending.Target != target.Key)
+        {
+            pendingSeek = null;
+            SetError(UiText.Get("Error_SeekInterrupted"));
+            return;
+        }
+
+        var timeline = target.Timeline;
+        if (routerState.Revision <= pending.BaselineRevision ||
+            timeline is null ||
+            (pending.BaselineTimelineUpdatedAt is { } baselineUpdatedAt &&
+                timeline.LastUpdatedAt <= baselineUpdatedAt))
+        {
+            return;
+        }
+
+        if ((timeline.Position - pending.AbsolutePosition).Duration() <= SeekConfirmationTolerance)
+        {
+            pendingSeek = null;
+        }
+    }
+
+    private SessionItemViewModel? ResolveSelection()
+    {
+        ExpireSelectionBookmarkIfNeeded();
+        if (selectionBookmark is not { } bookmark)
+        {
+            if (selectionInitialized)
+            {
+                return null;
+            }
+
+            var initial = Sessions.FirstOrDefault();
+            return initial is null ? null : RememberSelection(initial);
+        }
+
+        var existing = Sessions.FirstOrDefault(session => session.Key == bookmark.Key);
+        if (existing is not null)
+        {
+            return RememberSelection(existing);
+        }
+
+        if (selectionRecoveryPending)
+        {
+            if (routerState.Mode is not RoutingMode.AppLock and not RoutingMode.SessionLock)
+            {
+                selectionRecoveryPending = false;
+            }
+            else
+            {
+                if (routerState.ActiveTarget is { } recoveredKey)
+                {
+                    var recovered = Sessions.FirstOrDefault(session => session.Key == recoveredKey);
+                    if (recovered is not null)
+                    {
+                        selectionRecoveryPending = false;
+                        return RememberSelection(recovered);
+                    }
+                }
+
+                return MarkSelectionMissing(bookmark);
+            }
+        }
+
+        var sameSource = Sessions
+            .Where(session => string.Equals(
+                session.SourceApplication,
+                bookmark.SourceApplication,
+                StringComparison.Ordinal))
+            .Take(2)
+            .ToArray();
+        return sameSource.Length == 1
+            ? RememberSelection(sameSource[0])
+            : MarkSelectionMissing(bookmark);
+    }
+
+    private SessionItemViewModel RememberSelection(SessionItemViewModel session)
+    {
+        selectionInitialized = true;
+        selectionBookmark = SelectionBookmark.From(session);
+        return session;
+    }
+
+    private SessionItemViewModel? MarkSelectionMissing(SelectionBookmark bookmark)
+    {
+        selectionBookmark = bookmark.MissingSince is null
+            ? bookmark with { MissingSince = timeProvider.GetUtcNow() }
+            : bookmark;
+        ExpireSelectionBookmarkIfNeeded();
+        return null;
+    }
+
+    private void ExpireSelectionBookmarkIfNeeded()
+    {
+        if (selectionBookmark is not { MissingSince: { } missingSince } ||
+            timeProvider.GetUtcNow() - missingSince < selectionBookmarkTimeout)
+        {
+            return;
+        }
+
+        selectionBookmark = null;
+        selectionRecoveryPending = false;
+    }
+
+    private sealed record SeekPreview(
+        SessionKey Target,
+        TimeSpan Start,
+        TimeSpan Duration,
+        TimeSpan Elapsed);
+
+    private sealed record PendingSeek(
+        SessionKey Target,
+        TimeSpan AbsolutePosition,
+        TimeSpan Duration,
+        TimeSpan Elapsed,
+        long BaselineRevision,
+        DateTimeOffset? BaselineTimelineUpdatedAt,
+        DateTimeOffset RequestedAt);
+
+    private sealed record SelectionBookmark(
+        SessionKey Key,
+        string SourceApplication,
+        DateTimeOffset? MissingSince)
+    {
+        public static SelectionBookmark From(SessionItemViewModel session) => new(
+            session.Key,
+            session.SourceApplication,
+            MissingSince: null);
+    }
 }
