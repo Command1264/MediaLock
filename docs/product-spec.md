@@ -151,6 +151,12 @@ The WPF client area uses one shared semantic visual system for Light and Dark th
 Session selection and primary media action have distinct visual hierarchy without changing their command semantics.
 Motion is short, non-blocking and disabled when Windows client-area animation is disabled.
 
+The current-target surface may show optional Now Playing artwork and a read-only timeline. Both are projections of
+the Session that would receive a command at that moment; selecting a different list row does not change them. Artwork
+failure falls back to a neutral placeholder and never changes routing state. Timeline interpolation is presentation
+only, clamps to the last observed GSMTC bounds and resets when the routed target disappears or changes. The progress
+indicator is not seekable until player-specific GSMTC capability and acceptance evidence is documented.
+
 ## 9. Non-functional requirements
 
 - Run without administrator privileges in supported scenarios.

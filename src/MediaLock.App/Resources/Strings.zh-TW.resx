@@ -13,6 +13,8 @@
   <data name="Main_RoutingStatus" xml:space="preserve"><value>路由狀態</value></data>
   <data name="Main_StatusFormat" xml:space="preserve"><value>狀態：{0}</value></data>
   <data name="Main_CurrentTarget" xml:space="preserve"><value>目前媒體目標</value></data>
+  <data name="Main_Artwork" xml:space="preserve"><value>目前媒體封面</value></data>
+  <data name="Main_PlaybackProgress" xml:space="preserve"><value>目前媒體播放進度</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>開啟 Media Lock 設定</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ 設定</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>

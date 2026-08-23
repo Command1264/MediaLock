@@ -1,6 +1,7 @@
 using MediaLock.Core.Media;
 using Windows.Media;
 using Windows.Media.Control;
+using Windows.Storage.Streams;
 
 namespace MediaLock.Windows.Gsmtc;
 
@@ -86,6 +87,8 @@ internal sealed class WindowsGsmtcSessionManager : IGsmtcSessionManager
 internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
 {
     private readonly GlobalSystemMediaTransportControlsSession session;
+    private MediaArtwork? artwork;
+    private bool artworkDirty = true;
     private bool disposed;
 
     public WindowsGsmtcSession(GlobalSystemMediaTransportControlsSession session)
@@ -112,6 +115,11 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
             .TryGetMediaPropertiesAsync()
             .AsTask(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        if (artworkDirty)
+        {
+            artworkDirty = false;
+            artwork = await TryReadArtworkAsync(properties.Thumbnail, cancellationToken);
+        }
 
         return new MediaSessionSnapshot(
             key,
@@ -129,7 +137,8 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
                 timeline.EndTime,
                 timeline.Position,
                 timeline.LastUpdatedTime),
-            PlaybackType: MapPlaybackType(properties.PlaybackType));
+            PlaybackType: MapPlaybackType(properties.PlaybackType),
+            Artwork: artwork);
     }
 
     public async ValueTask<MediaControlResult> TryExecuteAsync(
@@ -202,9 +211,51 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
             _ => MediaLock.Core.Media.MediaPlaybackType.Unknown,
         };
 
+    private static async ValueTask<MediaArtwork?> TryReadArtworkAsync(
+        IRandomAccessStreamReference? reference,
+        CancellationToken cancellationToken)
+    {
+        if (reference is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var stream = await reference.OpenReadAsync().AsTask(cancellationToken);
+            if (stream.Size is 0 or > MediaArtwork.MaximumEncodedByteCount)
+            {
+                return null;
+            }
+
+            var byteCount = checked((uint)stream.Size);
+            using var input = stream.GetInputStreamAt(0);
+            using var reader = new DataReader(input);
+            reader.InputStreamOptions = InputStreamOptions.None;
+            var loaded = await reader.LoadAsync(byteCount).AsTask(cancellationToken);
+            if (loaded != byteCount)
+            {
+                return null;
+            }
+
+            var bytes = new byte[byteCount];
+            reader.ReadBytes(bytes);
+            return MediaArtwork.TryCreate(bytes, out var result) ? result : null;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Artwork is optional presentation data and must not fail Session discovery or routing.
+            return null;
+        }
+    }
+
     private void OnMediaPropertiesChanged(
         GlobalSystemMediaTransportControlsSession sender,
-        MediaPropertiesChangedEventArgs args) => Changed?.Invoke(this, EventArgs.Empty);
+        MediaPropertiesChangedEventArgs args)
+    {
+        artworkDirty = true;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     private void OnPlaybackInfoChanged(
         GlobalSystemMediaTransportControlsSession sender,

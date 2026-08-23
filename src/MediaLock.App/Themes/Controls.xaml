@@ -216,6 +216,25 @@
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
 
+    <Style TargetType="ProgressBar">
+        <Setter Property="Height" Value="5" />
+        <Setter Property="Background" Value="{DynamicResource SubtleBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="2.5">
+                        <Grid x:Name="PART_Track" ClipToBounds="True">
+                            <Border x:Name="PART_Indicator" HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}" CornerRadius="2.5" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="ComboBox">
         <Setter Property="MinHeight" Value="36" />
         <Setter Property="Padding" Value="10,6,34,6" />

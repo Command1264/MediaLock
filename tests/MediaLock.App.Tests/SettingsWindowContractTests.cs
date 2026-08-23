@@ -16,7 +16,7 @@ namespace MediaLock.App.Tests;
 public sealed class SettingsWindowContractTests
 {
     [Fact]
-    public void SettingsUsesAFixedFramelessSurfaceWithSelectedAppearanceOptions()
+    public void DesktopWindowsPreserveSettingsAndNowPlayingContracts()
     {
         RunOnStaThread(() =>
         {
@@ -49,6 +49,24 @@ public sealed class SettingsWindowContractTests
             {
                 window.Close();
                 UiText.Apply(originalLanguage);
+            }
+
+            using var mainViewModel = new MainWindowViewModel(
+                new FakeApplication(),
+                synchronizationContext: null);
+            var mainWindow = new MainWindow(mainViewModel);
+            mainWindow.Show();
+            try
+            {
+                mainWindow.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                var progress = Assert.Single(FindVisualChildren<ProgressBar>(mainWindow));
+                Assert.False(progress.IsHitTestVisible);
+                Assert.False(progress.Focusable);
+                Assert.Single(FindVisualChildren<Image>(mainWindow));
+            }
+            finally
+            {
+                mainWindow.Close();
             }
         });
     }

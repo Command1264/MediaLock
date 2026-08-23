@@ -81,6 +81,13 @@ main-window minimum-size layout, keyboard focus, Settings scrolling/dragging/Can
 Settings is open, a direct Alt+Tab-close foreground return, notification-area lifecycle and one routed Play/Pause
 without duplicate action.
 
+Phase 7C tests bounded artwork validation independently from WinRT, target-owned artwork/timeline projection and
+deterministic playing-position interpolation with a fake `TimeProvider`. WPF coverage verifies that the current-target
+surface contains a non-interactive progress indicator and optional artwork presentation. Manual coverage uses Brave
+YouTube and YouTube Music to verify artwork changes, play/pause timeline behavior, Session recreation, Light/Dark,
+English/Traditional Chinese and unchanged single-dispatch media-key routing. Seek is recorded only as a separate
+capability probe and is not part of the production UI.
+
 ### Integration tests
 
 Cover:

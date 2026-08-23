@@ -9,6 +9,94 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public void NowPlayingUsesTheRoutedTargetAndInterpolatesOnlyWhilePlaying()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-23T06:00:00Z");
+        var clock = new TestTimeProvider(observedAt.AddSeconds(5));
+        Assert.True(MediaArtwork.TryCreate([0xFF, 0xD8, 0xFF, 0x01], out var artwork));
+        var routed = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave.Music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            observedAt,
+            Metadata: new MediaMetadata("Song", "Artist", null, null),
+            Timeline: new MediaTimeline(
+                TimeSpan.Zero,
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(30),
+                observedAt),
+            Artwork: artwork);
+        var selectedOnly = new MediaSessionSnapshot(
+            new SessionKey("video"),
+            "Brave",
+            PlaybackStatus.Paused,
+            MediaCommandCapabilities.All,
+            observedAt,
+            Metadata: new MediaMetadata("Other", "Publisher", null, null));
+        var application = new FakeApplication(new MediaLockApplicationState(
+            RouterState.Initial with
+            {
+                Sessions = [routed, selectedOnly],
+                WindowsCurrentSession = routed.Key,
+                Revision = 1,
+            }));
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            timeProvider: clock);
+        viewModel.SelectedSession = Assert.Single(viewModel.Sessions, item => item.Key == selectedOnly.Key);
+
+        viewModel.RefreshTimeline();
+
+        Assert.Equal("Song", viewModel.NowPlayingTitle);
+        Assert.Equal("Artist", viewModel.NowPlayingArtist);
+        Assert.Same(artwork, viewModel.NowPlayingArtwork);
+        Assert.True(viewModel.HasNowPlayingTimeline);
+        Assert.Equal("0:35", viewModel.NowPlayingElapsed);
+        Assert.Equal("3:00", viewModel.NowPlayingDuration);
+        Assert.Equal(35d / 180d, viewModel.NowPlayingProgress, precision: 6);
+
+        application.Publish(new MediaLockApplicationState(
+            application.State.Router with
+            {
+                Sessions = [routed with { PlaybackStatus = PlaybackStatus.Paused }],
+                Revision = 2,
+            }));
+        clock.Advance(TimeSpan.FromSeconds(20));
+        viewModel.RefreshTimeline();
+
+        Assert.Equal("0:30", viewModel.NowPlayingElapsed);
+    }
+
+    [Fact]
+    public void InvalidOrMissingTimelineIsHiddenAndCannotRetainThePreviousTarget()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-23T06:00:00Z");
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave.Music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            observedAt,
+            Timeline: new MediaTimeline(
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(2),
+                observedAt));
+        var application = new FakeApplication(StateWith(session));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.False(viewModel.HasNowPlayingTimeline);
+
+        application.Publish(MediaLockApplicationState.Initial);
+
+        Assert.Null(viewModel.NowPlayingArtwork);
+        Assert.False(viewModel.HasNowPlayingTimeline);
+        Assert.Equal(string.Empty, viewModel.NowPlayingElapsed);
+    }
+
+    [Fact]
     public async Task SettingsCommandUsesTheDesktopNavigationSeam()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
@@ -311,5 +399,14 @@ public sealed class MainWindowViewModelTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class TestTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        private DateTimeOffset current = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => current;
+
+        public void Advance(TimeSpan amount) => current += amount;
     }
 }

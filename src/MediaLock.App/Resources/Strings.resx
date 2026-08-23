@@ -13,6 +13,8 @@
   <data name="Main_RoutingStatus" xml:space="preserve"><value>Routing status</value></data>
   <data name="Main_StatusFormat" xml:space="preserve"><value>Status: {0}</value></data>
   <data name="Main_CurrentTarget" xml:space="preserve"><value>Current media target</value></data>
+  <data name="Main_Artwork" xml:space="preserve"><value>Current media artwork</value></data>
+  <data name="Main_PlaybackProgress" xml:space="preserve"><value>Current media playback progress</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>Open Media Lock settings</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>

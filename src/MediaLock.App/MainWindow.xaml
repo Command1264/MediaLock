@@ -40,13 +40,51 @@
 
         <StackPanel Grid.Row="1">
             <Border Margin="0,0,0,12" Style="{StaticResource CardStyle}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SecondaryTextStyle}"
-                               Text="{loc:Translate Main_CurrentTarget}" />
-                    <TextBlock Margin="0,5,0,0" FontFamily="Segoe UI Variable Display, Segoe UI"
-                               FontSize="21" FontWeight="SemiBold" Text="{Binding TargetDescription}"
-                               TextTrimming="CharacterEllipsis" />
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="96" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Width="88" Height="88" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Border Background="{DynamicResource SubtleBrush}" CornerRadius="8" />
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontFamily="Segoe Fluent Icons, Segoe UI Symbol" FontSize="30"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Text="&#xE8D6;" />
+                        <Image AutomationProperties.Name="{loc:Translate Main_Artwork}"
+                               Source="{Binding NowPlayingArtwork, Converter={StaticResource MediaArtworkImageConverter}}"
+                               Stretch="UniformToFill">
+                            <Image.Clip>
+                                <RectangleGeometry Rect="0,0,88,88" RadiusX="8" RadiusY="8" />
+                            </Image.Clip>
+                        </Image>
+                    </Grid>
+                    <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                   Text="{loc:Translate Main_CurrentTarget}" />
+                        <TextBlock Margin="0,4,0,0" FontFamily="Segoe UI Variable Display, Segoe UI"
+                                   FontSize="20" FontWeight="SemiBold" Text="{Binding TargetDescription}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Margin="0,3,0,0" Style="{StaticResource SecondaryTextStyle}"
+                                   Text="{Binding NowPlayingArtist}" TextTrimming="CharacterEllipsis" />
+                        <Grid Margin="0,10,0,0"
+                              Visibility="{Binding HasNowPlayingTimeline, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ProgressBar Grid.Row="0" Maximum="1"
+                                         Value="{Binding NowPlayingProgress, Mode=OneWay}"
+                                         IsHitTestVisible="False" Focusable="False"
+                                         AutomationProperties.Name="{loc:Translate Main_PlaybackProgress}" />
+                            <Grid Grid.Row="1" Margin="0,5,0,0">
+                                <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                           FontSize="11" Text="{Binding NowPlayingElapsed}" />
+                                <TextBlock HorizontalAlignment="Right" Style="{StaticResource SecondaryTextStyle}"
+                                           FontSize="11" Text="{Binding NowPlayingDuration}" />
+                            </Grid>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Border>
             <Border Margin="0,0,0,12">
                 <Border.Style>

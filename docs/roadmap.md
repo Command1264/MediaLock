@@ -152,3 +152,16 @@ Exit criteria:
 ### Phase 7C — Now Playing artwork and timeline
 
 Evaluate artwork and timeline presentation first; seek remains separately gated on real GSMTC capability evidence.
+
+Exit criteria:
+
+- The resolved routing target, rather than the merely selected Session, owns the displayed artwork and timeline.
+- JPEG and PNG artwork is size-bounded, cached between metadata changes and treated as optional presentation data;
+  missing, malformed or unreadable artwork cannot interrupt catalog refresh, Recovery or command routing.
+- A valid timeline displays elapsed and total time. Playing position advances from the immutable GSMTC observation,
+  while paused, stopped, missing and invalid timelines remain stable or hidden and every value is clamped to bounds.
+- Target change, Session recreation and target loss cannot retain stale artwork or timeline state.
+- English and Traditional Chinese, Light and Dark, supported minimum size and physical-media-key routing pass the
+  focused desktop smoke test.
+- Seek is not exposed until Brave YouTube and YouTube Music provide separate real-session capability and acceptance
+  evidence.
