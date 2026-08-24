@@ -300,6 +300,19 @@ changes, Recovery, suspend/resume and shutdown cannot leave stale metadata or a 
 documented as limited or rejected; a separate Media Lock-owned on-screen display may later provide guaranteed visual
 feedback, but it must not be described as the Windows native media surface.
 
+#### Installable Windows package
+
+Media Lock `0.3.x` may add an unsigned per-user installer beside, not in place of, the supported portable ZIP. The
+installer must require no elevation, use a stable `%LocalAppData%\Programs\MediaLock\` path, create one current-user
+Start Menu entry for Windows Search, register one Installed apps uninstall entry and preserve user data by default.
+Installer and ZIP must contain the same reviewed payload and carry independent hashes tied to the same source commit.
+
+Login startup remains an explicit Settings choice. In-place upgrades must preserve its exact executable command, while
+uninstall may remove only a matching installed-path value and must not disturb a portable copy. Until a trusted signing
+path is separately approved, documentation must identify both installer and executable as unsigned and must not imply
+that installer format suppresses SmartScreen or Smart App Control. Portable distribution remains available until
+clean-Windows upgrade, rollback and uninstall evidence passes.
+
 ### v1.0
 
 Stabilized Session Lock, App Lock, rules, browser integration, tray control, recovery, startup, logging and settings

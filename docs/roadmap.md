@@ -456,6 +456,14 @@ supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSI
 selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
 The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
 
+Status: planning complete; implementation awaiting approval. The proposed decision is a per-user Inno Setup EXE at a
+stable `%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. MSIX is deferred while
+direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
+enterprise deployment or repair becomes a concrete requirement. See the
+[Phase 12A plan](phase-12/installable-package-plan.md),
+[packaging ADR](adr/0004-use-inno-setup-for-first-installer.md) and
+[official-source comparison](research/windows-installation-packaging-options.md).
+
 ### Phase 12B — Footprint measurement and optimization
 
 Measure the compressed archive, single-file executable, managed framework, native WPF/WinRT payload and runtime

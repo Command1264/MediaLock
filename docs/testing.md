@@ -190,6 +190,19 @@ competing ordinary YouTube Session through reload/Recovery, target changes, lock
 named Windows builds. A passing adapter lifecycle does not imply current-session selection. Phase 11C is blocked unless
 the evidence supports a precise compatibility claim; unreliable selection produces a limit or reject record instead.
 
+Phase 12A tests the installer and portable archive as two containers around one reviewed payload. Packaging coverage
+first makes the fixed Inno `AppId`, per-user privilege mode, stable install directory, Start Menu shortcut and uninstall
+metadata requirements fail, then verifies both artifacts record the same payload hash and source commit. The release
+command must retain dirty/changing-source rejection, refuse partial final output, independently verify every digest and
+fail clearly when the pinned Inno compiler is absent or unexpected. Startup tests cover exact quoted-command matching
+and prove uninstall cannot remove a Run value owned by a portable executable.
+
+The clean-Windows Phase 12A gate starts from an ordinary user and separately records cold install, Search launch,
+Installed apps metadata, runtime smoke, opt-in login startup, previous-version in-place upgrade, controlled
+cancellation/failure, supported downgrade or an actionable block, uninstall with retained user data, and portable
+coexistence. Installer, ZIP, source commit and Windows build evidence are inseparable. An unsigned Setup remains an
+explicit test fact, and observed Inno behavior must not be generalized into MSI-level transactional rollback.
+
 ### Integration tests
 
 Cover:
