@@ -365,6 +365,11 @@ input first, drains or cancels routing work, persists state, removes subscriptio
 The same root injects the Windows environment and desktop-support adapters into Settings; tests replace both through
 their public seams without launching Explorer, a browser or the Clipboard.
 
+An installer-only `--uninstall-cleanup` command is handled before single-instance, GSMTC, tray or input initialization.
+It delegates to the Windows startup adapter, which removes the current-user Run value only when its complete quoted
+command matches the executing installed path. Missing or portable-owned values are preserved. The command produces no
+desktop UI and reports cleanup failure through its process exit code for the uninstaller.
+
 ## 11. Publication
 
 The release candidate targets `win-x64`, self-contained, single-file publication. Single-file output can be larger

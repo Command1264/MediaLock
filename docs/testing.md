@@ -203,6 +203,13 @@ cancellation/failure, supported downgrade or an actionable block, uninstall with
 coexistence. Installer, ZIP, source commit and Windows build evidence are inseparable. An unsigned Setup remains an
 explicit test fact, and observed Inno behavior must not be generalized into MSI-level transactional rollback.
 
+The initial implementation pins official Inno Setup `6.7.3`. Local RED → GREEN evidence covers owned and nonowned
+startup values, early non-UI cleanup command parsing, isolated ZIP/Setup publication, schema-2 manifest hashes and
+unsigned installer metadata. A reversible current-user transaction smoke installed without elevation, created the
+fixed executable/Start Menu/Installed apps entries, removed an owned Run value, preserved a portable-owned value and
+left existing user data intact after uninstall. This host evidence does not replace the remaining clean-Windows,
+upgrade, downgrade or full runtime matrix.
+
 ### Integration tests
 
 Cover:

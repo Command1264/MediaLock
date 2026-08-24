@@ -6,6 +6,10 @@ The release under validation is stable `0.2.0`, targeting `win-x64` as a self-co
 It promotes the behavior validated in `0.2.0-rc.3` without adding product features. Volume, customizable shortcuts,
 Playback State Lock, Windows Media Surface Mirror and browser integration remain outside this release.
 
+The published `v0.2.0` assets remain frozen and portable-only. On `develop`, Phase 12A extends the same command to
+produce an unpublic per-user installer for the next release. Re-running the command with version `0.2.0` is development
+evidence only and must not mutate or be attached to the existing GitHub Release.
+
 The release is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. The earlier formal
 `0.2.0-rc.1` and `0.2.0-rc.2` passed their own clean-environment gates. Their evidence does not transfer to
@@ -22,6 +26,7 @@ Prerequisites:
 - Windows x64.
 - PowerShell 7.
 - The .NET SDK selected by `global.json` (`10.0.400`, with latest-patch roll-forward).
+- Official Inno Setup `6.7.3`; the publish command rejects an absent or different compiler version.
 - A clean Git worktree at the reviewed source commit.
 
 Run the automated local gate:
@@ -50,24 +55,31 @@ Expected files:
 - `artifacts\MediaLock-0.2.0-win-x64.zip`
 - `artifacts\MediaLock-0.2.0-win-x64.manifest.json`
 - `artifacts\MediaLock-0.2.0-win-x64.sha256`
+- `artifacts\MediaLock-Setup-0.2.0-win-x64.exe`
+- `artifacts\MediaLock-Setup-0.2.0-win-x64.sha256`
 
-The ZIP must contain exactly one file named `MediaLock.exe`. The manifest is the source of truth for version, source
-commit, SDK, RID, dirty/signing state and archive size/hash.
+The ZIP must contain exactly one file named `MediaLock.exe`. Manifest schema 2 is the source of truth for version,
+source commit, SDK, Inno version, RID, dirty/signing state, payload hash and each container's size/hash. ZIP and Setup
+must be produced from that one staged payload; neither may independently rebuild it.
 
 ## Verify a transferred artifact
 
-Place the three files in one directory and run:
+Place all five files in one directory and run:
 
 ```powershell
 $archive = '.\MediaLock-0.2.0-win-x64.zip'
+$installer = '.\MediaLock-Setup-0.2.0-win-x64.exe'
 $manifest = Get-Content '.\MediaLock-0.2.0-win-x64.manifest.json' -Raw | ConvertFrom-Json
-$actualHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-$actualHash
+$archiveHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+$installerHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+$archiveHash
 $manifest.archive.sha256
+$installerHash
+$manifest.installer.sha256
 ```
 
-The two values must match before extraction. A formal release also requires `sourceDirty: false`, `signed: false`,
-`runtimeIdentifier: win-x64`, `selfContained: true` and `singleFile: true`.
+Each pair must match before extraction or installation. A formal release also requires `sourceDirty: false`, both
+payload and installer `signed: false`, `runtimeIdentifier: win-x64`, `selfContained: true` and `singleFile: true`.
 
 ## Host smoke test
 
@@ -83,10 +95,22 @@ The two values must match before extraction. A formal release also requires `sou
 
 Record Windows build, artifact hash, manifest source commit, actual results and any warning shown.
 
+### Installer transaction smoke test
+
+1. Confirm no installed Media Lock entry or fixed install directory already exists; preserve any unrelated portable
+   process and startup value instead of overwriting them.
+2. Run Setup as the current user and confirm no UAC, one
+   `%LocalAppData%\Programs\MediaLock\MediaLock.exe`, one Start Menu shortcut and one Installed apps entry.
+3. Confirm the installed ProductVersion, default-disabled login startup and retained `%LocalAppData%\MediaLock\` data.
+4. Enable login startup, uninstall, and confirm only the exact installed-path Run value is removed.
+5. Repeat with a Run value pointing to a portable path; uninstall must preserve that value. Remove only the exact test
+   value after recording the assertion.
+6. Confirm program files, shortcut and uninstall entry are gone while user data remains.
+
 ## Clean supported Windows gate
 
-Use Windows Sandbox or a disposable x64 Windows VM that has not built Media Lock. Transfer only the three artifact
-files, verify the hash, then repeat the host smoke test items that do not require preinstalled media applications:
+Use Windows Sandbox or a disposable x64 Windows VM that has not built Media Lock. Transfer the five artifact files,
+verify both container hashes, then repeat the host smoke test items that do not require preinstalled media applications:
 
 - cold start without a separately installed .NET runtime;
 - one window/process/icon after second launch;
@@ -99,10 +123,12 @@ enumeration and one routed command. A host-only pass is not a clean-environment 
 
 ## Rollback and cleanup
 
-Media Lock is portable in layout and has no installer transaction. To roll back, exit the release and start the
-previous trusted executable. Preserve `%LocalAppData%\MediaLock\` before investigating a failure; do not delete user
-settings as a routine rollback step. If login startup was enabled, disable it from the running release before
-rollback or remove only the exact current-user `MediaLock` startup entry after confirming its target.
+The ZIP remains portable and has no installer transaction. To roll it back, exit the release and start the previous
+trusted executable. An installed release uses same-`AppId`, same-directory replacement; its previous-version upgrade
+and supported downgrade require separate Sandbox evidence. In either path, preserve `%LocalAppData%\MediaLock\`
+before investigating a failure and do not delete user settings as routine rollback. If login startup was enabled,
+disable it from the running release before rollback or remove only the exact current-user `MediaLock` startup entry
+after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
 approval after all release gates pass. That approval was granted for `0.2.0`: the GPG-signed annotated `v0.2.0` tag

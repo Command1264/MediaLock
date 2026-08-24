@@ -75,16 +75,19 @@ Session 的來源應用程式，並在該應用程式的候選 Sessions 間依�
 
 ## 建立 Release Artifact
 
-Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manifest 與 SHA-256：
+本地封裝命令會從乾淨 Git commit 產生共用同一 `MediaLock.exe` payload 的 portable ZIP 與 per-user
+Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.json` 指定的 .NET SDK，建置主機需要
+官方 Inno Setup `6.7.3`；這只是 build-only 工具，使用者不需要安裝它。
 
 ```powershell
 & .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0
 ```
 
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
-官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。目前公開的
+官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`，Setup 預設安裝至
+`%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。目前公開的
 `0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
-Windows Sandbox gate，沒有沿用 RC3 證據。完整驗證、證據與回復流程見
+Windows Sandbox gate，仍然只發布既有 portable ZIP；Phase 12A 產生的 installer 尚未公開。完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
 [0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。正式版透過

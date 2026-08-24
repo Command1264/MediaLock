@@ -6,8 +6,8 @@ Add a per-user Inno Setup installer beside the existing portable ZIP. A successf
 11 user install Media Lock without elevation, find it through Windows Search, upgrade it in place, remove it through
 Installed apps and retain a valid optional login-startup path.
 
-This plan does not authorize implementation, install Inno Setup, add a production dependency, publish an artifact or
-change the public release. Those operations begin only after the proposed packaging decision is approved.
+Implementation was approved on 2026-08-25. Public artifact publication, signing, tag and Release changes remain
+separately authorized operations. Inno Setup is a build-only tool and is not a Media Lock runtime dependency.
 
 ## Fixed product contract
 
@@ -24,6 +24,9 @@ change the public release. Those operations begin only after the proposed packag
   labeled and may be warned about or blocked by Windows security features.
 - Distribution: portable ZIP remains supported until the installed upgrade and rollback matrix passes in a clean
   Windows environment.
+- Installer language: the first package uses Inno Setup's official built-in English messages. Media Lock itself still
+  applies English or Traditional Chinese normally. A reviewed in-repository Traditional Chinese installer language
+  file may be added later; the build must not download an untrusted translation.
 
 ## Implementation slices
 

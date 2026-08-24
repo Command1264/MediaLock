@@ -1,6 +1,6 @@
 # Use Inno Setup for the first installable package
 
-Status: Proposed
+Status: Accepted on 2026-08-25
 
 ## Context
 
@@ -15,8 +15,7 @@ SmartScreen and signing limitations. The detailed comparison and primary-source 
 
 ## Decision
 
-Subject to implementation approval, use an Inno Setup per-user EXE installer for the first installable `0.3.x`
-package:
+Use an Inno Setup per-user EXE installer for the first installable `0.3.x` package:
 
 - install without elevation to `%LocalAppData%\Programs\MediaLock\`;
 - keep one permanent `AppId`, install scope and unversioned install directory across compatible `0.3.x` upgrades;

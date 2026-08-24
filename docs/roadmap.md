@@ -456,8 +456,11 @@ supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSI
 selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
 The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
 
-Status: planning complete; implementation awaiting approval. The proposed decision is a per-user Inno Setup EXE at a
-stable `%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. MSIX is deferred while
+Status: implementation in progress. The accepted decision is a per-user Inno Setup EXE at a stable
+`%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. The first RED → GREEN slices
+produce ZIP and Setup from one payload and protect startup cleanup from deleting a portable-owned Run value. Local
+silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
+default user-data retention; clean-Windows upgrade, downgrade and full runtime gates remain. MSIX is deferred while
 direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
 enterprise deployment or repair becomes a concrete requirement. See the
 [Phase 12A plan](phase-12/installable-package-plan.md),
