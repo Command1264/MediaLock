@@ -389,7 +389,8 @@ Phase 11 targets `0.3.0`. It does not mutate the published stable `0.2.0` releas
 Let the user explicitly choose Off or one-way Keep Playing for the current routed target without turning ordinary
 Play/Pause controls into an unbounded automation loop or adding a Keep Paused mode.
 
-Status: in progress on `codex/feat/phase-11a-playback-state-lock`.
+Status: complete. PR #35 integrated the one-way Keep Playing policy, repeated-pause escape hatch and named host
+validation into `develop` on 2026-08-25.
 
 Exit criteria:
 
@@ -417,7 +418,9 @@ Exit criteria:
 Measure whether a Media Lock-owned SMTC Session can make Windows' native media surface usefully reflect and control the
 routed target. This is a feasibility probe, not a production promise.
 
-Status: planned after Phase 11A.
+Status: complete on 2026-08-25 with a final **Limit** decision. The documented mirror synchronized target data and
+routed native-surface actions exactly once, but Windows did not reliably retain it as Current Session after control,
+unlock or sleep/resume. See [`phase-11/windows-media-surface-probe.md`](phase-11/windows-media-surface-probe.md).
 
 Exit criteria:
 
@@ -437,6 +440,10 @@ Proceed only if Phase 11B demonstrates reliable, supportable native-surface beha
 replaceable adapter, fake-driven Application coverage, self-session exclusion, accessibility/localization, stale-state
 cleanup and a documented compatibility boundary. If the probe fails, record the limitation and scope any Media Lock
 on-screen display as a separate feature rather than calling it native Windows synchronization.
+
+Status: not proceeding. Phase 11B could not establish the required Current Session persistence, so Media Lock does
+not ship or promise a native Windows media-surface replacement. A separately scoped best-effort mirror or Media Lock
+on-screen display would require a new product decision.
 
 ## Phase 12 — Distribution and footprint
 
