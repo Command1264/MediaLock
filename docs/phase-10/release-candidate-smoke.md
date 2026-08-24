@@ -114,4 +114,12 @@ No candidate may be called portable or published until both sections are complet
 
 ## Public publication
 
-Status: not authorized. Do not create a tag, GitHub Release or public asset from this record alone.
+Status: complete after separate approval on 2026-08-24.
+
+- PR #26 merged the reviewed release branch into `develop`; PR #27 synchronized it to `main`.
+- GPG-signed annotated tag `v0.2.0-rc.3` peels to candidate source commit
+  `10dbb5b1452fe27084a28e254388fe974ed277e6`.
+- The [public GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.3) contains exactly
+  one asset: `MediaLock-0.2.0-rc.3-win-x64.zip`, 78,676,125 bytes.
+- GitHub reports asset SHA-256 `ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a`,
+  matching the independently verified local artifact. The executable remains unsigned.

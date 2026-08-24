@@ -347,4 +347,6 @@ Exit criteria:
 Status: complete on 2026-08-24 for source commit `10dbb5b1452fe27084a28e254388fe974ed277e6` and archive
 SHA-256 `ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a`. All automated, isolated
 packaging, exact-artifact local-host and Windows Sandbox gates passed. The candidate remains unsigned; no tag, GitHub
-Prerelease or public artifact publication is implied by phase completion.
+Prerelease or public artifact publication is implied by phase completion. A separately approved publication operation
+later merged PR #26 into `develop`, synchronized PR #27 to `main`, created GPG-signed annotated tag `v0.2.0-rc.3` at
+the candidate source commit and published the verified ZIP as the sole asset of the public GitHub Prerelease.
