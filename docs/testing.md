@@ -150,6 +150,29 @@ Windows Sandbox results must independently match that commit and archive digest,
 surface, and confirm the existing single-instance, Settings, startup, tray, GSMTC and global-media-key paths. No
 `0.2.0-rc.1` or `0.2.0-rc.2` evidence transfers.
 
+Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off, both
+desired states and observed Playing, Paused, Stopped, Closed and unavailable states. It requires no correction for a
+matching observation, uses explicit Play/Pause for an opposite observation, and never restarts Stopped or Closed
+playback. Application tests use fake time and controller observations to prove captured-target protection, one
+in-flight correction, confirmation, bounded retry, exhaustion, Stop clearing, Next/Previous preservation and
+Play/Pause desired-state updates. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown
+must cancel or suspend pending work without dispatching to a competing Session. Process restart begins at Off.
+
+Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one visible policy state,
+stable geometry, accessibility names, keyboard operation and English/Traditional Chinese plus Light/Dark rendering.
+Hardware-assisted coverage uses YouTube Music and ordinary YouTube simultaneously. It changes playback both through
+Media Lock and outside it, then repeats Next, Previous, reload/Recovery, focus changes, lock/unlock, sleep/resume and
+physical Play/Pause. Evidence records every requested and observed transition; accepted GSMTC calls alone are not proof
+that the state was enforced.
+
+Phase 11B is a separately scoped feasibility test. Unit tests cover metadata/capability projection, event translation,
+self-session exclusion, target capture, one-dispatch behavior and disposal with a fake media-surface adapter. The
+Windows probe records whether the Media Lock SMTC Session exists, whether Windows makes it current, what the native
+surface renders, and which Session actually changes after each button or seek action. Test YouTube Music against a
+competing ordinary YouTube Session through reload/Recovery, target changes, lock/unlock, sleep/resume and shutdown on
+named Windows builds. A passing adapter lifecycle does not imply current-session selection. Phase 11C is blocked unless
+the evidence supports a precise compatibility claim; unreliable selection produces a limit or reject record instead.
+
 ### Integration tests
 
 Cover:

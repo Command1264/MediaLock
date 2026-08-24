@@ -350,3 +350,56 @@ packaging, exact-artifact local-host and Windows Sandbox gates passed. The candi
 Prerelease or public artifact publication is implied by phase completion. A separately approved publication operation
 later merged PR #26 into `develop`, synchronized PR #27 to `main`, created GPG-signed annotated tag `v0.2.0-rc.3` at
 the candidate source commit and published the verified ZIP as the sole asset of the public GitHub Prerelease.
+
+## Phase 11 — Playback intent and Windows media surface
+
+Phase 11 targets `0.3.0`. It does not mutate the published `0.2.0-rc.3` candidate or bypass the independent stable
+`0.2.0` release gate.
+
+### Phase 11A — Playback State Lock
+
+Let the user explicitly choose Off, Keep Playing or Keep Paused for the current routed target without turning ordinary
+Play/Pause controls into an unbounded automation loop.
+
+Status: planned.
+
+Exit criteria:
+
+- Core defines the three policy values and deterministic correction decisions without WPF or Windows dependencies.
+- Application arms the policy to a captured target, serializes observations and corrections, and sends only explicit
+  Play or Pause with `ExpectedTarget`; TogglePlayPause is never used for enforcement.
+- Play/Pause updates the Desired Playback State, Next/Previous preserves it, and Stop clears the lock before stopping.
+- Recovery may resume only for the Router-accepted successor. Fallback, unrelated target changes, ambiguity, catalog
+  loss, suspend and shutdown cannot redirect an enforcement command.
+- Correction confirmation and retry are bounded, observable and deterministically tested; Keep Playing does not restart
+  Stopped, Closed or naturally exhausted playback.
+- The current-target UI exposes Off and the active locked state in English/Traditional Chinese and Light/Dark without
+  resizing controls. The first version is not restored on process startup.
+- Real YouTube Music plus ordinary YouTube evidence covers external state changes, Next/Previous, Recovery, competing
+  sources, lock/unlock, sleep/resume, physical media keys and explicit Exit with no duplicate or competing action.
+
+### Phase 11B — Windows Media Surface Mirror probe
+
+Measure whether a Media Lock-owned SMTC Session can make Windows' native media surface usefully reflect and control the
+routed target. This is a feasibility probe, not a production promise.
+
+Status: planned after Phase 11A.
+
+Exit criteria:
+
+- The probe uses documented desktop SMTC interop and records Windows build, current-session identity, rendered metadata,
+  controls, timeline, button/seek events, Recovery and lifecycle outcomes separately.
+- Media Lock's own Session is excluded from the catalog and can never be selected as a routing target or create a
+  command feedback loop.
+- Each system-surface action enters the existing Application/Router path once and retains capture-time target identity.
+- The probe compares YouTube Music with a competing ordinary YouTube Session across target changes, reload, lock/unlock,
+  sleep/resume and process shutdown on named supported Windows builds.
+- Evidence ends in an explicit proceed, limit or reject decision. It does not infer that Media Lock controls Windows
+  Current Session merely because the mirror Session exists.
+
+### Phase 11C — Production mirror integration (conditional)
+
+Proceed only if Phase 11B demonstrates reliable, supportable native-surface behavior. Production work must add a
+replaceable adapter, fake-driven Application coverage, self-session exclusion, accessibility/localization, stale-state
+cleanup and a documented compatibility boundary. If the probe fails, record the limitation and scope any Media Lock
+on-screen display as a separate feature rather than calling it native Windows synchronization.
