@@ -51,7 +51,7 @@ public sealed class DiagnosticSummaryTests
             },
         };
 
-        var summary = DiagnosticSummary.Create(environment, state);
+        var summary = DiagnosticSummary.Create(environment, state, isMediaInputRunning: true);
 
         var expected = string.Join(
             Environment.NewLine,
@@ -64,7 +64,7 @@ public sealed class DiagnosticSummaryTests
             "Routing mode: PriorityRules",
             "Routing status: Recovering",
             "Media catalog: Reacquiring",
-            "Media-key interception: Enabled",
+            "Media-key interception: Active",
             "Session count: 1",
             "Recovery timeout: 30 seconds",
             "Fallback policy: Wait");
@@ -94,12 +94,38 @@ public sealed class DiagnosticSummaryTests
             },
         };
 
-        var summary = DiagnosticSummary.Create(environment, state);
+        var summary = DiagnosticSummary.Create(environment, state, isMediaInputRunning: false);
 
         Assert.Contains($"Release: Stable{Environment.NewLine}", summary, StringComparison.Ordinal);
         Assert.Contains($"Signature: Signed{Environment.NewLine}", summary, StringComparison.Ordinal);
         Assert.Contains("Media-key interception: Unknown", summary, StringComparison.Ordinal);
         Assert.Contains("Recovery timeout: Unknown", summary, StringComparison.Ordinal);
         Assert.Contains("Fallback policy: Unknown", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateReportsUnavailableWhenInterceptionIsEnabledButHookIsNotRunning()
+    {
+        var environment = new AppEnvironmentInfo(
+            "0.2.0-rc.3",
+            "Windows 11 Pro",
+            "25H2",
+            "26200.1000",
+            "X64",
+            IsSigned: false);
+        var state = MediaLockApplicationState.Initial with
+        {
+            Settings = MediaLockSettings.Default with
+            {
+                Desktop = MediaLockSettings.Default.Desktop! with
+                {
+                    InterceptMediaKeys = true,
+                },
+            },
+        };
+
+        var summary = DiagnosticSummary.Create(environment, state, isMediaInputRunning: false);
+
+        Assert.Contains("Media-key interception: Unavailable", summary, StringComparison.Ordinal);
     }
 }

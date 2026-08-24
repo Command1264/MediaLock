@@ -308,7 +308,7 @@ Exit criteria:
 - Settings contains one bilingual, themed About and diagnostics card within its existing scrolling modal surface.
 - Version, Windows product/display/build/architecture, prerelease/stable state and embedded-signature state are visible.
 - Copy diagnostics produces native-line-ending text from an explicit allowlist: environment, Routing Mode/status,
-  catalog status, media-key interception, Session count, Recovery timeout and Fallback Policy.
+  catalog status, actual media-key interception availability, Session count, Recovery timeout and Fallback Policy.
 - The standard summary omits media title, artist, account name, full path, persisted target identity and complete settings.
 - Open logs creates and opens the bounded log directory; Open support and Report a bug use the canonical GitHub pages.
 - External desktop actions are replaceable in tests and failures remain visible as localized actionable errors.

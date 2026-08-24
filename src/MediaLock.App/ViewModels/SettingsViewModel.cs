@@ -20,6 +20,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private readonly Action<string>? applyTheme;
     private readonly AppEnvironmentInfo environmentInfo;
     private readonly IDesktopSupportActions? desktopSupportActions;
+    private readonly Func<bool> isMediaInputRunning;
     private readonly AsyncCommand saveCommand;
     private bool closeToTray;
     private bool startWithWindows;
@@ -45,7 +46,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         Action<string>? applyLanguage = null,
         Action<string>? applyTheme = null,
         IAppEnvironmentInfoProvider? environmentInfoProvider = null,
-        IDesktopSupportActions? desktopSupportActions = null)
+        IDesktopSupportActions? desktopSupportActions = null,
+        Func<bool>? isMediaInputRunning = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
@@ -61,6 +63,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             "Unknown",
             IsSigned: false);
         this.desktopSupportActions = desktopSupportActions;
+        this.isMediaInputRunning = isMediaInputRunning ?? (() => false);
         saveCommand = new AsyncCommand(_ => SaveAsync(), _ => !HasErrors);
         SaveCommand = saveCommand;
         CancelCommand = new AsyncCommand(_ => CancelAsync());
@@ -357,7 +360,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         try
         {
             var summary = action == DesktopSupportAction.CopyDiagnostics
-                ? DiagnosticSummary.Create(environmentInfo, application.State)
+                ? DiagnosticSummary.Create(
+                    environmentInfo,
+                    application.State,
+                    isMediaInputRunning())
                 : null;
             await desktopSupportActions.ExecuteAsync(
                 new DesktopSupportRequest(action, summary),

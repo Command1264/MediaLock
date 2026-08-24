@@ -107,7 +107,8 @@ public partial class App : System.Windows.Application
                 UiText.Apply,
                 ApplyTheme,
                 environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
-                desktopSupportActions: new DesktopSupportActions());
+                desktopSupportActions: new DesktopSupportActions(),
+                isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true);
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;

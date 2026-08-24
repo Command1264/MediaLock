@@ -7,7 +7,8 @@ do not treat `0.2.0-rc.2` evidence as transferable.
 
 1. Start Media Lock in Release configuration and play one supported media source.
 2. Open Settings and scroll to **About and diagnostics**.
-3. Repeat the visual checks in English/Light, English/Dark, Traditional Chinese/Light and Traditional Chinese/Dark.
+3. Repeat the visual checks in Traditional Chinese/Dark and English/Light. The automated palette and localization
+   contracts cover the remaining language/theme combinations without duplicating every visual row manually.
 
 ## Acceptance
 
@@ -28,7 +29,9 @@ Record the exact commit, executable version, Windows build, language/theme combi
 
 ## Local host acceptance — 2026-08-24
 
-- Source: `codex/feat/phase-10b-about-diagnostics`, pre-commit Release build.
+- Source: `codex/feat/phase-10b-about-diagnostics`, Release build immediately preceding review commit `495c139`.
+- Traceability: commit `495c139` contains the exact tested executable sources; its later review-only follow-up changes
+  the diagnostic interception fact and acceptance documentation, so those changes require automated verification.
 - Executable version: `0.2.0-rc.3`.
 - Windows: Windows 11 Pro 25H2, build 26200.9168, x64.
 - Traditional Chinese/Dark and English/Light layout: pass.

@@ -36,7 +36,8 @@ public sealed class SettingsViewModelTests
         using var viewModel = new SettingsViewModel(
             application,
             environmentInfoProvider: environment,
-            desktopSupportActions: actions);
+            desktopSupportActions: actions,
+            isMediaInputRunning: () => true);
 
         await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
         var copyStatus = viewModel.SupportStatusMessage;
@@ -56,6 +57,7 @@ public sealed class SettingsViewModelTests
             actions.Requests,
             request => request.Action == DesktopSupportAction.CopyDiagnostics);
         Assert.Contains("Version: 0.2.0-rc.3", copied.DiagnosticSummary, StringComparison.Ordinal);
+        Assert.Contains("Media-key interception: Active", copied.DiagnosticSummary, StringComparison.Ordinal);
         Assert.DoesNotContain("Private title", copied.DiagnosticSummary, StringComparison.Ordinal);
         Assert.DoesNotContain("Private artist", copied.DiagnosticSummary, StringComparison.Ordinal);
         Assert.NotNull(copyStatus);

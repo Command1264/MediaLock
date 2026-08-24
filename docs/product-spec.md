@@ -133,8 +133,9 @@ Settings ends with one About and diagnostics card. It shows the executable versi
 and architecture, prerelease/stable state, and whether the executable contains an Authenticode signature. It can
 copy a privacy-safe diagnostic summary, open the bounded log directory, open support, or open the canonical bug
 form. The summary contains environment, routing, catalog, interception and Recovery facts, but excludes media title,
-artist, account name, full path, complete settings and persisted target identity. It uses the host operating system's
-native line separator and explicitly asks the user to review the text before sharing.
+artist, account name, full path, complete settings and persisted target identity. Media-key interception distinguishes
+an active hook from an enabled setting whose hook is unavailable. The summary uses the host operating system's native
+line separator and explicitly asks the user to review the text before sharing.
 
 Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while

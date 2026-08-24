@@ -6,7 +6,8 @@ public static class DiagnosticSummary
 {
     public static string Create(
         AppEnvironmentInfo environment,
-        MediaLockApplicationState state)
+        MediaLockApplicationState state,
+        bool isMediaInputRunning)
     {
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(state);
@@ -24,7 +25,7 @@ public static class DiagnosticSummary
             $"Routing mode: {state.Router.Mode}",
             $"Routing status: {state.Router.Status}",
             $"Media catalog: {state.CatalogStatus}",
-            $"Media-key interception: {FormatBoolean(desktop?.InterceptMediaKeys)}",
+            $"Media-key interception: {FormatInterception(desktop?.InterceptMediaKeys, isMediaInputRunning)}",
             $"Session count: {state.Router.Sessions.Length}",
             $"Recovery timeout: {FormatTimeout(recovery?.Timeout)}",
             $"Fallback policy: {recovery?.FallbackPolicy.ToString() ?? "Unknown"}",
@@ -42,9 +43,10 @@ public static class DiagnosticSummary
             $"(build {environment.WindowsBuild})";
     }
 
-    private static string FormatBoolean(bool? value) => value switch
+    private static string FormatInterception(bool? enabled, bool isRunning) => enabled switch
     {
-        true => "Enabled",
+        true when isRunning => "Active",
+        true => "Unavailable",
         false => "Disabled",
         null => "Unknown",
     };
