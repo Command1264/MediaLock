@@ -13,6 +13,7 @@ namespace MediaLock.App.ViewModels;
 
 public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataErrorInfo, IDisposable
 {
+    private static readonly TimeSpan SupportStatusDuration = TimeSpan.FromSeconds(5);
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly Action? requestClose;
@@ -35,6 +36,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
     private string? supportStatusMessage;
+    private CancellationTokenSource? supportStatusCancellation;
     private string? selectedAvailableApplication;
     private MediaLockSettings? appliedSettings;
     private bool disposed;
@@ -283,6 +285,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
         application.StateChanged -= OnApplicationStateChanged;
         UiText.CultureChanged -= OnCultureChanged;
+        ClearSupportStatus();
         disposed = true;
     }
 
@@ -309,6 +312,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             applyLanguage?.Invoke(SelectedLanguage);
             applyTheme?.Invoke(SelectedTheme);
             ErrorMessage = null;
+            ClearSupportStatus();
             requestClose?.Invoke();
         }
         catch (Exception exception)
@@ -328,6 +332,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     {
         Apply(application.State.Settings);
         ErrorMessage = null;
+        ClearSupportStatus();
     }
 
     private void OnCultureChanged(object? sender, EventArgs args)
@@ -335,12 +340,22 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {
-            synchronizationContext.Post(_ => RefreshLocalizedOptions(), null);
+            synchronizationContext.Post(_ => RefreshLocalizedPresentation(), null);
             return;
         }
 
+        RefreshLocalizedPresentation();
+    }
+
+    private void RefreshLocalizedPresentation()
+    {
         RefreshLocalizedOptions();
         OnPropertyChanged(nameof(ReleaseStatusText));
+        if (SupportStatusMessage is not null)
+        {
+            SupportStatusMessage = UiText.Get("Settings_DiagnosticsCopied");
+        }
+
         if (HasErrors)
         {
             recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
@@ -369,14 +384,58 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
                 new DesktopSupportRequest(action, summary),
                 CancellationToken.None);
             ErrorMessage = null;
-            SupportStatusMessage = action == DesktopSupportAction.CopyDiagnostics
-                ? UiText.Get("Settings_DiagnosticsCopied")
-                : null;
+            if (action == DesktopSupportAction.CopyDiagnostics)
+            {
+                ShowSupportStatus(UiText.Get("Settings_DiagnosticsCopied"));
+            }
+            else
+            {
+                ClearSupportStatus();
+            }
         }
         catch (Exception exception)
         {
-            SupportStatusMessage = null;
+            ClearSupportStatus();
             ErrorMessage = UiText.Format("Settings_SupportActionFailed", exception.Message);
+        }
+    }
+
+    private void ShowSupportStatus(string message)
+    {
+        ClearSupportStatus();
+        SupportStatusMessage = message;
+        var cancellation = new CancellationTokenSource();
+        supportStatusCancellation = cancellation;
+        _ = ClearSupportStatusAfterDelayAsync(cancellation);
+    }
+
+    private void ClearSupportStatus()
+    {
+        var cancellation = supportStatusCancellation;
+        supportStatusCancellation = null;
+        cancellation?.Cancel();
+        SupportStatusMessage = null;
+    }
+
+    private async Task ClearSupportStatusAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(SupportStatusDuration, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(supportStatusCancellation, cancellation))
+            {
+                supportStatusCancellation = null;
+                SupportStatusMessage = null;
+            }
+
+            cancellation.Dispose();
         }
     }
 

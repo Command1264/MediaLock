@@ -6,21 +6,26 @@ after the release source commit is reviewed and clean.
 ## Candidate identity
 
 - Version: `0.2.0-rc.3`.
-- Source commit: `0431eeedd6858901c0e9e189fa3344d3fa2455a9`.
+- Source commit: pending replacement candidate.
 - Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
 - Single-file: must be `true`.
 - Signed: expected `false`; verify Authenticode independently.
-- Archive: `MediaLock-0.2.0-rc.3-win-x64.zip`; 78,676,024 bytes.
-- Archive SHA-256: `b8e6c0b7b8dd734ec7ab5b7a811ee786a8181f43322bf38f36ac0bc06a1bf157`.
+- Archive: `MediaLock-0.2.0-rc.3-win-x64.zip`; replacement size pending.
+- Archive SHA-256: pending replacement candidate.
+
+The earlier artifact from source `0431eeedd6858901c0e9e189fa3344d3fa2455a9` and SHA-256
+`b8e6c0b7b8dd734ec7ab5b7a811ee786a8181f43322bf38f36ac0bc06a1bf157` was superseded after Sandbox validation
+found that the copied-diagnostics confirmation did not expire or clear with Settings. Its evidence is historical only.
 
 Before host testing, independently recompute the digest, compare the manifest and checksum, expand exactly one
 `MediaLock.exe`, and record ProductVersion, FileVersion and Authenticode status.
 
 ## Local host smoke
 
-Status: passed on Windows 11 Pro 25H2, build `26200.9168`, 64-bit, for the exact commit and digest above.
+Status: pending for the replacement commit and digest. The observations below belong to the superseded artifact and
+must be repeated before publication.
 
 The host used an ASUS ROG STRIX FLARE keyboard, a regular Brave YouTube source and the Brave YouTube Music PWA.
 Priority Rules resolved YouTube Music while the competing regular YouTube source remained available.
@@ -62,7 +67,7 @@ Observed results:
 
 ## Windows Sandbox gate
 
-Status: pending for the exact commit and digest above.
+Status: pending for the replacement commit and digest.
 
 Transfer only the ZIP, manifest and checksum into a fresh Windows Sandbox. Record Windows caption/display version/full
 build/architecture and verify:

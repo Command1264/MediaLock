@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -7,6 +8,7 @@ using Xunit;
 
 namespace MediaLock.App.Tests;
 
+[Collection("Localization")]
 public sealed class SettingsViewModelTests
 {
     [Fact]
@@ -62,6 +64,76 @@ public sealed class SettingsViewModelTests
         Assert.DoesNotContain("Private artist", copied.DiagnosticSummary, StringComparison.Ordinal);
         Assert.NotNull(copyStatus);
         Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CopiedDiagnosticsConfirmationExpires()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await Task.Delay(TimeSpan.FromSeconds(5.5));
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task CancelingSettingsClearsCopiedDiagnosticsConfirmation()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await viewModel.CancelCommand.ExecuteAsync(null);
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task SavingSettingsClearsCopiedDiagnosticsConfirmation()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task VisibleCopiedDiagnosticsConfirmationUsesTheCurrentLanguage()
+    {
+        UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        try
+        {
+            var application = new FakeApplication(MediaLockApplicationState.Initial);
+            using var viewModel = new SettingsViewModel(
+                application,
+                desktopSupportActions: new FakeDesktopSupportActions());
+
+            await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+            Assert.Equal(
+                "Diagnostics copied. Review the text before sharing it.",
+                viewModel.SupportStatusMessage);
+
+            UiText.Apply(UiLanguagePreference.TraditionalChinese);
+
+            Assert.Equal(
+                "已複製診斷摘要。分享前請先檢閱內容。",
+                viewModel.SupportStatusMessage);
+        }
+        finally
+        {
+            UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        }
     }
 
     [Fact]

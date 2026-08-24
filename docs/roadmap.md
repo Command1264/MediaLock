@@ -312,6 +312,7 @@ Exit criteria:
 - The standard summary omits media title, artist, account name, full path, persisted target identity and complete settings.
 - Open logs creates and opens the bounded log directory; Open support and Report a bug use the canonical GitHub pages.
 - External desktop actions are replaceable in tests and failures remain visible as localized actionable errors.
+- Successful copy confirmation follows live language changes and clears after five seconds or when Settings closes.
 - Light/Dark, English/Traditional Chinese, keyboard focus, automation names and narrow wrapped button layout pass the
   documented manual and automated checks.
 - Repository Topics describe the actual Windows/.NET/WPF/GSMTC/media-routing scope without exceeding GitHub limits.
