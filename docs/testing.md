@@ -218,8 +218,14 @@ The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
 `6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched
 the installed payload hash, created the Start Menu and Installed apps entries without enabling startup by default,
 removed an installer-owned startup value, preserved a portable-owned startup value, retained user data and finished
-with no Media Lock process. This result covers the scripted install/uninstall transaction only; Search launch, full
+with no Media Lock process. This result covers the scripted install/uninstall transaction only; indexed Search, full
 runtime/media behavior, actual login restart, upgrade, downgrade and controlled cancellation remain separate gates.
+
+The same artifact also passed a visible ordinary-user Sandbox smoke: the English Setup wizard opened without UAC,
+used the fixed per-user destination, launched without a separate .NET installation prompt, opened Settings, appeared
+in the Windows search panel and restored the existing process, and exposed a notification-area icon that restored the
+window on double-click. Windows Sandbox reported that search indexing was disabled, so indexed keyword search remains
+a host/manual gate rather than an inferred pass from the visible shortcut.
 
 ### Integration tests
 
