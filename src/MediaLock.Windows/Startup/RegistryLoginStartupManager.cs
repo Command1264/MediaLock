@@ -67,4 +67,18 @@ public sealed class RegistryLoginStartupManager : ILoginStartupManager
 
         return ValueTask.CompletedTask;
     }
+
+    public ValueTask<bool> RemoveIfOwnedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var key = root.OpenSubKey(subKeyPath, writable: true);
+        if (key?.GetValue(valueName) is not string configured ||
+            !string.Equals(configured, command, StringComparison.Ordinal))
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        key.DeleteValue(valueName, throwOnMissingValue: false);
+        return ValueTask.FromResult(true);
+    }
 }

@@ -5,6 +5,15 @@ namespace MediaLock.App.Tests;
 
 public sealed class AppDiagnosticTests
 {
+    [Theory]
+    [InlineData("--uninstall-cleanup")]
+    [InlineData("--UNINSTALL-CLEANUP")]
+    public void UninstallCleanupCommandIsHandledBeforeDesktopStartup(string argument)
+    {
+        Assert.True(App.IsUninstallCleanupCommand([argument]));
+        Assert.False(App.IsUninstallCleanupCommand(["--startup"]));
+    }
+
     [Fact]
     public async Task InputHookStartedDiagnosticFailureIsContained()
     {

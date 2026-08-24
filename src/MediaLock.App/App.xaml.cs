@@ -43,6 +43,23 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (IsUninstallCleanupCommand(e.Args))
+        {
+            try
+            {
+                await new RegistryLoginStartupManager().RemoveIfOwnedAsync(
+                    CancellationToken.None);
+                Shutdown();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Trace.TraceError(exception.ToString());
+                Shutdown(1);
+            }
+
+            return;
+        }
+
         UiText.Apply(UiLanguagePreference.System);
         ApplyTheme(UiThemePreference.System);
 
@@ -158,6 +175,9 @@ public partial class App : System.Windows.Application
             Shutdown(1);
         }
     }
+
+    internal static bool IsUninstallCleanupCommand(IReadOnlyList<string> arguments) =>
+        arguments.Contains("--uninstall-cleanup", StringComparer.OrdinalIgnoreCase);
 
     private void OnMainWindowClosing(object? sender, CancelEventArgs e)
     {
