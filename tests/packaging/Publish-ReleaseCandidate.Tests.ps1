@@ -85,6 +85,36 @@ try {
     Assert-VersionReachesDirtySourceGuard `
         $publishScript '0.2.0-rc.99' $artifactOutputRoot $InnoCompilerPath
 
+    $missingCompilerRejected = $false
+    try {
+        & $publishScript `
+            -Version $version `
+            -OutputRoot $artifactOutputRoot `
+            -InnoCompilerPath (Join-Path $temporaryRoot 'missing\ISCC.exe') `
+            -AllowDirty
+    }
+    catch {
+        $missingCompilerRejected =
+            $_.Exception.Message -like '*Inno Setup 6.7.3 compiler was not found*'
+    }
+    Assert-Condition $missingCompilerRejected `
+        'Publication must reject a missing pinned Inno Setup compiler with an actionable error.'
+
+    $wrongCompilerRejected = $false
+    try {
+        & $publishScript `
+            -Version $version `
+            -OutputRoot $artifactOutputRoot `
+            -InnoCompilerPath (Get-Command powershell.exe).Source `
+            -AllowDirty
+    }
+    catch {
+        $wrongCompilerRejected =
+            $_.Exception.Message -like '*requires Inno Setup 6.7.3*'
+    }
+    Assert-Condition $wrongCompilerRejected `
+        'Publication must reject an unexpected compiler with an actionable error.'
+
     & $publishScript `
         -Version $version `
         -OutputRoot $artifactOutputRoot `
@@ -112,6 +142,8 @@ try {
     Assert-Condition ($manifest.selfContained -eq $true) 'Manifest must declare a self-contained artifact.'
     Assert-Condition ($manifest.singleFile -eq $true) 'Manifest must declare a single-file artifact.'
     Assert-Condition ($manifest.signed -eq $false) 'Manifest must disclose that the executable is unsigned.'
+    Assert-Condition ($manifest.innoSetupVersion -eq '6.7.3') `
+        'Manifest must record the pinned Inno Setup version.'
     Assert-Condition ($manifest.sourceDirty -eq $true) 'Manifest must disclose that the test artifact used a dirty source tree.'
     Assert-Condition ($manifest.archive.fileName -eq "$artifactStem.zip") 'Manifest archive name is incorrect.'
     Assert-Condition ($manifest.installer.fileName -eq "$installerStem.exe") `
@@ -132,6 +164,11 @@ try {
         "$expectedInstallerHash  $installerStem.exe") 'Installer checksum file is incorrect.'
     Assert-Condition ($manifest.installer.signed -eq $false) `
         'Manifest must disclose that the installer is unsigned.'
+    Assert-Condition ((Get-AuthenticodeSignature -LiteralPath $installerPath).Status -eq `
+        [System.Management.Automation.SignatureStatus]::NotSigned) `
+        'Installer must actually be unsigned.'
+    Assert-Condition ((Get-Item -LiteralPath $installerPath).VersionInfo.ProductVersion.Trim() -eq $version) `
+        'Installer ProductVersion must match the requested version.'
 
     Expand-Archive -LiteralPath $archivePath -DestinationPath $expandedRoot
     $archiveFiles = @(Get-ChildItem -LiteralPath $expandedRoot -File -Recurse)
@@ -141,6 +178,8 @@ try {
     Assert-Condition ($archiveFiles[0].VersionInfo.FileVersion -eq '0.2.0.0') 'Executable FileVersion must be 0.2.0.0.'
     Assert-Condition ($manifest.payload.fileName -eq 'MediaLock.exe') `
         'Manifest payload name is incorrect.'
+    Assert-Condition ($manifest.payload.signed -eq $false) `
+        'Manifest must disclose that the payload is unsigned.'
     Assert-Condition ($manifest.payload.sha256 -eq `
         (Get-FileHash -LiteralPath $archiveFiles[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()) `
         'Manifest payload SHA-256 does not match the portable executable.'
