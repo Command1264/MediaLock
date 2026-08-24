@@ -150,6 +150,14 @@ Windows Sandbox results must independently match that commit and archive digest,
 surface, and confirm the existing single-instance, Settings, startup, tray, GSMTC and global-media-key paths. No
 `0.2.0-rc.1` or `0.2.0-rc.2` evidence transfers.
 
+Phase 10D first makes stable-version acceptance red at the packaging seam, then changes only release identity,
+packaging compatibility and documentation. Automated coverage requires project Version and InformationalVersion
+`0.2.0`, stable About/diagnostics classification, continued acceptance of `-rc.N`, dirty-source rejection, exact
+artifact names, one executable, ProductVersion/FileVersion, manifest flags and independently recomputed checksums.
+Run the complete local gate and two-axis review before creating the clean formal artifact. Local-host and Windows
+Sandbox evidence must match that artifact's exact source commit and digest and repeat the RC3 critical paths; no RC
+runtime result transfers. Preserve `release/0.2` as the current stable hotfix baseline after merge and publication.
+
 Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off, both
 desired states and observed Playing, Paused, Stopped, Closed and unavailable states. It requires no correction for a
 matching observation, uses explicit Play/Pause for an opposite observation, and never restarts Stopped or Closed
@@ -301,8 +309,8 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 & .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
 ```
 
-After committing the reviewed source, produce the provenance-clean candidate with
-`eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
+After committing the reviewed source, produce the provenance-clean release artifact with
+`eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
 
 For public feedback metadata, additionally run a local YAML parse and relative-link check. Before merging Issue Forms,
@@ -330,6 +338,8 @@ was completed independently for the formal `0.2.0-rc.2` candidate on 2026-08-24;
 preserved in [Phase 9 packaged validation](phase-9/release-candidate-smoke.md). Evidence does not transfer between
 commits or digests. Record `0.2.0-rc.3` evidence independently in
 [Phase 10C packaged validation](phase-10/release-candidate-smoke.md).
+Record stable `0.2.0` evidence independently in
+[Phase 10D packaged validation](phase-10/stable-release-smoke.md).
 
 ## 7. Manual evidence
 

@@ -15,8 +15,8 @@ body:
     id: version
     attributes:
       label: Media Lock version / 版本
-      description: Use the version shown by the downloaded package or executable, for example 0.2.0-rc.3.
-      placeholder: 0.2.0-rc.3
+      description: Use the version shown by the downloaded package or executable, for example 0.2.0.
+      placeholder: 0.2.0
     validations:
       required: true
 
