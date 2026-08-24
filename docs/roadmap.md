@@ -356,7 +356,10 @@ the candidate source commit and published the verified ZIP as the sole asset of 
 Promote the final validated product behavior to stable `0.2.0` without adding a feature after `0.2.0-rc.3`. The stable
 executable receives an independent identity and complete release evidence.
 
-Status: in progress.
+Status: complete on 2026-08-24 for source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` and archive
+SHA-256 `f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`. Automated gates, two-axis review,
+clean artifact inspection, local-host smoke and Windows Sandbox passed. The release remains unsigned; tag, GitHub
+Release, Latest designation and public artifact publication remain separately authorized operations.
 
 Exit criteria:
 

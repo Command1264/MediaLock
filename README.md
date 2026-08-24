@@ -9,8 +9,8 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
-目前開發來源正在準備 `0.2.0` 正式版；公開下載仍是已完成獨立驗證的 `0.2.0-rc.3`，直到正式版
-以獨立 commit、digest、主機與 Windows Sandbox 證據完成並另行核准發布。
+`0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證；公開下載仍是
+`0.2.0-rc.3`，直到正式版取得另行發布核准。
 
 已驗證的基礎能力包括：
 
@@ -84,7 +84,7 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
 官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。目前公開的
 `0.2.0-rc.3` 已以 source commit `10dbb5b1452fe27084a28e254388fe974ed277e6` 與 archive digest 通過主機及
-Windows Sandbox gate。`0.2.0` 必須取得自己的證據，不能沿用 RC3。完整驗證、證據與回復流程見
+Windows Sandbox gate。`0.2.0` 也已取得自己的獨立證據，沒有沿用 RC3。完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
 [0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前正式候選透過

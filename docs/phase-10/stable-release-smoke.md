@@ -51,7 +51,7 @@ Observed results for source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` an
 
 ## Windows Sandbox gate
 
-Status: pending.
+Status: passed on Windows 11 Enterprise 24H2, build `26100.9168`, x64.
 
 Transfer only the ZIP, manifest and checksum into a fresh Windows Sandbox. Verify:
 
@@ -62,7 +62,21 @@ Transfer only the ZIP, manifest and checksum into a fresh Windows Sandbox. Verif
 5. Edge or Chrome GSMTC discovery, one routed Play/Pause and one supported Seek.
 6. Close-to-tray, restore and explicit Exit with zero remaining processes and no startup entry.
 
-Record the Windows caption, display version, full build, architecture and observed results here.
+Observed results for source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` and the recorded archive digest:
+
+- The manifest, checksum and independently computed digest matched. The archive expanded to one `MediaLock.exe`
+  with ProductVersion `0.2.0`, FileVersion `0.2.0.0` and Authenticode `NotSigned`.
+- Cold start required no separately installed .NET runtime. The tray icon appeared, and a second launch left one
+  process while activating the existing window.
+- About and privacy-safe diagnostics reported `0.2.0`, Stable and Unsigned. Clipboard output used CRLF only and
+  omitted media metadata, account names, executable paths and the source commit; its success notice expired.
+- English applied immediately and persisted across reopening Settings. Current-user startup registered the exact
+  extracted executable path plus `--startup`; both settings were restored and the startup value was removed.
+- YouTube Music in Edge exposed an `MSEdge` Session with artwork, metadata and timeline. Session Lock, Pause, Play and
+  one Seek from approximately `1:00` to `2:25` succeeded.
+- Close-to-tray, notification-area restore and explicit Exit passed. Exit left zero processes and no startup entry.
+- `settings.json`, `state.json` and one JSONL log parsed successfully with zero invalid lines and zero Error/Critical
+  entries.
 
 ## Public publication
 
