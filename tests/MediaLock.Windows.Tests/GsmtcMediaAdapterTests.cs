@@ -187,6 +187,27 @@ public sealed class GsmtcMediaAdapterTests
     }
 
     [Fact]
+    public async Task ExcludedOwnedSessionCannotEnterCatalogOrBecomeCurrent()
+    {
+        var owned = new FakeSession("MediaLock.Phase11BMirrorProbe.exe", MediaControlResult.Succeeded);
+        var target = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var manager = new FakeListManager([owned, target], owned);
+        await using var adapter = new GsmtcMediaAdapter(
+            new FakeManagerFactory(manager),
+            TimeProvider.System,
+            excludedSourceApplicationIds: ["MediaLock.Phase11BMirrorProbe.exe"]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        var snapshot = snapshots.Current;
+
+        Assert.Equal("Brave", Assert.Single(snapshot.Sessions).SourceAppUserModelId);
+        Assert.Null(snapshot.WindowsCurrentSession);
+        Assert.Equal(0, owned.ReadCount);
+    }
+
+    [Fact]
     public async Task AbsoluteSeekUsesTheSameLiveSessionControlSeam()
     {
         var session = new FakeSession("Brave", MediaControlResult.Succeeded);
@@ -396,6 +417,23 @@ public sealed class GsmtcMediaAdapterTests
             Disposed = true;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FakeListManager(
+        IReadOnlyList<IGsmtcSession> sessions,
+        IGsmtcSession? currentSession) : IGsmtcSessionManager
+    {
+        public event EventHandler? SessionsChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public IReadOnlyList<IGsmtcSession> GetSessions() => sessions;
+
+        public IGsmtcSession? GetCurrentSession() => currentSession;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeSession(
