@@ -7,6 +7,22 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+trap {
+    $failureResult = [ordered]@{
+        passed = $false
+        error = $_.Exception.Message
+        scriptStackTrace = $_.ScriptStackTrace
+    }
+
+    $failureResultDirectory = Split-Path -Parent $ResultPath
+    New-Item -ItemType Directory -Path $failureResultDirectory -Force |
+        Out-Null
+    $failureResult |
+        ConvertTo-Json |
+        Set-Content -LiteralPath $ResultPath -Encoding utf8
+    exit 1
+}
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory)]
