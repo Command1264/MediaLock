@@ -52,3 +52,18 @@ _Avoid_: Selection, dispatch
 **Media Command**:
 使用者意圖執行的播放、暫停、切換播放狀態、上一首、下一首、停止或未來支援的定位操作。
 _Avoid_: Key press, hotkey
+
+**Playback State Lock**:
+針對當前控制目標持續維持播放狀態的執行期政策；正式值為 Off、Keep Playing 與 Keep Paused。它會修正
+同一目標的相反播放狀態，但不把一次性的 Play、Pause 或 TogglePlayPause 重新命名為鎖定。
+_Avoid_: Playback mode, forced toggle, autoplay
+
+**Desired Playback State**:
+Playback State Lock 在仍為同一控制目標時要維持的 Playing 或 Paused 狀態；它是使用者意圖，不是尚未
+確認的 GSMTC 觀察值。
+_Avoid_: Playback status, optimistic status
+
+**Windows Media Surface Mirror**:
+由 Media Lock 公開、鏡像當前控制目標資料與控制能力的自有 SMTC Media Session。它可讓 Windows 媒體
+表面顯示及操作 Media Lock 的路由目標，但不代表 Media Lock 能指定 Windows Current Session。
+_Avoid_: Windows Current Session override, native panel takeover
