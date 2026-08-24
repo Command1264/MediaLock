@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MediaLock.Phase11BMirrorProbe</AssemblyName>
+    <RootNamespace>MediaLock.Phase11BMirrorProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MediaLock.Application\MediaLock.Application.csproj" />
+    <ProjectReference Include="..\..\src\MediaLock.Core\MediaLock.Core.csproj" />
+    <ProjectReference Include="..\..\src\MediaLock.Windows\MediaLock.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
