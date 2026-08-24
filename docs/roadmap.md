@@ -356,10 +356,13 @@ the candidate source commit and published the verified ZIP as the sole asset of 
 Promote the final validated product behavior to stable `0.2.0` without adding a feature after `0.2.0-rc.3`. The stable
 executable receives an independent identity and complete release evidence.
 
-Status: complete on 2026-08-24 for source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` and archive
-SHA-256 `f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`. Automated gates, two-axis review,
-clean artifact inspection, local-host smoke and Windows Sandbox passed. The release remains unsigned; tag, GitHub
-Release, Latest designation and public artifact publication remain separately authorized operations.
+Status: complete and published on 2026-08-24 for source commit
+`7ce40ab31433998665b30ac18a7f50ebb3dafec7` and archive SHA-256
+`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`. Automated gates, two-axis review,
+clean artifact inspection, local-host smoke and Windows Sandbox passed. After separate publication approval, PR #31
+merged the release branch into `develop`, PR #32 synchronized `main`, GPG-signed annotated tag `v0.2.0` identified
+the exact artifact source commit, and the verified ZIP became the sole asset of the Stable／Latest GitHub Release.
+The release remains unsigned and the long-lived `release/0.2` branch remains the stable hotfix baseline.
 
 Exit criteria:
 
@@ -379,8 +382,7 @@ Exit criteria:
 
 ## Phase 11 — Playback intent and Windows media surface
 
-Phase 11 targets `0.3.0`. It does not mutate the published `0.2.0-rc.3` candidate or bypass the independent stable
-`0.2.0` release gate.
+Phase 11 targets `0.3.0`. It does not mutate the published stable `0.2.0` release or its retained hotfix baseline.
 
 ### Phase 11A — Playback State Lock
 

@@ -11,8 +11,9 @@ Media Lock 目前以 unsigned、portable `win-x64` ZIP 發布，沒有安裝程�
 
 ## 下載與驗證
 
-1. 從 [Media Lock Releases](https://github.com/Command1264/MediaLock/releases) 下載最新版本的
-   `MediaLock-<version>-win-x64.zip`。不要從不明鏡像下載。
+1. 從 [Media Lock 0.2.0 Stable Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 下載
+   `MediaLock-0.2.0-win-x64.zip`。後續版本請從 [Media Lock Releases](https://github.com/Command1264/MediaLock/releases)
+   選擇最新 Stable／Latest 版本；不要從不明鏡像下載。
 2. 在 PowerShell 將 `<version>` 換成實際版本，以實際檔名計算 SHA-256：
 
    ```powershell
@@ -21,6 +22,9 @@ Media Lock 目前以 unsigned、portable `win-x64` ZIP 發布，沒有安裝程�
 
 3. 將結果與該版本 GitHub Release 說明中的 SHA-256 完整比對。大小寫不影響雜湊值，但每個十六進位字元
    都必須相同；不相同時不要執行檔案。
+
+`0.2.0` 的 SHA-256 是
+`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`。
 
 ## 第一次執行
 
