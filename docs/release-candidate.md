@@ -2,7 +2,7 @@
 
 ## Scope and release status
 
-The candidate under validation is `0.2.0-rc.3`, targeting `win-x64` as a self-contained single-file WPF application.
+The validated candidate is `0.2.0-rc.3`, targeting `win-x64` as a self-contained single-file WPF application.
 It contains the `0.2.0-rc.2` routing, Recovery, localization, theme, Now Playing, Seek and production media-key work,
 plus the Phase 10B in-app About and privacy-safe diagnostics surface. Volume, customizable shortcuts and browser
 integration remain outside this candidate.
@@ -10,8 +10,8 @@ integration remain outside this candidate.
 The candidate is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. The earlier formal
 `0.2.0-rc.1` and `0.2.0-rc.2` passed their own clean-environment gates. Their evidence does not transfer to
-`0.2.0-rc.3`; the new candidate may be described as portable in layout only after its exact source commit and archive
-digest pass the same host and Windows Sandbox gates.
+`0.2.0-rc.3`. Its exact source commit `10dbb5b1452fe27084a28e254388fe974ed277e6` and archive SHA-256
+`ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a` passed the host and Windows Sandbox gates.
 
 Single-file publication embeds native libraries for extraction. On Windows, .NET can extract bundled files beneath
 `%TEMP%\.net` while the program runs. Trimming and ReadyToRun are disabled for this candidate.

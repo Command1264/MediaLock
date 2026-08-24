@@ -25,8 +25,9 @@ Before host testing, independently recompute the digest, compare the manifest an
 
 ## Local host smoke
 
-Status: pending for the replacement commit and digest. The observations below belong to the superseded artifact and
-must be repeated before publication.
+Status: passed on 2026-08-24 for source commit
+`10dbb5b1452fe27084a28e254388fe974ed277e6` and archive SHA-256
+`ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a`.
 
 The host used an ASUS ROG STRIX FLARE keyboard, a regular Brave YouTube source and the Brave YouTube Music PWA.
 Priority Rules resolved YouTube Music while the competing regular YouTube source remained available.
@@ -48,21 +49,24 @@ Routing Mode. Verify:
 Observed results:
 
 - The independently recomputed archive digest matched both the manifest and checksum. Extraction produced exactly one
-  200,300,136-byte `MediaLock.exe`; ProductVersion was `0.2.0-rc.3`, FileVersion was `0.2.0.0`, and Authenticode was
+  200,304,232-byte `MediaLock.exe`; ProductVersion was `0.2.0-rc.3`, FileVersion was `0.2.0.0`, and Authenticode was
   `NotSigned`.
 - Cold start, the notification icon, one-process enforcement and second-instance activation succeeded. About reported
-  the candidate version, host build, architecture, prerelease status and unsigned state.
+  the candidate version, Windows 11 Pro 25H2 build 26200.9168, X64 architecture, prerelease status and unsigned state.
 - Copied diagnostics used 12 CRLF separators with no lone LF or CR. The expected support facts were present while media
   title, artist, source application, account name, private paths, settings payload, persisted identity and source commit
-  were absent. Open logs, Open support and Report a bug reached their intended destinations without submitting data.
+  were absent. Its confirmation cleared after five seconds. Open logs, Open support and Report a bug had already passed
+  against the same replacement artifact in the clean Sandbox without submitting data.
 - Settings persisted successfully. Enabling login startup through a normally launched candidate created the exact
   `"<executable>" --startup` current-user Run value without elevation; disabling it removed the value. An earlier
   automation-broker launch did not expose the same Registry behavior, so the release result was established with a
   normal Windows process launch and independently verified Registry values.
 - Sessions, artwork, timeline and routed Play/Pause worked. One physical Play/Pause changed YouTube Music exactly once
-  while the regular YouTube source remained unchanged.
-- Close-to-tray, notification-area restore and explicit Exit succeeded; the final process count was zero and the
-  disabled login-startup value remained absent.
+  while the regular Brave YouTube source remained playing in the foreground. The structured log contained one accepted
+  input and one completed Priority Rules route to the YouTube Music target, with no duplicate or error-like event.
+- Close-to-tray and notification-area explicit Exit succeeded; second-instance activation returned to the existing main
+  window without creating another process. The final process count was zero and the disabled login-startup value
+  remained absent.
 - `settings.json` and `state.json` parsed successfully. One JSONL log file contained zero invalid lines and zero
   Error/Critical or failure events.
 
