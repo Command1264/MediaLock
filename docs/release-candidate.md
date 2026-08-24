@@ -112,6 +112,13 @@ Record Windows build, artifact hash, manifest source commit, actual results and 
 Use Windows Sandbox or a disposable x64 Windows VM that has not built Media Lock. Transfer the five artifact files,
 verify both container hashes, then repeat the host smoke test items that do not require preinstalled media applications:
 
+The repeatable PowerShell 5.1 transaction gate is
+`tests\packaging\WindowsSandbox-InstallerSmoke.ps1`. Map the five artifacts read-only to
+`C:\MediaLockArtifacts`, map a writable results directory to `C:\MediaLockResults`, then run the script inside the
+Sandbox. Its JSON result covers hashes, installed payload identity, Start Menu/Installed apps registration, default
+startup state, owned/nonowned startup cleanup, user-data retention and final process count. It does not replace the
+interactive runtime items below.
+
 - cold start without a separately installed .NET runtime;
 - one window/process/icon after second launch;
 - Settings save and user-file creation;

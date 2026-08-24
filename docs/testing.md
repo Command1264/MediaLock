@@ -210,6 +210,10 @@ fixed executable/Start Menu/Installed apps entries, removed an owned Run value, 
 left existing user data intact after uninstall. This host evidence does not replace the remaining clean-Windows,
 upgrade, downgrade or full runtime matrix.
 
+`tests/packaging/WindowsSandbox-InstallerSmoke.ps1` is the PowerShell 5.1-compatible clean-environment transaction
+gate. It consumes only a read-only five-file artifact set and writes a JSON result to a separately mapped directory;
+it never treats an installed executable as evidence of a matching payload without independently hashing it.
+
 ### Integration tests
 
 Cover:
