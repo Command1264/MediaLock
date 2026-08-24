@@ -250,7 +250,7 @@ public sealed class JsonSettingsRepositoryTests
     }
 
     [Fact]
-    public async Task VersionSixSettingsMigrateToRepeatedPauseOverrideDefaults()
+    public async Task VersionSixSettingsPreserveMediaKeyPreferenceAndMigratePlaybackStateLockDefaults()
     {
         using var directory = new TemporaryDirectory();
         await File.WriteAllTextAsync(
@@ -268,7 +268,7 @@ public sealed class JsonSettingsRepositoryTests
                 "startWithWindows": false,
                 "language": "system",
                 "theme": "system",
-                "interceptMediaKeys": true
+                "interceptMediaKeys": false
               },
               "priorityRules": []
             }
@@ -279,6 +279,7 @@ public sealed class JsonSettingsRepositoryTests
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
         Assert.Equal(7, result.Value.SchemaVersion);
+        Assert.False(result.Value.Desktop!.InterceptMediaKeys);
         Assert.Equal(MediaLockSettings.Default.PlaybackStateLock, result.Value.PlaybackStateLock);
         Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);

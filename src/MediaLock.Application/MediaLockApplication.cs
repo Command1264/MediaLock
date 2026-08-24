@@ -977,38 +977,22 @@ public sealed class MediaLockApplication : IMediaLockApplication
         string message,
         CancellationToken cancellationToken)
     {
-        await dispatchGate.WaitAsync(cancellationToken);
         try
         {
-            try
-            {
-                var previousRevision = State.Router.Revision;
-                var result = await router.DispatchAsync(
-                    new RouterIntent.CatalogUpdated([], null),
-                    cancellationToken);
-                Apply(result);
-                if (!runtimeStatePersistenceSuppressed)
-                {
-                    await PersistRuntimeStateAsync(result.State, cancellationToken);
-                }
-                await RecordStateTransitionAsync(
-                    previousRevision,
-                    result.State,
-                    cancellationToken);
-                PublishError(message);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                PublishError($"{message} State transition failed: {exception.Message}");
-            }
+            await DispatchRouterAsync(
+                new RouterIntent.CatalogUpdated([], null),
+                cancellationToken,
+                nextCatalogStatus: MediaSessionCatalogStatus.Unavailable,
+                nextCatalogStatusMessage: message);
+            PublishError(message);
         }
-        finally
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            dispatchGate.Release();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            PublishError($"{message} State transition failed: {exception.Message}");
         }
     }
 

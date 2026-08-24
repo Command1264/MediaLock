@@ -76,7 +76,9 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                                 Theme = sourceVersion <= 4
                                     ? UiThemePreference.System
                                     : settings.Desktop.Theme,
-                                InterceptMediaKeys = true,
+                                InterceptMediaKeys = sourceVersion <= 5
+                                    ? true
+                                    : settings.Desktop.InterceptMediaKeys,
                             },
                     PriorityRules = sourceVersion <= 2 ? [] : settings.PriorityRules,
                     PlaybackStateLock = MediaLockSettings.Default.PlaybackStateLock,

@@ -1634,6 +1634,10 @@ public sealed class MediaLockApplicationTests
         await application.DispatchAsync(
             new ApplicationIntent.LockSession(session.Key),
             CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
         var errorObserved = new TaskCompletionSource<MediaLockApplicationState>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         application.StateChanged += (_, args) =>
@@ -1648,8 +1652,15 @@ public sealed class MediaLockApplicationTests
         var failed = await errorObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.Equal("Media Session catalog stopped unexpectedly.", failed.ErrorMessage);
+        Assert.Equal(MediaSessionCatalogStatus.Unavailable, failed.CatalogStatus);
         Assert.Empty(failed.Router.Sessions);
         Assert.Equal(RouterStatus.Recovering, failed.Router.Status);
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            failed.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Suspended,
+            failed.PlaybackStateLock.Status);
         var routed = await application.DispatchAsync(
             new ApplicationIntent.Route(MediaCommand.Next),
             CancellationToken.None);
