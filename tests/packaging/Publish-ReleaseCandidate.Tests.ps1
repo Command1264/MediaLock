@@ -176,11 +176,11 @@ try {
     Assert-Condition ($archiveFiles[0].Name -eq 'MediaLock.exe') 'Release archive must contain MediaLock.exe.'
     Assert-Condition ($archiveFiles[0].VersionInfo.ProductVersion -eq $version) "Executable ProductVersion must be $version."
     Assert-Condition ($archiveFiles[0].VersionInfo.FileVersion -eq '0.2.0.0') 'Executable FileVersion must be 0.2.0.0.'
-    Assert-Condition ($manifest.payload.fileName -eq 'MediaLock.exe') `
+    Assert-Condition ($manifest.executable.fileName -eq 'MediaLock.exe') `
         'Manifest payload name is incorrect.'
-    Assert-Condition ($manifest.payload.signed -eq $false) `
+    Assert-Condition ($manifest.executable.signed -eq $false) `
         'Manifest must disclose that the payload is unsigned.'
-    Assert-Condition ($manifest.payload.sha256 -eq `
+    Assert-Condition ($manifest.executable.sha256 -eq `
         (Get-FileHash -LiteralPath $archiveFiles[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()) `
         'Manifest payload SHA-256 does not match the portable executable.'
 }

@@ -136,13 +136,14 @@ $finalManifestPath = Join-Path $OutputRoot $manifestName
 $finalChecksumPath = Join-Path $OutputRoot $checksumName
 $finalInstallerPath = Join-Path $OutputRoot $installerName
 $finalInstallerChecksumPath = Join-Path $OutputRoot $installerChecksumName
-
-foreach ($outputPath in @(
+$finalOutputPaths = @(
     $finalArchivePath,
     $finalManifestPath,
     $finalChecksumPath,
     $finalInstallerPath,
-    $finalInstallerChecksumPath)) {
+    $finalInstallerChecksumPath)
+
+foreach ($outputPath in $finalOutputPaths) {
     if (Test-Path -LiteralPath $outputPath) {
         throw "Release output already exists; choose a new OutputRoot or remove it explicitly: $outputPath"
     }
@@ -157,6 +158,7 @@ $stagedManifestPath = Join-Path $stagingRoot $manifestName
 $stagedChecksumPath = Join-Path $stagingRoot $checksumName
 $stagedInstallerPath = Join-Path $stagingRoot $installerName
 $stagedInstallerChecksumPath = Join-Path $stagingRoot $installerChecksumName
+$publicationCompleted = $false
 
 try {
     New-Item -ItemType Directory -Path $publishRoot | Out-Null
@@ -254,7 +256,7 @@ try {
         dotnetSdkVersion = $dotnetSdkVersion
         innoSetupVersion = $innoCompiler.Version
         generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
-        payload = [ordered]@{
+        executable = [ordered]@{
             fileName = $executable.Name
             sizeBytes = $executable.Length
             sha256 = $payloadHash
@@ -286,6 +288,7 @@ try {
     Move-Item -LiteralPath $stagedChecksumPath -Destination $finalChecksumPath
     Move-Item -LiteralPath $stagedInstallerPath -Destination $finalInstallerPath
     Move-Item -LiteralPath $stagedInstallerChecksumPath -Destination $finalInstallerChecksumPath
+    $publicationCompleted = $true
 
     [pscustomobject]@{
         Archive = $finalArchivePath
@@ -296,6 +299,14 @@ try {
     }
 }
 finally {
+    if (-not $publicationCompleted) {
+        foreach ($outputPath in $finalOutputPaths) {
+            if (Test-Path -LiteralPath $outputPath -PathType Leaf) {
+                Remove-Item -LiteralPath $outputPath -Force
+            }
+        }
+    }
+
     if (Test-Path -LiteralPath $stagingRoot) {
         $resolvedStagingRoot = (Resolve-Path -LiteralPath $stagingRoot).Path
         if (-not $resolvedStagingRoot.StartsWith(
