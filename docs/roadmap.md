@@ -351,6 +351,29 @@ Prerelease or public artifact publication is implied by phase completion. A sepa
 later merged PR #26 into `develop`, synchronized PR #27 to `main`, created GPG-signed annotated tag `v0.2.0-rc.3` at
 the candidate source commit and published the verified ZIP as the sole asset of the public GitHub Prerelease.
 
+### Phase 10D — `0.2.0` stable release
+
+Promote the final validated product behavior to stable `0.2.0` without adding a feature after `0.2.0-rc.3`. The stable
+executable receives an independent identity and complete release evidence.
+
+Status: in progress.
+
+Exit criteria:
+
+- Project defaults, packaging tests, user documentation and release notes identify stable `0.2.0`; historical RC
+  records remain unchanged.
+- The publishing command accepts both stable semantic versions and the existing `-rc.N` form, rejects dirty formal
+  source and produces the ZIP/manifest/checksum provenance set.
+- Restore, formatting, complete automated tests, Release build, isolated packaging and two-axis review pass locally
+  without relying on GitHub Actions capacity.
+- A clean reviewed commit produces exactly one self-contained `MediaLock.exe` whose ProductVersion is `0.2.0`,
+  FileVersion is `0.2.0.0`, Authenticode is `NotSigned`, and independently recomputed hashes agree.
+- Local-host and Windows Sandbox gates independently pass for the exact stable source commit and digest; RC results do
+  not transfer.
+- The long-lived `release/0.2` branch remains available as the stable hotfix baseline after integration and publication.
+- Tagging, stable GitHub Release creation, Latest designation and public ZIP upload remain separately approved remote
+  operations.
+
 ## Phase 11 — Playback intent and Windows media surface
 
 Phase 11 targets `0.3.0`. It does not mutate the published `0.2.0-rc.3` candidate or bypass the independent stable

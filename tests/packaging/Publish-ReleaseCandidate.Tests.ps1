@@ -14,13 +14,36 @@ function Assert-Condition {
     }
 }
 
+function Assert-VersionReachesDirtySourceGuard {
+    param(
+        [Parameter(Mandatory)]
+        [string] $PublishScript,
+
+        [Parameter(Mandatory)]
+        [string] $Version,
+
+        [Parameter(Mandatory)]
+        [string] $OutputRoot
+    )
+
+    $reachedDirtySourceGuard = $false
+    try {
+        & $PublishScript -Version $Version -OutputRoot $OutputRoot
+    }
+    catch {
+        $reachedDirtySourceGuard = $_.Exception.Message -like '*require a clean Git worktree*'
+    }
+
+    Assert-Condition $reachedDirtySourceGuard "Publication must accept $Version and reject its dirty source worktree."
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "MediaLock-Packaging-Test-$([Guid]::NewGuid().ToString('N'))"
 $isolatedSourceRoot = Join-Path $temporaryRoot 'source'
 $artifactOutputRoot = Join-Path $temporaryRoot 'output'
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
 $dirtyMarkerPath = Join-Path $isolatedSourceRoot '.MediaLock-Packaging-Test.tmp'
-$version = '0.2.0-rc.3'
+$version = '0.2.0'
 $artifactStem = "MediaLock-$version-win-x64"
 $isolatedWorktreeCreated = $false
 
@@ -43,14 +66,8 @@ try {
     $publishScript = Join-Path $isolatedSourceRoot 'eng\Publish-ReleaseCandidate.ps1'
     [IO.File]::WriteAllText($dirtyMarkerPath, 'Packaging provenance test marker.')
 
-    $rejectedDirtySource = $false
-    try {
-        & $publishScript -Version $version -OutputRoot $artifactOutputRoot
-    }
-    catch {
-        $rejectedDirtySource = $_.Exception.Message -like '*require a clean Git worktree*'
-    }
-    Assert-Condition $rejectedDirtySource 'Formal publication must reject a dirty source worktree.'
+    Assert-VersionReachesDirtySourceGuard $publishScript $version $artifactOutputRoot
+    Assert-VersionReachesDirtySourceGuard $publishScript '0.2.0-rc.99' $artifactOutputRoot
 
     & $publishScript -Version $version -OutputRoot $artifactOutputRoot -AllowDirty
 
@@ -68,6 +85,7 @@ try {
     Assert-Condition ($manifest.runtimeIdentifier -eq 'win-x64') 'Manifest runtimeIdentifier must be win-x64.'
     Assert-Condition ($manifest.selfContained -eq $true) 'Manifest must declare a self-contained artifact.'
     Assert-Condition ($manifest.singleFile -eq $true) 'Manifest must declare a single-file artifact.'
+    Assert-Condition ($manifest.signed -eq $false) 'Manifest must disclose that the executable is unsigned.'
     Assert-Condition ($manifest.sourceDirty -eq $true) 'Manifest must disclose that the test artifact used a dirty source tree.'
     Assert-Condition ($manifest.archive.fileName -eq "$artifactStem.zip") 'Manifest archive name is incorrect.'
 
@@ -81,6 +99,7 @@ try {
     Assert-Condition ($archiveFiles.Count -eq 1) 'Release archive must contain exactly one file.'
     Assert-Condition ($archiveFiles[0].Name -eq 'MediaLock.exe') 'Release archive must contain MediaLock.exe.'
     Assert-Condition ($archiveFiles[0].VersionInfo.ProductVersion -eq $version) "Executable ProductVersion must be $version."
+    Assert-Condition ($archiveFiles[0].VersionInfo.FileVersion -eq '0.2.0.0') 'Executable FileVersion must be 0.2.0.0.'
 }
 finally {
     [IO.File]::Delete($dirtyMarkerPath)
