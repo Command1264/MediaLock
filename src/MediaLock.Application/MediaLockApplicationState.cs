@@ -1,5 +1,6 @@
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
+using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Application;
@@ -11,6 +12,9 @@ public sealed record MediaLockApplicationState(
     MediaSessionCatalogStatus CatalogStatus = MediaSessionCatalogStatus.Available,
     string? CatalogStatusMessage = null)
 {
+    public PlaybackStateLockState PlaybackStateLock { get; init; } =
+        PlaybackStateLockState.Off;
+
     public MediaLockApplicationState(
         RouterState router,
         string? errorMessage = null)
@@ -22,6 +26,27 @@ public sealed record MediaLockApplicationState(
         RouterState.Initial,
         null,
         MediaLockSettings.Default);
+}
+
+public enum PlaybackStateLockStatus
+{
+    Off,
+    Ready,
+    Suspended,
+    Failed,
+    Released,
+}
+
+public sealed record PlaybackStateLockState(
+    PlaybackStateLockMode Mode,
+    PlaybackStateLockStatus Status,
+    SessionKey? ArmedTarget,
+    string? Message = null)
+{
+    public static PlaybackStateLockState Off { get; } = new(
+        PlaybackStateLockMode.Off,
+        PlaybackStateLockStatus.Off,
+        ArmedTarget: null);
 }
 
 public sealed class MediaLockApplicationStateChangedEventArgs(

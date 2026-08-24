@@ -42,6 +42,28 @@ public sealed class GsmtcMediaAdapterTests
     }
 
     [Fact]
+    public async Task WorkstationUnlockQueuesAFreshCatalogSnapshot()
+    {
+        var session = new FakeSession("Brave", MediaControlResult.Succeeded);
+        var lifecycle = new FakeSystemLifecycle();
+        await using var adapter = new GsmtcMediaAdapter(
+            new FakeManagerFactory(new FakeManager(session)),
+            TimeProvider.System,
+            lifecycle);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await using var snapshots = adapter.WatchAsync(cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(1, session.ReadCount);
+
+        lifecycle.Lock();
+        lifecycle.Unlock();
+
+        Assert.True(await snapshots.MoveNextAsync());
+        Assert.Equal(MediaSessionCatalogStatus.Available, snapshots.Current.Status);
+        Assert.True(session.ReadCount >= 2);
+    }
+
+    [Fact]
     public async Task FailedResumeUsesThreeAttemptsAndASecondResumeCanRecover()
     {
         var initialManager = new FakeManager(
@@ -318,15 +340,33 @@ public sealed class GsmtcMediaAdapterTests
         }
     }
 
-    private sealed class FakeSystemLifecycle : ISystemLifecycle
+    private sealed class FakeSystemLifecycle : ISystemLifecycle, IWorkstationLockState
     {
+        public bool IsLocked { get; private set; }
+
         public event Action? Suspending;
 
         public event Action? Resumed;
 
+        public event Action? Locked;
+
+        public event Action? Unlocked;
+
         public void Suspend() => Suspending?.Invoke();
 
         public void Resume() => Resumed?.Invoke();
+
+        public void Lock()
+        {
+            IsLocked = true;
+            Locked?.Invoke();
+        }
+
+        public void Unlock()
+        {
+            IsLocked = false;
+            Unlocked?.Invoke();
+        }
     }
 
     private sealed class FakeManager(

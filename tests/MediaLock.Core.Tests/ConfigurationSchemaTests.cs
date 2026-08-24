@@ -9,12 +9,16 @@ public sealed class ConfigurationSchemaTests
     [Fact]
     public void DefaultSettingsEnableCloseToTrayAndMediaKeyInterceptionButNotLoginStartup()
     {
-        Assert.Equal(6, MediaLockSettings.CurrentSchemaVersion);
+        Assert.Equal(7, MediaLockSettings.CurrentSchemaVersion);
         Assert.True(MediaLockSettings.Default.Desktop!.CloseToTray);
         Assert.False(MediaLockSettings.Default.Desktop.StartWithWindows);
         Assert.True(MediaLockSettings.Default.Desktop.InterceptMediaKeys);
         Assert.Equal(UiLanguagePreference.System, MediaLockSettings.Default.Desktop.Language);
         Assert.Equal(UiThemePreference.System, MediaLockSettings.Default.Desktop.Theme);
+        Assert.True(MediaLockSettings.Default.PlaybackStateLock!.RepeatedPauseOverrideEnabled);
+        Assert.Equal(TimeSpan.FromSeconds(5), MediaLockSettings.Default.PlaybackStateLock.RepeatedPauseWindow);
+        Assert.Equal(3, MediaLockSettings.Default.PlaybackStateLock.RepeatedPauseCount);
+        Assert.True(MediaLockSettings.Default.PlaybackStateLock.PlayOverrideSound);
     }
 
     [Fact]
@@ -33,10 +37,34 @@ public sealed class ConfigurationSchemaTests
         Assert.Equal(2, issues.Length);
         Assert.Contains(issues, issue =>
             issue.Path == "schemaVersion" &&
-            issue.Message == "Expected schema version 6, but found 99.");
+            issue.Message == "Expected schema version 7, but found 99.");
         Assert.Contains(issues, issue =>
             issue.Path == "recovery.timeout" &&
             issue.Message == "Recovery timeout must be between 0 seconds and 5 minutes.");
+    }
+
+    [Theory]
+    [InlineData(0, 3, "playbackStateLock.repeatedPauseWindow")]
+    [InlineData(61, 3, "playbackStateLock.repeatedPauseWindow")]
+    [InlineData(5, 1, "playbackStateLock.repeatedPauseCount")]
+    [InlineData(5, 11, "playbackStateLock.repeatedPauseCount")]
+    public void InvalidRepeatedPauseOverrideSettingsReturnActionableIssues(
+        int windowSeconds,
+        int count,
+        string expectedPath)
+    {
+        var settings = MediaLockSettings.Default with
+        {
+            PlaybackStateLock = new PlaybackStateLockSettings(
+                true,
+                TimeSpan.FromSeconds(windowSeconds),
+                count,
+                true),
+        };
+
+        var issue = Assert.Single(settings.Validate());
+
+        Assert.Equal(expectedPath, issue.Path);
     }
 
     [Fact]

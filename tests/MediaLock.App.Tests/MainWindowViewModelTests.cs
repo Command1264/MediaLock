@@ -1,6 +1,9 @@
+using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
+using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
+using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
 using Xunit;
 
@@ -8,6 +11,137 @@ namespace MediaLock.App.Tests;
 
 public sealed class MainWindowViewModelTests
 {
+    [Fact]
+    public async Task KeepPlayingCanBeEnabledForThePlayingRoutedTarget()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-24T00:00:00Z"));
+        var application = new FakeApplication(StateWith(session));
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null);
+
+        Assert.True(viewModel.KeepPlayingCommand.CanExecute(null));
+        await viewModel.KeepPlayingCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.SetPlaybackStateLock>(
+            Assert.Single(application.Intents));
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, intent.Mode);
+    }
+
+    [Fact]
+    public async Task ActiveKeepPlayingCanBeTurnedOffExplicitly()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-24T00:00:00Z"));
+        var application = new FakeApplication(StateWith(session) with
+        {
+            PlaybackStateLock = new PlaybackStateLockState(
+                PlaybackStateLockMode.KeepPlaying,
+                PlaybackStateLockStatus.Ready,
+                session.Key),
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null);
+
+        Assert.True(viewModel.IsKeepPlaying);
+        Assert.True(viewModel.PlaybackStateLockOffCommand.CanExecute(null));
+        await viewModel.PlaybackStateLockOffCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.SetPlaybackStateLock>(
+            Assert.Single(application.Intents));
+        Assert.Equal(PlaybackStateLockMode.Off, intent.Mode);
+    }
+
+    [Fact]
+    public void FailedKeepPlayingHasAnActionableLocalizedNotice()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            PlaybackStateLock = new PlaybackStateLockState(
+                PlaybackStateLockMode.KeepPlaying,
+                PlaybackStateLockStatus.Failed,
+                new SessionKey("music"),
+                "diagnostic detail"),
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null);
+
+        Assert.True(viewModel.HasPlaybackStateLockNotice);
+        Assert.Equal(
+            UiText.Get("Main_KeepPlayingFailed"),
+            viewModel.PlaybackStateLockNotice);
+    }
+
+    [Fact]
+    public async Task RepeatedPauseReleasePlaysOneSoundAndShowsATransientNotice()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        var feedback = new RecordingPlaybackStateLockFeedback();
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            playbackStateLockFeedback: feedback,
+            playbackStateLockNoticeDuration: TimeSpan.FromMilliseconds(50));
+        var released = application.State with
+        {
+            PlaybackStateLock = new PlaybackStateLockState(
+                PlaybackStateLockMode.Off,
+                PlaybackStateLockStatus.Released,
+                ArmedTarget: null),
+        };
+
+        application.Publish(released);
+        application.Publish(released with { Router = released.Router with { Revision = 1 } });
+
+        Assert.Equal(1, feedback.PlayCount);
+        Assert.True(viewModel.HasPlaybackStateLockNotice);
+        Assert.Equal(UiText.Get("Main_KeepPlayingReleased"), viewModel.PlaybackStateLockNotice);
+        await Task.Delay(100);
+        Assert.False(viewModel.HasPlaybackStateLockNotice);
+    }
+
+    [Fact]
+    public void RepeatedPauseReleaseRespectsTheSoundSetting()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Settings = MediaLockSettings.Default with
+            {
+                PlaybackStateLock = MediaLockSettings.Default.PlaybackStateLock! with
+                {
+                    PlayOverrideSound = false,
+                },
+            },
+        });
+        var feedback = new RecordingPlaybackStateLockFeedback();
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            playbackStateLockFeedback: feedback);
+
+        application.Publish(application.State with
+        {
+            PlaybackStateLock = new PlaybackStateLockState(
+                PlaybackStateLockMode.Off,
+                PlaybackStateLockStatus.Released,
+                ArmedTarget: null),
+        });
+
+        Assert.Equal(0, feedback.PlayCount);
+        Assert.True(viewModel.HasPlaybackStateLockNotice);
+    }
+
     [Fact]
     public void NowPlayingUsesTheRoutedTargetAndInterpolatesOnlyWhilePlaying()
     {
@@ -1126,5 +1260,12 @@ public sealed class MainWindowViewModelTests
         public override DateTimeOffset GetUtcNow() => current;
 
         public void Advance(TimeSpan amount) => current += amount;
+    }
+
+    private sealed class RecordingPlaybackStateLockFeedback : IPlaybackStateLockFeedback
+    {
+        public int PlayCount { get; private set; }
+
+        public void PlayOverrideReleasedSound() => PlayCount++;
     }
 }

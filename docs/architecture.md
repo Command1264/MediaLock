@@ -300,20 +300,35 @@ sole authority for target identity; the UI bookmark never changes Router state.
 ### Playback State Lock
 
 Playback State Lock extends the existing deep Application routing module rather than adding a ViewModel loop or a
-second media-control service. Core owns a pure decision value for Off, Keep Playing and Keep Paused. The Application
-dispatcher owns the armed target, Desired Playback State, observation/confirmation status and bounded correction
-effects inside the same serialized critical section as catalog and Route intents.
+second media-control service. Core owns pure Off/Keep Playing eligibility and correction decisions. The Application
+dispatcher owns the Armed Playback Target, observation/confirmation status and bounded correction effects inside the
+same serialized critical section as catalog and Route intents.
 
-Each correction is an ordinary explicit Play or Pause Media Command carrying the captured `ExpectedTarget`. The Router
+Each correction is an ordinary explicit Play Media Command carrying the captured `ExpectedTarget`. The Router
 still resolves capability and rejects stale targets; the Windows GSMTC adapter remains a one-shot controller. Catalog
-observations trigger policy evaluation, so no polling loop is introduced. Recovery, fallback, catalog unavailability,
-suspend and shutdown cancel pending confirmation. Only the Router-accepted successor of the armed identity may resume
-enforcement; an unrelated Active Target clears the lock.
+observations trigger policy evaluation, so no polling loop is introduced. Recovery, catalog unavailability and suspend
+make enforcement Suspended; fallback, an unrelated Active Target and shutdown cannot redirect a correction. Only the
+Router-accepted successor of the armed identity may resume enforcement.
 
 Application state exposes the selected policy, armed target continuity and Ready, Suspended or Failed result for WPF
 projection. The current-target ViewModel submits intents and renders state but neither compares playback observations
-nor retries commands. A supplied time boundary makes confirmation and retry tests deterministic. Retries are finite,
-and the module waits for a fresh playback observation before any subsequent correction.
+nor retries commands. The module waits for a fresh playback observation before any subsequent correction, allows at
+most two unconfirmed Play attempts per paused episode and exposes Failed when confirmation is exhausted. Media Lock
+Pause, TogglePlayPause and Stop clear the policy before their one-shot command is routed.
+
+The Core lifecycle port separately exposes workstation Lock/Unlock without depending on Windows APIs. The Windows
+adapter translates Session Switch notifications and requests a fresh GSMTC snapshot after unlock. Application keeps a
+small attribution window across that transition: Playing closes it and preserves Keep Playing, while Paused, Stopped
+or Closed clears the policy without correction. A missing or unknown target remains Suspended and cannot redirect a
+command to a competitor.
+
+Settings schema v7 adds `PlaybackStateLockSettings` for the repeated-pause escape hatch. Application keeps a bounded
+queue of distinct direct Playing-to-Paused observation times. Duplicate Paused events never add entries; Changing,
+Recovery, suspend, target changes, explicit routes, settings changes and workstation transitions reset or bypass the
+sequence. Reaching the configured threshold publishes a one-shot Released status and performs no Play correction.
+WPF owns the replaceable notification-sound adapter and the five-second localized live-region message; neither Core
+nor Application depends on presentation or audio APIs. Schema v1–v6 migration supplies the 5-second/3-transition,
+sound-enabled defaults.
 
 ### Windows Media Surface Mirror
 

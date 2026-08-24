@@ -19,6 +19,18 @@ public sealed record DesktopSettings(
     string Theme = UiThemePreference.System,
     bool InterceptMediaKeys = true);
 
+public sealed record PlaybackStateLockSettings(
+    bool RepeatedPauseOverrideEnabled,
+    TimeSpan RepeatedPauseWindow,
+    int RepeatedPauseCount,
+    bool PlayOverrideSound)
+{
+    public const int MinimumWindowSeconds = 1;
+    public const int MaximumWindowSeconds = 60;
+    public const int MinimumPauseCount = 2;
+    public const int MaximumPauseCount = 10;
+}
+
 public static class UiLanguagePreference
 {
     public const string System = "system";
@@ -46,6 +58,9 @@ public sealed record MediaLockSettings(
     DesktopSettings? Desktop,
     ImmutableArray<PriorityRule> PriorityRules)
 {
+    public PlaybackStateLockSettings? PlaybackStateLock { get; init; } =
+        DefaultPlaybackStateLock;
+
     public MediaLockSettings(
         int SchemaVersion,
         RoutingMode DefaultRoutingMode,
@@ -55,7 +70,13 @@ public sealed record MediaLockSettings(
     {
     }
 
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
+
+    private static PlaybackStateLockSettings DefaultPlaybackStateLock { get; } = new(
+        RepeatedPauseOverrideEnabled: true,
+        RepeatedPauseWindow: TimeSpan.FromSeconds(5),
+        RepeatedPauseCount: 3,
+        PlayOverrideSound: true);
 
     public static MediaLockSettings Default { get; } = new(
         CurrentSchemaVersion,
@@ -66,7 +87,10 @@ public sealed record MediaLockSettings(
         new DesktopSettings(
             CloseToTray: true,
             StartWithWindows: false),
-        []);
+        [])
+    {
+        PlaybackStateLock = DefaultPlaybackStateLock,
+    };
 
     public ImmutableArray<ConfigurationIssue> Validate()
     {
@@ -107,6 +131,34 @@ public sealed record MediaLockSettings(
             issues.Add(new ConfigurationIssue(
                 "defaultRoutingMode",
                 $"Unknown routing mode value {(int)DefaultRoutingMode}."));
+        }
+
+        if (PlaybackStateLock is null)
+        {
+            issues.Add(new ConfigurationIssue(
+                "playbackStateLock",
+                "Playback State Lock settings are required."));
+        }
+        else
+        {
+            if (PlaybackStateLock.RepeatedPauseWindow <
+                    TimeSpan.FromSeconds(PlaybackStateLockSettings.MinimumWindowSeconds) ||
+                PlaybackStateLock.RepeatedPauseWindow >
+                    TimeSpan.FromSeconds(PlaybackStateLockSettings.MaximumWindowSeconds))
+            {
+                issues.Add(new ConfigurationIssue(
+                    "playbackStateLock.repeatedPauseWindow",
+                    "Repeated-pause window must be between 1 and 60 seconds."));
+            }
+
+            if (PlaybackStateLock.RepeatedPauseCount is <
+                    PlaybackStateLockSettings.MinimumPauseCount or >
+                    PlaybackStateLockSettings.MaximumPauseCount)
+            {
+                issues.Add(new ConfigurationIssue(
+                    "playbackStateLock.repeatedPauseCount",
+                    "Repeated-pause count must be between 2 and 10."));
+            }
         }
 
         if (Desktop is null)

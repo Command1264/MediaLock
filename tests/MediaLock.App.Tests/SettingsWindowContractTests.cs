@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
@@ -12,6 +13,39 @@ namespace MediaLock.App.Tests;
 [Collection("Localization")]
 public sealed class SettingsWindowContractTests
 {
+    [Fact]
+    public void SettingsCardsFollowTheRequestedTopToBottomOrder()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "MediaLock.App",
+            "SettingsWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var headings = xaml.Descendants(presentation + "TextBlock")
+            .Select(element => (string?)element.Attribute("Text"))
+            .Where(text => text is
+                "{loc:Translate Settings_General}" or
+                "{loc:Translate Settings_Appearance}" or
+                "{loc:Translate Settings_PlaybackStateLock}" or
+                "{loc:Translate Settings_RoutingRecovery}" or
+                "{loc:Translate Settings_PriorityRules}" or
+                "{loc:Translate Settings_AboutDiagnostics}")
+            .Select(text => text!)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "{loc:Translate Settings_General}",
+                "{loc:Translate Settings_Appearance}",
+                "{loc:Translate Settings_PlaybackStateLock}",
+                "{loc:Translate Settings_RoutingRecovery}",
+                "{loc:Translate Settings_PriorityRules}",
+                "{loc:Translate Settings_AboutDiagnostics}",
+            ],
+            headings);
+    }
+
     [Fact]
     public void SettingsUsesAFixedFramelessSurfaceWithSelectedAppearanceOptions()
     {
@@ -39,6 +73,7 @@ public sealed class SettingsWindowContractTests
                 AssertSelectedAppearanceOptions(window, viewModel);
                 AssertMediaKeyInterceptionSwitch(window);
                 AssertRecoveryFieldsAreAligned(window, viewModel);
+                AssertRepeatedPauseOverrideUsesSharedControls(window, viewModel);
                 AssertAboutAndDiagnosticActions(window, viewModel);
 
                 UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
@@ -144,6 +179,29 @@ public sealed class SettingsWindowContractTests
         Assert.Equal(window.FindResource("DangerBrush"), chrome.BorderBrush);
     }
 
+    private static void AssertRepeatedPauseOverrideUsesSharedControls(
+        SettingsWindow window,
+        SettingsViewModel viewModel)
+    {
+        var checkBoxes = WpfTestHost.FindVisualChildren<CheckBox>(window).ToArray();
+        Assert.Single(checkBoxes, candidate =>
+            candidate.GetBindingExpression(CheckBox.IsCheckedProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.RepeatedPauseOverrideEnabled));
+        Assert.Single(checkBoxes, candidate =>
+            candidate.GetBindingExpression(CheckBox.IsCheckedProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.PlayRepeatedPauseOverrideSound));
+
+        var textBoxes = WpfTestHost.FindVisualChildren<TextBox>(window).ToArray();
+        var windowField = Assert.Single(textBoxes, candidate =>
+            candidate.GetBindingExpression(TextBox.TextProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.RepeatedPauseWindowText));
+        var countField = Assert.Single(textBoxes, candidate =>
+            candidate.GetBindingExpression(TextBox.TextProperty)?
+                .ParentBinding.Path.Path == nameof(SettingsViewModel.RepeatedPauseCountText));
+        Assert.Equal(36, windowField.ActualHeight);
+        Assert.Equal(36, countField.ActualHeight);
+    }
+
     private sealed class FixedEnvironmentInfoProvider : IAppEnvironmentInfoProvider
     {
         public AppEnvironmentInfo GetCurrent() => new(
@@ -153,6 +211,22 @@ public sealed class SettingsWindowContractTests
             "26100.9168",
             "X64",
             IsSigned: false);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "MediaLock.sln")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the Media Lock repository root.");
     }
 
 }

@@ -158,15 +158,24 @@ Run the complete local gate and two-axis review before creating the clean formal
 Sandbox evidence must match that artifact's exact source commit and digest and repeat the RC3 critical paths; no RC
 runtime result transfers. Preserve `release/0.2` as the current stable hotfix baseline after merge and publication.
 
-Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off, both
-desired states and observed Playing, Paused, Stopped, Closed and unavailable states. It requires no correction for a
-matching observation, uses explicit Play/Pause for an opposite observation, and never restarts Stopped or Closed
-playback. Application tests use fake time and controller observations to prove captured-target protection, one
-in-flight correction, confirmation, bounded retry, exhaustion, Stop clearing, Next/Previous preservation and
-Play/Pause desired-state updates. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown
-must cancel or suspend pending work without dispatching to a competing Session. Process restart begins at Off.
+Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off and Keep
+Playing against observed Playing, Paused, Stopped, Closed and unavailable states. Only Keep Playing plus Paused yields
+an explicit Play correction; no policy yields Pause, and Stopped or Closed playback is never restarted. Application
+tests use controller observations and fresh catalog snapshots to prove captured-target protection, one in-flight
+correction, confirmation, two-attempt exhaustion, Media Lock Pause/Toggle/Stop clearing and Play/Next/Previous
+preservation. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown must cancel,
+suspend or clear work without dispatching to a competing Session. Process restart begins at Off.
+Workstation lifecycle tests distinguish power suspend from Session Lock/Unlock, require an unlock-triggered GSMTC
+refresh, and cover lock-screen Pause arriving on either side of the Unlock event. That explicit override clears Keep
+Playing with zero correction commands; an unchanged Playing refresh preserves the policy and closes the attribution
+window so a later desktop Pause is corrected normally.
+Repeated-pause tests use a controllable clock to prove that three distinct Playing-to-Paused transitions in the
+default five-second window release Keep Playing, leave the third pause uncorrected and emit a Released state. They
+also prove window expiry, duplicate Paused suppression, Changing-to-Paused buffering exclusion, sequence resets and
+settings bounds. ViewModel tests verify one optional system-sound request and a localized notice that clears after
+five seconds or disposal.
 
-Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one visible policy state,
+Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one of Off/Keep Playing,
 stable geometry, accessibility names, keyboard operation and English/Traditional Chinese plus Light/Dark rendering.
 Hardware-assisted coverage uses YouTube Music and ordinary YouTube simultaneously. It changes playback both through
 Media Lock and outside it, then repeats Next, Previous, reload/Recovery, focus changes, lock/unlock, sleep/resume and

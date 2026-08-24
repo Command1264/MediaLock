@@ -239,33 +239,50 @@ correlate browser tabs with GSMTC Sessions remain later `v0.3.x` work when techn
 Before browser integration, Phase 7 establishes localization and visual foundations as independently reviewed
 post-RC work. Localization does not alter Session matching or routing semantics.
 
-The published `0.2.0-rc.3` artifact remains frozen. Phase 11 does not amend that candidate or transfer its evidence;
-stable `0.2.0` keeps its existing release gate, while executable Phase 11 work targets `0.3.0`.
+The published stable `0.2.0` artifact and retained `release/0.2` hotfix baseline remain frozen. Executable Phase 11
+work targets `0.3.0` and does not transfer stable-release evidence.
 
 #### Playback State Lock
 
-Playback State Lock is an explicit three-state control on the current-target surface:
+Playback State Lock is an explicit two-state control on the current-target surface:
 
 - **Off** sends ordinary one-shot media commands and performs no later correction.
-- **Keep Playing** corrects an observed Paused state with an explicit Play request.
-- **Keep Paused** corrects an observed Playing state with an explicit Pause request.
+- **Keep Playing** can be armed only while the routed target is Playing and corrects an externally observed Paused
+  state with an explicit Play request.
 
 Enforcement never uses TogglePlayPause because a delayed or duplicate toggle could invert the intended state. A Media
-Lock Play, Pause or physical Play/Pause action updates the Desired Playback State when the lock is armed; Next and
-Previous preserve it. Stop first clears Playback State Lock and then stops so enforcement cannot immediately restart
-the target. Keep Playing does not resurrect a Stopped, Closed or unavailable source, including a naturally exhausted
-queue.
+Lock Pause, TogglePlayPause or Stop action clears Keep Playing before routing, so an explicit Media Lock action can
+pause or stop normally. Play, Next and Previous preserve it. Off ignores both external Playing-to-Paused and
+Paused-to-Playing changes. Keep Playing does not resurrect a Stopped, Closed or unavailable source, including a
+naturally exhausted queue.
+
+Windows lock-screen media controls are an explicit user override. A Paused, Stopped or Closed observation from the
+Armed Playback Target while the workstation is locked, or in the first fresh observation immediately after unlock,
+clears Keep Playing without sending Play. Locking and unlocking without changing playback preserves the policy; the
+post-unlock GSMTC refresh closes this attribution window before later desktop observations are evaluated normally.
+
+An enabled-by-default repeated-pause override gives a person another deliberate escape path. The defaults are three
+distinct Playing-to-Paused transitions within five seconds and one system notification sound. The threshold event is
+not corrected: it turns Keep Playing Off and leaves the target paused. Settings allow a 1–60 second window, a 2–10
+transition threshold and sound on/off. Changing/buffering observations, duplicate Paused events, Recovery, catalog
+loss, target changes, Media Lock commands and lock-screen overrides do not increment the sequence. Because GSMTC does
+not expose the origin of a Paused value, a player that reports sustained buffering as a genuine direct
+Playing-to-Paused transition cannot be distinguished perfectly; Media Lock uses the explicit Changing state and
+transition history rather than claiming source attribution it does not receive.
 
 The lock is armed against the active target identity at the moment the user selects it. Recovery may resume enforcement
-only for the accepted successor of that same target. Catalog loss, suspend, fallback routing and ambiguous recovery
-suspend correction and must never send it to another Session. An explicit target change clears the lock and requires
-the user to arm it again. Corrections use bounded confirmation and retry; exhaustion leaves an actionable visible status
-instead of fighting the player indefinitely.
+only for the accepted successor of that same target. Catalog loss, suspend and ambiguous Recovery suspend correction;
+fallback routing and unrelated target changes clear it and must never redirect a correction. Corrections wait for fresh
+catalog observations, allow at most two unconfirmed Play attempts for one paused episode, and expose an actionable
+Failed state instead of fighting the player indefinitely. A fresh Playing observation confirms recovery and resets the
+bounded attempt state.
 
 The first version is process-lifetime state and is not restored at login or application restart. This prevents a
 background startup from unexpectedly starting audio. Persisted automatic re-arming, if ever added, requires a separate
-opt-in product decision and migration. The current-target surface shows which Play or Pause state is locked so the
-policy is not hidden in Settings.
+opt-in product decision and migration. The current-target surface shows Off or Keep Playing so the policy is not
+hidden in Settings.
+Settings schema v7 persists only repeated-pause override preferences; the active policy and its counter remain
+process-lifetime state. Schema v1–v6 documents migrate to the enabled 5-second/3-transition/sound defaults.
 
 #### Windows Media Surface Mirror
 
