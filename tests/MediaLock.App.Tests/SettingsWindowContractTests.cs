@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
+using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using Xunit;
 
@@ -16,7 +17,9 @@ public sealed class SettingsWindowContractTests
     {
         WpfTestHost.Run(() =>
         {
-            using var viewModel = new SettingsViewModel(new FakeMediaLockApplication());
+            using var viewModel = new SettingsViewModel(
+                new FakeMediaLockApplication(),
+                environmentInfoProvider: new FixedEnvironmentInfoProvider());
             var window = new SettingsWindow(viewModel);
             var originalLanguage = UiText.CurrentCulture.Name == "zh-TW"
                 ? UiLanguagePreference.TraditionalChinese
@@ -36,6 +39,7 @@ public sealed class SettingsWindowContractTests
                 AssertSelectedAppearanceOptions(window, viewModel);
                 AssertMediaKeyInterceptionSwitch(window);
                 AssertRecoveryFieldsAreAligned(window, viewModel);
+                AssertAboutAndDiagnosticActions(window, viewModel);
 
                 UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
@@ -47,6 +51,33 @@ public sealed class SettingsWindowContractTests
                 UiText.Apply(originalLanguage);
             }
         });
+    }
+
+    private static void AssertAboutAndDiagnosticActions(
+        SettingsWindow window,
+        SettingsViewModel viewModel)
+    {
+        var buttons = WpfTestHost.FindVisualChildren<Button>(window).ToArray();
+        Assert.Single(buttons, button => ReferenceEquals(
+            button.Command,
+            viewModel.CopyDiagnosticsCommand));
+        Assert.Single(buttons, button => ReferenceEquals(
+            button.Command,
+            viewModel.OpenLogsFolderCommand));
+        Assert.Single(buttons, button => ReferenceEquals(
+            button.Command,
+            viewModel.OpenSupportCommand));
+        Assert.Single(buttons, button => ReferenceEquals(
+            button.Command,
+            viewModel.ReportBugCommand));
+
+        var text = WpfTestHost.FindVisualChildren<TextBlock>(window)
+            .Select(textBlock => textBlock.Text)
+            .ToArray();
+        Assert.Contains("0.2.0-rc.3", text);
+        Assert.Contains(text, value => value.Contains(
+            "Windows 11 Enterprise 24H2",
+            StringComparison.Ordinal));
     }
 
     private static void AssertSelectedAppearanceOptions(
@@ -99,6 +130,17 @@ public sealed class SettingsWindowContractTests
             WpfTestHost.FindVisualChildren<Border>(timeout),
             candidate => candidate.Name == "Chrome");
         Assert.Equal(window.FindResource("DangerBrush"), chrome.BorderBrush);
+    }
+
+    private sealed class FixedEnvironmentInfoProvider : IAppEnvironmentInfoProvider
+    {
+        public AppEnvironmentInfo GetCurrent() => new(
+            "0.2.0-rc.3",
+            "Windows 11 Enterprise",
+            "24H2",
+            "26100.9168",
+            "X64",
+            IsSigned: false);
     }
 
 }

@@ -13,11 +13,15 @@ namespace MediaLock.App.ViewModels;
 
 public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataErrorInfo, IDisposable
 {
+    private static readonly TimeSpan SupportStatusDuration = TimeSpan.FromSeconds(5);
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly Action? requestClose;
     private readonly Action<string>? applyLanguage;
     private readonly Action<string>? applyTheme;
+    private readonly AppEnvironmentInfo environmentInfo;
+    private readonly IDesktopSupportActions? desktopSupportActions;
+    private readonly Func<bool> isMediaInputRunning;
     private readonly AsyncCommand saveCommand;
     private bool closeToTray;
     private bool startWithWindows;
@@ -31,6 +35,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private string? recoveryTimeoutError;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
+    private string? supportStatusMessage;
+    private CancellationTokenSource? supportStatusCancellation;
     private string? selectedAvailableApplication;
     private MediaLockSettings? appliedSettings;
     private bool disposed;
@@ -40,7 +46,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         SynchronizationContext? synchronizationContext = null,
         Action? requestClose = null,
         Action<string>? applyLanguage = null,
-        Action<string>? applyTheme = null)
+        Action<string>? applyTheme = null,
+        IAppEnvironmentInfoProvider? environmentInfoProvider = null,
+        IDesktopSupportActions? desktopSupportActions = null,
+        Func<bool>? isMediaInputRunning = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
@@ -48,6 +57,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         this.requestClose = requestClose;
         this.applyLanguage = applyLanguage;
         this.applyTheme = applyTheme;
+        environmentInfo = environmentInfoProvider?.GetCurrent() ?? new AppEnvironmentInfo(
+            "Unknown",
+            "Windows",
+            string.Empty,
+            "Unknown",
+            "Unknown",
+            IsSigned: false);
+        this.desktopSupportActions = desktopSupportActions;
+        this.isMediaInputRunning = isMediaInputRunning ?? (() => false);
         saveCommand = new AsyncCommand(_ => SaveAsync(), _ => !HasErrors);
         SaveCommand = saveCommand;
         CancelCommand = new AsyncCommand(_ => CancelAsync());
@@ -55,6 +73,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         MovePriorityRuleUpCommand = new AsyncCommand(MovePriorityRuleUpAsync);
         MovePriorityRuleDownCommand = new AsyncCommand(MovePriorityRuleDownAsync);
         RemovePriorityRuleCommand = new AsyncCommand(RemovePriorityRuleAsync);
+        CopyDiagnosticsCommand = new AsyncCommand(
+            _ => ExecuteSupportActionAsync(DesktopSupportAction.CopyDiagnostics),
+            _ => desktopSupportActions is not null);
+        OpenLogsFolderCommand = new AsyncCommand(
+            _ => ExecuteSupportActionAsync(DesktopSupportAction.OpenLogsFolder),
+            _ => desktopSupportActions is not null);
+        OpenSupportCommand = new AsyncCommand(
+            _ => ExecuteSupportActionAsync(DesktopSupportAction.OpenSupport),
+            _ => desktopSupportActions is not null);
+        ReportBugCommand = new AsyncCommand(
+            _ => ExecuteSupportActionAsync(DesktopSupportAction.ReportBug),
+            _ => desktopSupportActions is not null);
         application.StateChanged += OnApplicationStateChanged;
         UiText.CultureChanged += OnCultureChanged;
         RefreshLocalizedOptions();
@@ -199,6 +229,40 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
     public IAsyncCommand RemovePriorityRuleCommand { get; }
 
+    public IAsyncCommand CopyDiagnosticsCommand { get; }
+
+    public IAsyncCommand OpenLogsFolderCommand { get; }
+
+    public IAsyncCommand OpenSupportCommand { get; }
+
+    public IAsyncCommand ReportBugCommand { get; }
+
+    public string AppVersion => environmentInfo.AppVersion;
+
+    public string WindowsDescription
+    {
+        get
+        {
+            var displayVersion = string.IsNullOrWhiteSpace(environmentInfo.WindowsDisplayVersion)
+                ? string.Empty
+                : $" {environmentInfo.WindowsDisplayVersion}";
+            return $"{environmentInfo.WindowsProductName}{displayVersion} · " +
+                $"{environmentInfo.WindowsBuild} · {environmentInfo.Architecture}";
+        }
+    }
+
+    public string ReleaseStatusText => UiText.Get(environmentInfo.IsPrerelease
+        ? "Settings_ReleasePrerelease"
+        : "Settings_ReleaseStable") + " · " + UiText.Get(environmentInfo.IsSigned
+            ? "Settings_SignatureSigned"
+            : "Settings_SignatureUnsigned");
+
+    public string? SupportStatusMessage
+    {
+        get => supportStatusMessage;
+        private set => SetField(ref supportStatusMessage, value);
+    }
+
     public string? ErrorMessage
     {
         get => errorMessage;
@@ -221,6 +285,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
         application.StateChanged -= OnApplicationStateChanged;
         UiText.CultureChanged -= OnCultureChanged;
+        ClearSupportStatus();
         disposed = true;
     }
 
@@ -247,6 +312,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             applyLanguage?.Invoke(SelectedLanguage);
             applyTheme?.Invoke(SelectedTheme);
             ErrorMessage = null;
+            ClearSupportStatus();
             requestClose?.Invoke();
         }
         catch (Exception exception)
@@ -266,6 +332,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     {
         Apply(application.State.Settings);
         ErrorMessage = null;
+        ClearSupportStatus();
     }
 
     private void OnCultureChanged(object? sender, EventArgs args)
@@ -273,17 +340,102 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {
-            synchronizationContext.Post(_ => RefreshLocalizedOptions(), null);
+            synchronizationContext.Post(_ => RefreshLocalizedPresentation(), null);
             return;
         }
 
+        RefreshLocalizedPresentation();
+    }
+
+    private void RefreshLocalizedPresentation()
+    {
         RefreshLocalizedOptions();
+        OnPropertyChanged(nameof(ReleaseStatusText));
+        if (SupportStatusMessage is not null)
+        {
+            SupportStatusMessage = UiText.Get("Settings_DiagnosticsCopied");
+        }
+
         if (HasErrors)
         {
             recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
             ErrorsChanged?.Invoke(
                 this,
                 new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+        }
+    }
+
+    private async Task ExecuteSupportActionAsync(DesktopSupportAction action)
+    {
+        if (desktopSupportActions is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var summary = action == DesktopSupportAction.CopyDiagnostics
+                ? DiagnosticSummary.Create(
+                    environmentInfo,
+                    application.State,
+                    isMediaInputRunning())
+                : null;
+            await desktopSupportActions.ExecuteAsync(
+                new DesktopSupportRequest(action, summary),
+                CancellationToken.None);
+            ErrorMessage = null;
+            if (action == DesktopSupportAction.CopyDiagnostics)
+            {
+                ShowSupportStatus(UiText.Get("Settings_DiagnosticsCopied"));
+            }
+            else
+            {
+                ClearSupportStatus();
+            }
+        }
+        catch (Exception exception)
+        {
+            ClearSupportStatus();
+            ErrorMessage = UiText.Format("Settings_SupportActionFailed", exception.Message);
+        }
+    }
+
+    private void ShowSupportStatus(string message)
+    {
+        ClearSupportStatus();
+        SupportStatusMessage = message;
+        var cancellation = new CancellationTokenSource();
+        supportStatusCancellation = cancellation;
+        _ = ClearSupportStatusAfterDelayAsync(cancellation);
+    }
+
+    private void ClearSupportStatus()
+    {
+        var cancellation = supportStatusCancellation;
+        supportStatusCancellation = null;
+        cancellation?.Cancel();
+        SupportStatusMessage = null;
+    }
+
+    private async Task ClearSupportStatusAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(SupportStatusDuration, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(supportStatusCancellation, cancellation))
+            {
+                supportStatusCancellation = null;
+                SupportStatusMessage = null;
+            }
+
+            cancellation.Dispose();
         }
     }
 

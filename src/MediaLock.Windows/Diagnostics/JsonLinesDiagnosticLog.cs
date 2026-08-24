@@ -16,14 +16,16 @@ public sealed class JsonLinesDiagnosticLog : IDiagnosticLog, IAsyncDisposable
 
     public JsonLinesDiagnosticLog()
         : this(
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MediaLock",
-                "logs"),
+            DefaultDirectoryPath,
             DefaultMaxFileBytes,
             DefaultMaxFiles)
     {
     }
+
+    public static string DefaultDirectoryPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MediaLock",
+        "logs");
 
     internal JsonLinesDiagnosticLog(
         string directoryPath,

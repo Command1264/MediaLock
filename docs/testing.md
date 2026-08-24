@@ -136,6 +136,20 @@ environment and competing-source evidence while warning reporters to redact medi
 settings. Documentation review follows one fresh-download path through digest verification, first run, update,
 rollback and removal. GitHub Actions capacity is not required.
 
+Phase 10B tests `DiagnosticSummary` at its public pure-function seam with deliberately private media metadata and
+requires exact native line separators plus the documented allowlist. Windows adapter tests cover version/build
+projection, Windows 11 normalization, architecture, embedded-signature state, exact clipboard text, log-directory
+creation and canonical support targets without opening interactive applications. Settings ViewModel tests replace
+both adapters, verify all four actions and actionable failure projection; WPF contract coverage requires the version
+facts, four command bindings and accessibility names inside the existing scrollable modal. Manual verification follows
+[Phase 10B About and diagnostics smoke](phase-10/about-diagnostics-smoke.md) in English/Traditional Chinese and
+Light/Dark. This executable change requires a separately built `0.2.0-rc.3` clean-host and Sandbox gate.
+
+Phase 10C repeats the complete local and packaging gates from a clean reviewed `0.2.0-rc.3` source commit. Host and
+Windows Sandbox results must independently match that commit and archive digest, exercise the new About/diagnostics
+surface, and confirm the existing single-instance, Settings, startup, tray, GSMTC and global-media-key paths. No
+`0.2.0-rc.1` or `0.2.0-rc.2` evidence transfers.
+
 ### Integration tests
 
 Cover:
@@ -291,7 +305,8 @@ The formal `0.2.0-rc.1` candidate passed this gate on Windows Sandbox on 2026-08
 digest, environment and results are preserved in [Phase 6 packaged validation](phase-6/host-smoke.md). The same gate
 was completed independently for the formal `0.2.0-rc.2` candidate on 2026-08-24; its exact identity and results are
 preserved in [Phase 9 packaged validation](phase-9/release-candidate-smoke.md). Evidence does not transfer between
-commits or digests.
+commits or digests. Record `0.2.0-rc.3` evidence independently in
+[Phase 10C packaged validation](phase-10/release-candidate-smoke.md).
 
 ## 7. Manual evidence
 

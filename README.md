@@ -9,6 +9,7 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
+目前開發來源回報 `0.2.0-rc.3`；下方公開下載仍是已完成獨立驗證的 `0.2.0-rc.2`。
 
 已驗證的基礎能力包括：
 
@@ -48,6 +49,9 @@ Priority Rules，並可選擇跟隨 Windows、英文或繁體中文介面，以�
 直接恢復到前景。主視窗的 Windows 標題列會跟隨實際套用的淺色或深色主題。
 使用者資料位於 `%LocalAppData%\MediaLock\`：`settings.json`、`state.json` 與
 有界輪替的 `logs\*.jsonl`。正常診斷記錄預設不保存媒體 title 或 artist。
+目前原始碼的 Settings 最下方另有「關於與診斷」卡片，可查看程式與 Windows
+版本、發行／簽署狀態，複製保護隱私的診斷摘要、開啟記錄資料夾，以及前往支援或問題回報頁面。
+摘要不包含媒體標題、演出者、帳戶名稱、完整路徑或完整設定；公開分享前仍應自行檢閱。
 
 主視窗最後一次成功選擇的 Routing Mode 會成為下次啟動模式，Settings 以唯讀摘要顯示該值。
 Recovery timeout、Fallback Policy 與 Priority Rules 會在下次啟動時套用。Priority
@@ -73,14 +77,15 @@ Session 的來源應用程式，並在該應用程式的候選 Sessions 間依�
 Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manifest 與 SHA-256：
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.2
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.3
 ```
 
-輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。正式 `0.2.0-rc.2` 已以自身 source
+此命令供下一個候選版本使用，現在不代表 `0.2.0-rc.3` 已發布。輸出位於 `artifacts\`，ZIP 內只包含
+self-contained `MediaLock.exe`。正式 `0.2.0-rc.2` 已以自身 source
 commit 與 archive digest 通過 Windows Sandbox gate，可描述為 portable layout。目前僅支援 `win-x64`
 且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
-[Release candidate runbook](docs/release-candidate.md)，版本內容見
-[0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。正式候選已透過
+[Release candidate runbook](docs/release-candidate.md)，下一個候選的版本內容見
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前公開的正式候選仍透過
 [GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2) 公開 ZIP；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 

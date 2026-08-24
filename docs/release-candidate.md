@@ -2,17 +2,16 @@
 
 ## Scope and release status
 
-The current candidate is `0.2.0-rc.2`, targeting `win-x64` as a self-contained single-file WPF application. It
-packages Session Lock, App Lock, Priority Rules, Recovery, tray and settings behavior; English and Traditional Chinese
-localization; Light and Dark themes; routed-target artwork and timeline; absolute Seek; and production global
-media-key interception. Volume, customizable shortcuts and browser integration remain outside this candidate.
+The validated candidate is `0.2.0-rc.3`, targeting `win-x64` as a self-contained single-file WPF application.
+It contains the `0.2.0-rc.2` routing, Recovery, localization, theme, Now Playing, Seek and production media-key work,
+plus the Phase 10B in-app About and privacy-safe diagnostics surface. Volume, customizable shortcuts and browser
+integration remain outside this candidate.
 
 The candidate is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. The earlier formal
-`0.2.0-rc.1` candidate from source commit `a2e85007ec570344ab91518f0b1de918605be8a0` passed the clean-environment
-gate on 2026-08-23. That evidence does not transfer to `0.2.0-rc.2`; the new candidate may be described as portable
-in layout only after its exact source commit and archive digest pass the same gate. The formal `0.2.0-rc.2` candidate
-identified in the Phase 9 evidence passed that clean-environment gate on 2026-08-24.
+`0.2.0-rc.1` and `0.2.0-rc.2` passed their own clean-environment gates. Their evidence does not transfer to
+`0.2.0-rc.3`. Its exact source commit `10dbb5b1452fe27084a28e254388fe974ed277e6` and archive SHA-256
+`ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a` passed the host and Windows Sandbox gates.
 
 Single-file publication embeds native libraries for extraction. On Windows, .NET can extract bundled files beneath
 `%TEMP%\.net` while the program runs. Trimming and ReadyToRun are disabled for this candidate.
@@ -39,7 +38,7 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 Then create the formal artifact:
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.2
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.3
 ```
 
 The command refuses to overwrite existing outputs and refuses dirty source by default. It fingerprints tracked and
@@ -49,9 +48,9 @@ during the build. `-AllowDirty` exists only for explicitly disclosed test artifa
 
 Expected files:
 
-- `artifacts\MediaLock-0.2.0-rc.2-win-x64.zip`
-- `artifacts\MediaLock-0.2.0-rc.2-win-x64.manifest.json`
-- `artifacts\MediaLock-0.2.0-rc.2-win-x64.sha256`
+- `artifacts\MediaLock-0.2.0-rc.3-win-x64.zip`
+- `artifacts\MediaLock-0.2.0-rc.3-win-x64.manifest.json`
+- `artifacts\MediaLock-0.2.0-rc.3-win-x64.sha256`
 
 The ZIP must contain exactly one file named `MediaLock.exe`. The manifest is the source of truth for version, source
 commit, SDK, RID, dirty/signing state and archive size/hash.
@@ -61,8 +60,8 @@ commit, SDK, RID, dirty/signing state and archive size/hash.
 Place the three files in one directory and run:
 
 ```powershell
-$archive = '.\MediaLock-0.2.0-rc.2-win-x64.zip'
-$manifest = Get-Content '.\MediaLock-0.2.0-rc.2-win-x64.manifest.json' -Raw | ConvertFrom-Json
+$archive = '.\MediaLock-0.2.0-rc.3-win-x64.zip'
+$manifest = Get-Content '.\MediaLock-0.2.0-rc.3-win-x64.manifest.json' -Raw | ConvertFrom-Json
 $actualHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
 $actualHash
 $manifest.archive.sha256
@@ -107,10 +106,10 @@ settings as a routine rollback step. If login startup was enabled, disable it fr
 rollback or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
-approval after all release gates pass. That approval was separately granted for `0.2.0-rc.2`; its signed annotated tag,
-public GitHub Prerelease and ZIP asset are recorded in the Phase 9 evidence. The executable itself remains unsigned.
+approval after all release gates pass. No such approval is implied for `0.2.0-rc.3`. The executable remains unsigned.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
-[Phase 6 packaged validation](phase-6/host-smoke.md). Record `0.2.0-rc.2` results separately; a different version,
-source commit or archive digest always requires new evidence. Current `0.2.0-rc.2` progress is recorded in
-[Phase 9 packaged validation](phase-9/release-candidate-smoke.md).
+[Phase 6 packaged validation](phase-6/host-smoke.md), and `0.2.0-rc.2` evidence is preserved in
+[Phase 9 packaged validation](phase-9/release-candidate-smoke.md). A different version, source commit or archive digest
+always requires new evidence. Record current `0.2.0-rc.3` results only in
+[Phase 10C packaged validation](phase-10/release-candidate-smoke.md).

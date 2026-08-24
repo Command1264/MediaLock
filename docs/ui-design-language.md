@@ -30,6 +30,17 @@ The shared dictionary supplies custom templates for Button, Routing Mode ToggleB
 ProgressBar, Slider, ComboBox, ComboBoxItem, CheckBox and ListBoxItem. Card, status-pill and error surfaces use shared
 styles. Plain layout containers and text-only elements consume semantic brushes and typography but require no chrome.
 
+Settings About and diagnostics uses the existing `CardStyle`, secondary text and standard Button templates. Facts use
+a compact label/value grid; long Windows descriptions wrap instead of clipping. Actions use a `WrapPanel` so translated
+labels retain standard height and move as whole controls on narrower rows. Copy confirmation uses `SuccessBrush`,
+adapter failures use the existing Settings `DangerBrush` error surface, and neither state changes control geometry.
+Every action has a descriptive automation name; the confirmation is a polite live region.
+
+Transient success or informational feedback clears after five seconds and immediately when its owning surface closes.
+A newer message replaces the previous message and its pending timeout. Visible localized feedback refreshes when the UI
+language changes. Actionable errors are not transient: keep them visible until the user dismisses them or the
+underlying operation succeeds.
+
 Before adding another visible control type, first decide whether an existing shared style or semantic variant covers
 it. Add a shared template when the platform default would introduce a different radius, palette or interaction
 language.

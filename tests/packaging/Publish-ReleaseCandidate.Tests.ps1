@@ -20,7 +20,7 @@ $isolatedSourceRoot = Join-Path $temporaryRoot 'source'
 $artifactOutputRoot = Join-Path $temporaryRoot 'output'
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
 $dirtyMarkerPath = Join-Path $isolatedSourceRoot '.MediaLock-Packaging-Test.tmp'
-$version = '0.2.0-rc.2'
+$version = '0.2.0-rc.3'
 $artifactStem = "MediaLock-$version-win-x64"
 $isolatedWorktreeCreated = $false
 

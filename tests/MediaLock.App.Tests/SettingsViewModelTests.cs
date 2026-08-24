@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MediaLock.App.Localization;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -7,8 +8,159 @@ using Xunit;
 
 namespace MediaLock.App.Tests;
 
+[Collection("Localization")]
 public sealed class SettingsViewModelTests
 {
+    [Fact]
+    public async Task DiagnosticCommandsUseTheDesktopSupportSeamWithPrivacySafeContent()
+    {
+        var session = Session("secret-session", "MSEdge") with
+        {
+            Metadata = new MediaLock.Core.Media.MediaMetadata(
+                "Private title",
+                "Private artist",
+                null,
+                null),
+        };
+        var state = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with { Sessions = [session] },
+        };
+        var application = new FakeApplication(state);
+        var actions = new FakeDesktopSupportActions();
+        var environment = new FixedEnvironmentInfoProvider(new AppEnvironmentInfo(
+            "0.2.0-rc.3",
+            "Windows 11 Enterprise",
+            "24H2",
+            "26100.9168",
+            "X64",
+            IsSigned: false));
+        using var viewModel = new SettingsViewModel(
+            application,
+            environmentInfoProvider: environment,
+            desktopSupportActions: actions,
+            isMediaInputRunning: () => true);
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        var copyStatus = viewModel.SupportStatusMessage;
+        await viewModel.OpenLogsFolderCommand.ExecuteAsync(null);
+        await viewModel.OpenSupportCommand.ExecuteAsync(null);
+        await viewModel.ReportBugCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            [
+                DesktopSupportAction.CopyDiagnostics,
+                DesktopSupportAction.OpenLogsFolder,
+                DesktopSupportAction.OpenSupport,
+                DesktopSupportAction.ReportBug,
+            ],
+            actions.Requests.Select(request => request.Action));
+        var copied = Assert.Single(
+            actions.Requests,
+            request => request.Action == DesktopSupportAction.CopyDiagnostics);
+        Assert.Contains("Version: 0.2.0-rc.3", copied.DiagnosticSummary, StringComparison.Ordinal);
+        Assert.Contains("Media-key interception: Active", copied.DiagnosticSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private title", copied.DiagnosticSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private artist", copied.DiagnosticSummary, StringComparison.Ordinal);
+        Assert.NotNull(copyStatus);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task CopiedDiagnosticsConfirmationExpires()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await Task.Delay(TimeSpan.FromSeconds(5.5));
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task CancelingSettingsClearsCopiedDiagnosticsConfirmation()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await viewModel.CancelCommand.ExecuteAsync(null);
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task SavingSettingsClearsCopiedDiagnosticsConfirmation()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: new FakeDesktopSupportActions());
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
+    [Fact]
+    public async Task VisibleCopiedDiagnosticsConfirmationUsesTheCurrentLanguage()
+    {
+        UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        try
+        {
+            var application = new FakeApplication(MediaLockApplicationState.Initial);
+            using var viewModel = new SettingsViewModel(
+                application,
+                desktopSupportActions: new FakeDesktopSupportActions());
+
+            await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+            Assert.Equal(
+                "Diagnostics copied. Review the text before sharing it.",
+                viewModel.SupportStatusMessage);
+
+            UiText.Apply(UiLanguagePreference.TraditionalChinese);
+
+            Assert.Equal(
+                "已複製診斷摘要。分享前請先檢閱內容。",
+                viewModel.SupportStatusMessage);
+        }
+        finally
+        {
+            UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        }
+    }
+
+    [Fact]
+    public async Task FailedDesktopSupportActionShowsAnActionableError()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        var actions = new FakeDesktopSupportActions
+        {
+            Exception = new InvalidOperationException("Clipboard is unavailable."),
+        };
+        using var viewModel = new SettingsViewModel(
+            application,
+            environmentInfoProvider: new FixedEnvironmentInfoProvider(new AppEnvironmentInfo(
+                "0.2.0-rc.3",
+                "Windows 11",
+                "24H2",
+                "26100.9168",
+                "X64",
+                IsSigned: false)),
+            desktopSupportActions: actions);
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+
+        Assert.Contains("Clipboard is unavailable.", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.Null(viewModel.SupportStatusMessage);
+    }
+
     [Theory]
     [InlineData("-1")]
     [InlineData("301")]
@@ -355,6 +507,32 @@ public sealed class SettingsViewModelTests
         {
             State = state;
             StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(state));
+        }
+    }
+
+    private sealed class FixedEnvironmentInfoProvider(AppEnvironmentInfo info)
+        : IAppEnvironmentInfoProvider
+    {
+        public AppEnvironmentInfo GetCurrent() => info;
+    }
+
+    private sealed class FakeDesktopSupportActions : IDesktopSupportActions
+    {
+        public List<DesktopSupportRequest> Requests { get; } = [];
+
+        public Exception? Exception { get; init; }
+
+        public ValueTask ExecuteAsync(
+            DesktopSupportRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (Exception is not null)
+            {
+                throw Exception;
+            }
+
+            Requests.Add(request);
+            return ValueTask.CompletedTask;
         }
     }
 }

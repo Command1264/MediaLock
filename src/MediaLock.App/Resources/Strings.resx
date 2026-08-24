@@ -128,4 +128,24 @@
   <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>Media key interception unavailable</value></data>
   <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock could not start global media-key interception. Media controls in the app remain available, but physical media keys will be handled by Windows.</value></data>
   <data name="App_MediaInputStopped" xml:space="preserve"><value>Global media-key interception encountered an error. Physical media keys may be handled by Windows until Media Lock is restarted.</value></data>
+  <data name="Settings_ReleasePrerelease" xml:space="preserve"><value>Prerelease</value></data>
+  <data name="Settings_ReleaseStable" xml:space="preserve"><value>Stable release</value></data>
+  <data name="Settings_SignatureSigned" xml:space="preserve"><value>Signed</value></data>
+  <data name="Settings_SignatureUnsigned" xml:space="preserve"><value>Unsigned</value></data>
+  <data name="Settings_DiagnosticsCopied" xml:space="preserve"><value>Diagnostics copied. Review the text before sharing it.</value></data>
+  <data name="Settings_SupportActionFailed" xml:space="preserve"><value>Could not complete the support action: {0}</value></data>
+  <data name="Settings_AboutDiagnostics" xml:space="preserve"><value>About and diagnostics</value></data>
+  <data name="Settings_AboutDescription" xml:space="preserve"><value>Check this installation and open the resources needed for troubleshooting.</value></data>
+  <data name="Settings_Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Settings_Windows" xml:space="preserve"><value>Windows</value></data>
+  <data name="Settings_ReleaseStatus" xml:space="preserve"><value>Release status</value></data>
+  <data name="Settings_DiagnosticsPrivacy" xml:space="preserve"><value>The copied summary excludes media titles, artists, account names, full paths, and complete settings. Review it before sharing.</value></data>
+  <data name="Settings_CopyDiagnostics" xml:space="preserve"><value>Copy diagnostics</value></data>
+  <data name="Settings_CopyDiagnosticsAutomation" xml:space="preserve"><value>Copy privacy-safe Media Lock diagnostics</value></data>
+  <data name="Settings_OpenLogs" xml:space="preserve"><value>Open logs</value></data>
+  <data name="Settings_OpenLogsAutomation" xml:space="preserve"><value>Open the Media Lock logs folder</value></data>
+  <data name="Settings_OpenSupport" xml:space="preserve"><value>Open support</value></data>
+  <data name="Settings_OpenSupportAutomation" xml:space="preserve"><value>Open Media Lock support</value></data>
+  <data name="Settings_ReportBug" xml:space="preserve"><value>Report a bug</value></data>
+  <data name="Settings_ReportBugAutomation" xml:space="preserve"><value>Open the Media Lock bug report form</value></data>
 </root>

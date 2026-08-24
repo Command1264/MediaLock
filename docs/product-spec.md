@@ -129,6 +129,18 @@ draggable header; it has no minimize, maximize or native close actions, and its 
 is open. Cancel and Escape discard unsaved edits, while a successful save closes the surface. Closing Settings
 returns focus directly to the main window even after the user has switched applications.
 
+Settings ends with one About and diagnostics card. It shows the executable version, Windows product/display/build
+and architecture, prerelease/stable state, and whether the executable contains an Authenticode signature. It can
+copy a privacy-safe diagnostic summary, open the bounded log directory, open support, or open the canonical bug
+form. The summary contains environment, routing, catalog, interception and Recovery facts, but excludes media title,
+artist, account name, full path, complete settings and persisted target identity. Media-key interception distinguishes
+an active hook from an enabled setting whose hook is unavailable. The summary uses the host operating system's native
+line separator and explicitly asks the user to review the text before sharing.
+
+Successful informational confirmations in Settings are transient: they clear after five seconds, clear immediately
+when Settings closes, and refresh to the active UI language while visible. Actionable failures remain visible instead
+of disappearing on a timer.
+
 Every successful explicit Routing Mode choice on the main window becomes the startup Routing Mode. Merely selecting
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
 remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
@@ -196,6 +208,8 @@ to Windows without restarting discovery or routing.
 - Unsubscribe platform events and release resources during shutdown or adapter restart.
 - Make all failed control attempts observable through return values and structured logs.
 - Avoid logging sensitive or excessive media metadata by default; document diagnostic modes before enabling them.
+- Keep user-triggered diagnostic export privacy-safe by construction; never require raw logs or complete settings
+  merely to obtain the standard summary.
 
 ## 10. Explicit non-goals for MVP
 
@@ -213,8 +227,9 @@ App Lock, ordered application Priority Rules, artwork, timeline/seek, global med
 
 The first packaged candidate was `0.2.0-rc.1`, containing App Lock and ordered Priority Rules. The second candidate,
 `0.2.0-rc.2`, adds the completed localization and visual foundation, routed-target artwork and timeline, absolute Seek,
-and production global media-key interception. Customizable shortcuts and volume remain separately scoped; candidate
-versioning does not imply those unfinished features are present.
+and production global media-key interception. The third candidate, `0.2.0-rc.3`, adds the in-app About surface and
+privacy-safe diagnostic summary without broadening the routing feature set. Customizable shortcuts and volume remain
+separately scoped; candidate versioning does not imply those unfinished features are present.
 
 ### v0.3
 
