@@ -323,3 +323,24 @@ findings, and PR #24 integrated the implementation into `develop`. All 280 autom
 contract, and the bilingual Light/Dark, support-action, keyboard-focus and physical-media-key host matrix passed.
 This completes the Phase 10B product work only: a formal `0.2.0-rc.3` artifact still requires its own clean build,
 digest, host validation, Windows Sandbox validation and separately approved publication operation.
+
+### Phase 10C — `0.2.0-rc.3` release validation
+
+Package the Phase 10B executable changes as a third unsigned `win-x64` prerelease candidate without transferring any
+artifact identity or runtime evidence from `0.2.0-rc.2`.
+
+Exit criteria:
+
+- Release notes, runbook, project metadata and packaging tests consistently identify `0.2.0-rc.3` while public
+  download guidance continues to identify `0.2.0-rc.2` until a separately approved publication occurs.
+- Restore, formatting, 280-or-more automated tests, Release build, isolated packaging verification and two-axis review
+  pass locally without GitHub Actions capacity.
+- A clean reviewed commit produces exactly one self-contained `MediaLock.exe` in the ZIP plus a manifest and checksum
+  whose independently recomputed SHA-256 values agree.
+- Local-host validation covers version/signature facts, About and diagnostics actions, privacy-safe clipboard output,
+  Settings persistence, routing, media-key isolation, single instance, tray lifecycle and explicit Exit.
+- Windows Sandbox independently verifies the exact commit and digest, cold start without a separately installed .NET
+  runtime, About/diagnostics, current-user startup registration, Edge GSMTC routing and clean explicit Exit.
+- Tagging, GitHub Prerelease creation and public artifact upload remain separate remote operations requiring approval.
+
+Status: in progress on `codex/release/0.2.0-rc.3`; no formal artifact, tag or Release exists yet.

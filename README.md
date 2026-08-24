@@ -84,8 +84,8 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 self-contained `MediaLock.exe`。正式 `0.2.0-rc.2` 已以自身 source
 commit 與 archive digest 通過 Windows Sandbox gate，可描述為 portable layout。目前僅支援 `win-x64`
 且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
-[Release candidate runbook](docs/release-candidate.md)，版本內容見
-[0.2.0-rc.2 release notes](docs/releases/0.2.0-rc.2.md)。正式候選已透過
+[Release candidate runbook](docs/release-candidate.md)，下一個候選的版本內容見
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前公開的正式候選仍透過
 [GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2) 公開 ZIP；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 

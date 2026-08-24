@@ -223,8 +223,9 @@ App Lock, ordered application Priority Rules, artwork, timeline/seek, global med
 
 The first packaged candidate was `0.2.0-rc.1`, containing App Lock and ordered Priority Rules. The second candidate,
 `0.2.0-rc.2`, adds the completed localization and visual foundation, routed-target artwork and timeline, absolute Seek,
-and production global media-key interception. Customizable shortcuts and volume remain separately scoped; candidate
-versioning does not imply those unfinished features are present.
+and production global media-key interception. The third candidate, `0.2.0-rc.3`, adds the in-app About surface and
+privacy-safe diagnostic summary without broadening the routing feature set. Customizable shortcuts and volume remain
+separately scoped; candidate versioning does not imply those unfinished features are present.
 
 ### v0.3
 
