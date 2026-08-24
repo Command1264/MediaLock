@@ -460,7 +460,10 @@ Status: implementation in progress. The accepted decision is a per-user Inno Set
 `%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. The first RED → GREEN slices
 produce ZIP and Setup from one payload and protect startup cleanup from deleting a portable-owned Run value. Local
 silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
-default user-data retention; clean-Windows upgrade, downgrade and full runtime gates remain. MSIX is deferred while
+default user-data retention. A clean Windows Sandbox transaction gate also passed for commit
+`6233da8bab35e6fcde0858d1fa0a58fe5babfba6`, including payload/digest matching, default-disabled startup, owned versus
+portable startup cleanup and retained user data. Search launch, full runtime/media behavior, actual login restart,
+upgrade, downgrade and controlled cancellation gates remain. MSIX is deferred while
 direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
 enterprise deployment or repair becomes a concrete requirement. See the
 [Phase 12A plan](phase-12/installable-package-plan.md),
