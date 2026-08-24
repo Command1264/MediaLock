@@ -9,7 +9,7 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
-目前開發來源回報 `0.2.0-rc.3`；下方公開下載仍是已完成獨立驗證的 `0.2.0-rc.2`。
+目前開發來源與公開下載均為已完成獨立驗證的 `0.2.0-rc.3`。
 
 已驗證的基礎能力包括：
 
@@ -23,8 +23,8 @@ Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸�
 
 目前公開版本是 unsigned `win-x64` prerelease：
 
-- [下載 Media Lock 0.2.0-rc.2](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2)
-- SHA-256：`0c750e7f2eec132b6b82c4d78f491f961dad76358c4e0b9c49dc3042779ec5e7`
+- [下載 Media Lock 0.2.0-rc.3](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.3)
+- SHA-256：`ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a`
 - [下載、驗證、更新、回復與移除說明](docs/installation.md)
 
 ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。由於執行檔尚未 code signing，
@@ -80,13 +80,13 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 & .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0-rc.3
 ```
 
-此命令供下一個候選版本使用，現在不代表 `0.2.0-rc.3` 已發布。輸出位於 `artifacts\`，ZIP 內只包含
-self-contained `MediaLock.exe`。正式 `0.2.0-rc.2` 已以自身 source
-commit 與 archive digest 通過 Windows Sandbox gate，可描述為 portable layout。目前僅支援 `win-x64`
-且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
-[Release candidate runbook](docs/release-candidate.md)，下一個候選的版本內容見
-[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前公開的正式候選仍透過
-[GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.2) 公開 ZIP；Release 頁面
+此命令會建立本機候選輸出，但只有經獨立驗證且正式發布的 artifact 才是官方下載。輸出位於
+`artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。正式 `0.2.0-rc.3` 已以 source commit
+`10dbb5b1452fe27084a28e254388fe974ed277e6` 與 archive digest 通過主機及 Windows Sandbox gate。
+目前僅支援 `win-x64` 且未經 code signing，因此仍是 unsigned prerelease。完整驗證、證據與回復流程見
+[Release candidate runbook](docs/release-candidate.md)，版本內容見
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前正式候選透過
+[GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.3) 公開 ZIP；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
