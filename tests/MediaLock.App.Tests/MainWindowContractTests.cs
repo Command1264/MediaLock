@@ -20,6 +20,111 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowContractTests
 {
     [Fact]
+    public void PlaybackStateLockUsesTwoContentSizedSelectionControlsOnTheCurrentTargetSurface()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "MediaLock.App",
+            "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var panel = Assert.Single(
+            xaml.Descendants(presentation + "Grid"),
+            element => (string?)element.Attribute(x + "Name") ==
+                "PlaybackStateLockPanel");
+        var columns = Assert.Single(panel.Elements(presentation + "Grid.ColumnDefinitions"));
+        Assert.Equal(2, columns.Elements(presentation + "ColumnDefinition").Count());
+        var label = Assert.Single(
+            panel.Elements(presentation + "TextBlock"),
+            element => (string?)element.Attribute(x + "Name") ==
+                "PlaybackStateLockLabel");
+        Assert.Equal("14", (string?)label.Attribute("FontSize"));
+        Assert.Equal("SemiBold", (string?)label.Attribute("FontWeight"));
+        Assert.Equal("Center", (string?)label.Attribute("VerticalAlignment"));
+        var controls = panel.Descendants(presentation + "ToggleButton")
+            .Where(element =>
+                ((string?)element.Attribute(x + "Name"))?.StartsWith(
+                    "PlaybackStateLock",
+                    StringComparison.Ordinal) is true)
+            .ToArray();
+
+        Assert.Equal(2, controls.Length);
+        Assert.Single(panel.Elements(presentation + "WrapPanel"));
+        Assert.Empty(panel.Elements(presentation + "UniformGrid"));
+        Assert.All(controls, control =>
+        {
+            Assert.Equal("{StaticResource StateLockToggleStyle}",
+                (string?)control.Attribute("Style"));
+            Assert.Null(control.Attribute("MinWidth"));
+            Assert.NotNull(control.Attribute("Command"));
+            Assert.NotNull(control.Attribute("IsChecked"));
+            Assert.NotNull(control.Attribute("AutomationProperties.Name"));
+        });
+        Assert.Contains(controls, control =>
+            (string?)control.Attribute("Command") ==
+                "{Binding PlaybackStateLockOffCommand}");
+        Assert.Contains(controls, control =>
+            (string?)control.Attribute("Command") == "{Binding KeepPlayingCommand}");
+
+        var controlsXaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "MediaLock.App",
+            "Themes",
+            "Controls.xaml"));
+        var style = Assert.Single(
+            controlsXaml.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") ==
+                "StateLockToggleStyle");
+        Assert.Null(style.Attribute("BasedOn"));
+        var template = Assert.Single(style.Descendants(presentation + "ControlTemplate"));
+        var content = Assert.Single(template.Descendants(presentation + "ContentPresenter"));
+        Assert.Equal("1", (string?)content.Attribute("Grid.Column"));
+        Assert.Equal("Right", (string?)content.Attribute("HorizontalAlignment"));
+        var selectedMark = Assert.Single(
+            template.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute(x + "Name") == "SelectedMark");
+        Assert.Null(selectedMark.Attribute("HorizontalAlignment"));
+    }
+
+    [Fact]
+    public void PlaybackStateLockButtonsMeasureTheirLocalizedContentIndependently()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var originalLanguage = UiText.CurrentCulture.Name == "zh-TW"
+                ? UiLanguagePreference.TraditionalChinese
+                : UiLanguagePreference.EnglishUnitedStates;
+            UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+            using var viewModel = new MainWindowViewModel(
+                new FakeMediaLockApplication(),
+                synchronizationContext: SynchronizationContext.Current);
+            var window = new MainWindow(viewModel);
+            window.Show();
+            try
+            {
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                var buttons = WpfTestHost.FindVisualChildren<ToggleButton>(window).ToArray();
+                var off = Assert.Single(buttons, button =>
+                    ReferenceEquals(button.Command, viewModel.PlaybackStateLockOffCommand));
+                var keepPlaying = Assert.Single(buttons, button =>
+                    ReferenceEquals(button.Command, viewModel.KeepPlayingCommand));
+                Assert.True(keepPlaying.ActualWidth > off.ActualWidth);
+
+                UiText.Apply(UiLanguagePreference.TraditionalChinese);
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.True(keepPlaying.ActualWidth > off.ActualWidth);
+            }
+            finally
+            {
+                window.Close();
+                UiText.Apply(originalLanguage);
+            }
+        });
+    }
+
+    [Fact]
     public void NowPlayingArtworkAndTimelineExposeAnAccessibleSeekSlider()
     {
         WpfTestHost.Run(() =>
@@ -39,10 +144,20 @@ public sealed class MainWindowContractTests
                     System.Windows.Automation.AutomationProperties.GetName(slider)));
                 Assert.Empty(WpfTestHost.FindVisualChildren<ProgressBar>(window));
                 Assert.Single(WpfTestHost.FindVisualChildren<Image>(window));
-                var routingModes = WpfTestHost.FindVisualChildren<ToggleButton>(window).ToArray();
+                var selectionControls = WpfTestHost.FindVisualChildren<ToggleButton>(window).ToArray();
+                var routingModes = selectionControls.Where(button =>
+                    ReferenceEquals(button.Command, viewModel.LockCommand) ||
+                    ReferenceEquals(button.Command, viewModel.AppLockCommand) ||
+                    ReferenceEquals(button.Command, viewModel.PriorityRulesCommand) ||
+                    ReferenceEquals(button.Command, viewModel.WindowsAutoCommand)).ToArray();
                 Assert.Equal(4, routingModes.Length);
                 Assert.Single(routingModes, button => button.IsChecked is true);
-                Assert.All(routingModes, button =>
+                var playbackStateLocks = selectionControls.Where(button =>
+                    ReferenceEquals(button.Command, viewModel.PlaybackStateLockOffCommand) ||
+                    ReferenceEquals(button.Command, viewModel.KeepPlayingCommand)).ToArray();
+                Assert.Equal(2, playbackStateLocks.Length);
+                Assert.Single(playbackStateLocks, button => button.IsChecked is true);
+                Assert.All(selectionControls, button =>
                 {
                     Assert.Equal(36, button.MinHeight);
                     Assert.False(string.IsNullOrWhiteSpace(

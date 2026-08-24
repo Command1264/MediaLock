@@ -386,21 +386,27 @@ Phase 11 targets `0.3.0`. It does not mutate the published stable `0.2.0` releas
 
 ### Phase 11A — Playback State Lock
 
-Let the user explicitly choose Off, Keep Playing or Keep Paused for the current routed target without turning ordinary
-Play/Pause controls into an unbounded automation loop.
+Let the user explicitly choose Off or one-way Keep Playing for the current routed target without turning ordinary
+Play/Pause controls into an unbounded automation loop or adding a Keep Paused mode.
 
-Status: planned.
+Status: in progress on `codex/feat/phase-11a-playback-state-lock`.
 
 Exit criteria:
 
-- Core defines the three policy values and deterministic correction decisions without WPF or Windows dependencies.
+- Core defines Off/Keep Playing eligibility and deterministic correction decisions without WPF or Windows dependencies.
 - Application arms the policy to a captured target, serializes observations and corrections, and sends only explicit
-  Play or Pause with `ExpectedTarget`; TogglePlayPause is never used for enforcement.
-- Play/Pause updates the Desired Playback State, Next/Previous preserves it, and Stop clears the lock before stopping.
+  Play with `ExpectedTarget`; Pause and TogglePlayPause are never used for enforcement.
+- Media Lock Pause/TogglePlayPause/Stop clears the policy before routing; Play/Next/Previous preserves it.
+- Windows lock-screen Pause/Stop clears the policy; lock/unlock without a playback change preserves it, using a fresh
+  post-unlock GSMTC observation rather than guessing from stale state.
 - Recovery may resume only for the Router-accepted successor. Fallback, unrelated target changes, ambiguity, catalog
   loss, suspend and shutdown cannot redirect an enforcement command.
-- Correction confirmation and retry are bounded, observable and deterministically tested; Keep Playing does not restart
-  Stopped, Closed or naturally exhausted playback.
+- Correction confirmation is observation-driven and bounded to two unconfirmed attempts; exhaustion is visible and
+  deterministically tested. Keep Playing does not restart Stopped, Closed or naturally exhausted playback.
+- An enabled-by-default repeated-pause escape hatch turns Keep Playing Off on the third distinct direct
+  Playing-to-Paused transition within five seconds, leaves the third request paused and optionally plays one system
+  sound. Settings constrain the window to 1–60 seconds and the threshold to 2–10; schema v7 migrates v1–v6 defaults.
+  Changing/buffering, duplicate Paused, Recovery, target/lifecycle changes and Media Lock commands do not count.
 - The current-target UI exposes Off and the active locked state in English/Traditional Chinese and Light/Dark without
   resizing controls. The first version is not restored on process startup.
 - Real YouTube Music plus ordinary YouTube evidence covers external state changes, Next/Previous, Recovery, competing
@@ -431,3 +437,22 @@ Proceed only if Phase 11B demonstrates reliable, supportable native-surface beha
 replaceable adapter, fake-driven Application coverage, self-session exclusion, accessibility/localization, stale-state
 cleanup and a documented compatibility boundary. If the probe fails, record the limitation and scope any Media Lock
 on-screen display as a separate feature rather than calling it native Windows synchronization.
+
+## Phase 12 — Distribution and footprint
+
+Phase 12 is planned after Phase 11 and is not part of Playback State Lock.
+
+### Phase 12A — Installable Windows package
+
+Provide an ordinary-user installation path that registers Media Lock in the Start menu so Windows Search can find it,
+supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSIX with an installer-based package before
+selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
+The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
+
+### Phase 12B — Footprint measurement and optimization
+
+Measure the compressed archive, single-file executable, managed framework, native WPF/WinRT payload and runtime
+extraction separately before choosing an optimization. Compare the existing self-contained package with an optional
+framework-dependent package and safe publish settings. Trimming, native-library exclusion or compression changes do
+not ship unless WPF resources, GSMTC, tray, localization, startup and clean-machine tests pass; reducing bytes must not
+silently remove the current no-runtime-install promise from the portable package.

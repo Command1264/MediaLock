@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using MediaLock.App.Localization;
 using MediaLock.Application;
 using MediaLock.Core.Media;
+using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.App.ViewModels;
@@ -12,6 +13,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
     private static readonly TimeSpan SeekConfirmationTolerance = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan SeekConfirmationTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultPlaybackStateLockNoticeDuration = TimeSpan.FromSeconds(5);
 
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
@@ -19,10 +21,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncCommand appLockCommand;
     private readonly AsyncCommand priorityRulesCommand;
     private readonly AsyncCommand windowsAutoCommand;
+    private readonly AsyncCommand playbackStateLockOffCommand;
+    private readonly AsyncCommand keepPlayingCommand;
     private readonly AsyncCommand[] mediaCommands;
     private readonly TimeProvider timeProvider;
+    private readonly IPlaybackStateLockFeedback? playbackStateLockFeedback;
+    private readonly TimeSpan playbackStateLockNoticeDuration;
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
+    private PlaybackStateLockState playbackStateLock = PlaybackStateLockState.Off;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private SeekPreview? seekPreview;
     private PendingSeek? pendingSeek;
@@ -32,6 +39,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private bool selectionRecoveryPending;
     private bool projectingSelection;
     private string? errorMessage;
+    private bool releasedPlaybackStateLockNoticeVisible;
+    private CancellationTokenSource? playbackStateLockNoticeCancellation;
     private bool disposed;
 
     public MainWindowViewModel(
@@ -44,12 +53,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         TimeProvider? timeProvider = null,
         IAppEnvironmentInfoProvider? environmentInfoProvider = null,
         IDesktopSupportActions? desktopSupportActions = null,
-        Func<bool>? isMediaInputRunning = null)
+        Func<bool>? isMediaInputRunning = null,
+        IPlaybackStateLockFeedback? playbackStateLockFeedback = null,
+        TimeSpan? playbackStateLockNoticeDuration = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        this.playbackStateLockFeedback = playbackStateLockFeedback;
+        this.playbackStateLockNoticeDuration = playbackStateLockNoticeDuration ??
+            DefaultPlaybackStateLockNoticeDuration;
         Settings = new SettingsViewModel(
             application,
             synchronizationContext,
@@ -83,6 +97,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         windowsAutoCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.UseWindowsAuto()),
             _ => routerState.Mode != RoutingMode.WindowsAuto);
+        playbackStateLockOffCommand = new AsyncCommand(
+            _ => DispatchAsync(new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.Off)),
+            _ => playbackStateLock.Mode != PlaybackStateLockMode.Off);
+        keepPlayingCommand = new AsyncCommand(
+            _ => DispatchAsync(new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying)),
+            _ => playbackStateLock.Mode != PlaybackStateLockMode.KeepPlaying &&
+                catalogStatus == MediaSessionCatalogStatus.Available &&
+                ResolveTarget()?.PlaybackState == PlaybackStatus.Playing);
         PlayCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.Play);
         PauseCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.Pause);
         TogglePlayPauseCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.TogglePlayPause);
@@ -150,6 +174,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncCommand PriorityRulesCommand { get; }
 
     public IAsyncCommand WindowsAutoCommand { get; }
+
+    public IAsyncCommand PlaybackStateLockOffCommand => playbackStateLockOffCommand;
+
+    public IAsyncCommand KeepPlayingCommand => keepPlayingCommand;
+
+    public bool IsPlaybackStateLockOff =>
+        playbackStateLock.Mode == PlaybackStateLockMode.Off;
+
+    public bool IsKeepPlaying =>
+        playbackStateLock.Mode == PlaybackStateLockMode.KeepPlaying;
+
+    public bool HasPlaybackStateLockNotice =>
+        releasedPlaybackStateLockNoticeVisible ||
+        playbackStateLock.Status is PlaybackStateLockStatus.Suspended or
+            PlaybackStateLockStatus.Failed;
+
+    public bool IsPlaybackStateLockFailed =>
+        playbackStateLock.Status == PlaybackStateLockStatus.Failed;
+
+    public string PlaybackStateLockNotice => playbackStateLock.Status switch
+    {
+        _ when releasedPlaybackStateLockNoticeVisible => UiText.Get("Main_KeepPlayingReleased"),
+        PlaybackStateLockStatus.Suspended => UiText.Get("Main_KeepPlayingSuspended"),
+        PlaybackStateLockStatus.Failed => UiText.Get("Main_KeepPlayingFailed"),
+        _ => string.Empty,
+    };
 
     public IAsyncCommand PlayCommand { get; }
 
@@ -383,6 +433,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
         application.StateChanged -= OnApplicationStateChanged;
         UiText.CultureChanged -= OnCultureChanged;
+        ClearPlaybackStateLockReleasedNotice();
         Settings.Dispose();
         disposed = true;
     }
@@ -481,6 +532,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         routerState = state.Router;
+        var previousPlaybackStateLockStatus = playbackStateLock.Status;
+        playbackStateLock = state.PlaybackStateLock;
+        if (playbackStateLock.Status == PlaybackStateLockStatus.Released &&
+            previousPlaybackStateLockStatus != PlaybackStateLockStatus.Released)
+        {
+            ShowPlaybackStateLockReleasedNotice(state.Settings.PlaybackStateLock!.PlayOverrideSound);
+        }
+        else if (playbackStateLock.Status != PlaybackStateLockStatus.Released)
+        {
+            ClearPlaybackStateLockReleasedNotice();
+        }
         catalogStatus = state.CatalogStatus;
         selectionBookmarkTimeout = state.Settings.Recovery?.Timeout ?? TimeSpan.FromSeconds(15);
         errorMessage = state.ErrorMessage ??
@@ -492,9 +554,72 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(ErrorMessage));
         windowsAutoCommand.RaiseCanExecuteChanged();
         priorityRulesCommand.RaiseCanExecuteChanged();
+        playbackStateLockOffCommand.RaiseCanExecuteChanged();
+        keepPlayingCommand.RaiseCanExecuteChanged();
         foreach (var command in mediaCommands)
         {
             command.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void ShowPlaybackStateLockReleasedNotice(bool playSound)
+    {
+        ClearPlaybackStateLockReleasedNotice();
+        releasedPlaybackStateLockNoticeVisible = true;
+        OnPropertyChanged(nameof(HasPlaybackStateLockNotice));
+        OnPropertyChanged(nameof(PlaybackStateLockNotice));
+        if (playSound && playbackStateLockFeedback is not null)
+        {
+            try
+            {
+                playbackStateLockFeedback.PlayOverrideReleasedSound();
+            }
+            catch (Exception exception)
+            {
+                SetError(UiText.Format("Main_NotificationSoundFailed", exception.Message));
+            }
+        }
+
+        var cancellation = new CancellationTokenSource();
+        playbackStateLockNoticeCancellation = cancellation;
+        _ = ClearPlaybackStateLockReleasedNoticeAfterDelayAsync(cancellation);
+    }
+
+    private void ClearPlaybackStateLockReleasedNotice()
+    {
+        var cancellation = playbackStateLockNoticeCancellation;
+        playbackStateLockNoticeCancellation = null;
+        cancellation?.Cancel();
+        if (releasedPlaybackStateLockNoticeVisible)
+        {
+            releasedPlaybackStateLockNoticeVisible = false;
+            OnPropertyChanged(nameof(HasPlaybackStateLockNotice));
+            OnPropertyChanged(nameof(PlaybackStateLockNotice));
+        }
+    }
+
+    private async Task ClearPlaybackStateLockReleasedNoticeAfterDelayAsync(
+        CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(playbackStateLockNoticeDuration, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(playbackStateLockNoticeCancellation, cancellation))
+            {
+                playbackStateLockNoticeCancellation = null;
+                releasedPlaybackStateLockNoticeVisible = false;
+                OnPropertyChanged(nameof(HasPlaybackStateLockNotice));
+                OnPropertyChanged(nameof(PlaybackStateLockNotice));
+            }
+
+            cancellation.Dispose();
         }
     }
 
@@ -527,6 +652,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(IsPriorityRulesMode));
         OnPropertyChanged(nameof(IsAppLockMode));
         OnPropertyChanged(nameof(IsSessionLockMode));
+        OnPropertyChanged(nameof(IsPlaybackStateLockOff));
+        OnPropertyChanged(nameof(IsKeepPlaying));
+        OnPropertyChanged(nameof(HasPlaybackStateLockNotice));
+        OnPropertyChanged(nameof(IsPlaybackStateLockFailed));
+        OnPropertyChanged(nameof(PlaybackStateLockNotice));
         OnPropertyChanged(nameof(TargetDescription));
         OnPropertyChanged(nameof(NowPlayingTitle));
         OnPropertyChanged(nameof(NowPlayingArtist));

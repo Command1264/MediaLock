@@ -214,6 +214,49 @@ public sealed class SettingsViewModelTests
             intent.Settings.Recovery!.Timeout);
     }
 
+    [Theory]
+    [InlineData("0", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("61", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("1e2", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("5", "1", nameof(SettingsViewModel.RepeatedPauseCountText))]
+    [InlineData("5", "11", nameof(SettingsViewModel.RepeatedPauseCountText))]
+    public void InvalidRepeatedPauseSettingsAreReportedImmediately(
+        string window,
+        string count,
+        string invalidProperty)
+    {
+        using var viewModel = new SettingsViewModel(
+            new FakeApplication(MediaLockApplicationState.Initial));
+
+        viewModel.RepeatedPauseWindowText = window;
+        viewModel.RepeatedPauseCountText = count;
+
+        Assert.True(viewModel.HasErrors);
+        Assert.NotEmpty(viewModel.GetErrors(invalidProperty).Cast<string>());
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RepeatedPauseOverrideSettingsSaveThroughTheApplicationSeam()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application)
+        {
+            RepeatedPauseOverrideEnabled = false,
+            RepeatedPauseWindowText = "12",
+            RepeatedPauseCountText = "4",
+            PlayRepeatedPauseOverrideSound = false,
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(
+            Assert.Single(application.Intents));
+        Assert.Equal(
+            new PlaybackStateLockSettings(false, TimeSpan.FromSeconds(12), 4, false),
+            intent.Settings.PlaybackStateLock);
+    }
+
     [Fact]
     public async Task StartupRoutingModeIsReadOnlyAndPreservedWhenSettingsAreSaved()
     {

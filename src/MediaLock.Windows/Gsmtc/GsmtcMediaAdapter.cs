@@ -11,6 +11,7 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private readonly IGsmtcSessionManagerFactory managerFactory;
     private readonly TimeProvider timeProvider;
     private readonly ISystemLifecycle? systemLifecycle;
+    private readonly IWorkstationLockState? workstationLockState;
     private readonly IReadOnlyList<TimeSpan> reacquisitionDelays;
     private readonly Channel<MediaSessionCatalogSnapshot> snapshots =
         Channel.CreateUnbounded<MediaSessionCatalogSnapshot>(new UnboundedChannelOptions
@@ -69,6 +70,7 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         this.managerFactory = managerFactory;
         this.timeProvider = timeProvider;
         this.systemLifecycle = systemLifecycle;
+        workstationLockState = systemLifecycle as IWorkstationLockState;
         this.reacquisitionDelays = reacquisitionDelays ??
             [TimeSpan.Zero, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2)];
         if (this.reacquisitionDelays.Count != 3 ||
@@ -97,6 +99,10 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         {
             systemLifecycle.Suspending += OnSuspending;
             systemLifecycle.Resumed += OnResumed;
+        }
+        if (workstationLockState is not null)
+        {
+            workstationLockState.Unlocked += OnWorkstationUnlocked;
         }
 
         await AcquireManagerAndPublishAsync(startupCancellation.Token);
@@ -136,6 +142,10 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         {
             systemLifecycle.Suspending -= OnSuspending;
             systemLifecycle.Resumed -= OnResumed;
+        }
+        if (workstationLockState is not null)
+        {
+            workstationLockState.Unlocked -= OnWorkstationUnlocked;
         }
 
         await lifetime.CancelAsync();
@@ -251,6 +261,8 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private void OnResumed() =>
         lifecycleTransitions.Writer.TryWrite(new AdapterTransition(
             AdapterTransitionKind.Resume));
+
+    private void OnWorkstationUnlocked() => QueueRefresh();
 
     private void QueueRefresh()
     {
