@@ -80,5 +80,14 @@ Observed results for source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` an
 
 ## Public publication
 
-Status: not authorized. Tagging, GitHub Release creation and public ZIP upload require separate approval after both
-runtime gates pass for this exact commit and digest.
+Status: complete on 2026-08-24 after separate publication approval.
+
+- PR #31 merged `release/0.2` into `develop`; PR #32 synchronized `develop` to `main`.
+- GPG-signed annotated tag `v0.2.0` dereferences to the exact artifact source commit
+  `7ce40ab31433998665b30ac18a7f50ebb3dafec7`.
+- [GitHub Release `v0.2.0`](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) is public, Stable, not a
+  prerelease, and designated Latest.
+- Its sole asset is `MediaLock-0.2.0-win-x64.zip`; GitHub reports server digest
+  `sha256:f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`, matching the independently verified
+  archive.
+- The long-lived `release/0.2` branch remains available as the stable hotfix baseline.

@@ -9,8 +9,8 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
-`0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證；公開下載仍是
-`0.2.0-rc.3`，直到正式版取得另行發布核准。
+`0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
+Stable／Latest 版本。
 
 已驗證的基礎能力包括：
 
@@ -22,10 +22,10 @@ Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸�
 
 ## 下載與安裝
 
-目前公開版本是 unsigned `win-x64` prerelease：
+目前公開版本是 unsigned `win-x64` stable release：
 
-- [下載 Media Lock 0.2.0-rc.3](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.3)
-- SHA-256：`ee7e2174e54177c77d9edbe1233e94ed79f3613b42b782d3319c1357affa0f8a`
+- [下載 Media Lock 0.2.0](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0)
+- SHA-256：`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`
 - [下載、驗證、更新、回復與移除說明](docs/installation.md)
 
 ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。由於執行檔尚未 code signing，
@@ -83,12 +83,12 @@ Phase 6 的本地封裝命令會從乾淨 Git commit 產生版本化 ZIP、manif
 
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
 官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`。目前公開的
-`0.2.0-rc.3` 已以 source commit `10dbb5b1452fe27084a28e254388fe974ed277e6` 與 archive digest 通過主機及
-Windows Sandbox gate。`0.2.0` 也已取得自己的獨立證據，沒有沿用 RC3。完整驗證、證據與回復流程見
+`0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
+Windows Sandbox gate，沒有沿用 RC3 證據。完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
-[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。目前正式候選透過
-[GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0-rc.3) 公開 ZIP；Release 頁面
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。正式版透過
+[GitHub Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 公開 ZIP；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
