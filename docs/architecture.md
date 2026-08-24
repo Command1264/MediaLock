@@ -295,7 +295,54 @@ When the bookmarked row was the resolved Locked Target immediately before App Lo
 the Router's successor Active Target takes precedence over the generic unique-source match. Core Recovery remains the
 sole authority for target identity; the UI bookmark never changes Router state.
 
-## 9. Composition
+## 9. Phase 11 playback state and Windows media surface
+
+### Playback State Lock
+
+Playback State Lock extends the existing deep Application routing module rather than adding a ViewModel loop or a
+second media-control service. Core owns a pure decision value for Off, Keep Playing and Keep Paused. The Application
+dispatcher owns the armed target, Desired Playback State, observation/confirmation status and bounded correction
+effects inside the same serialized critical section as catalog and Route intents.
+
+Each correction is an ordinary explicit Play or Pause Media Command carrying the captured `ExpectedTarget`. The Router
+still resolves capability and rejects stale targets; the Windows GSMTC adapter remains a one-shot controller. Catalog
+observations trigger policy evaluation, so no polling loop is introduced. Recovery, fallback, catalog unavailability,
+suspend and shutdown cancel pending confirmation. Only the Router-accepted successor of the armed identity may resume
+enforcement; an unrelated Active Target clears the lock.
+
+Application state exposes the selected policy, armed target continuity and Ready, Suspended or Failed result for WPF
+projection. The current-target ViewModel submits intents and renders state but neither compares playback observations
+nor retries commands. A supplied time boundary makes confirmation and retry tests deterministic. Retries are finite,
+and the module waits for a fresh playback observation before any subsequent correction.
+
+### Windows Media Surface Mirror
+
+The GSMTC manager's documented contract exposes current-session observation, not current-session mutation. Per
+[ADR 0003](adr/0003-probe-a-media-lock-owned-smtc-mirror.md), Phase 11B therefore uses a replaceable Windows adapter
+to probe a Media Lock-owned SMTC Media Session through `ISystemMediaTransportControlsInterop.GetForWindow`.
+
+```text
+Routed target snapshot ──▶ Application mirror projection ──▶ Windows SMTC mirror
+                                                                  │ button/seek
+                                                                  ▼
+                                                        serialized Application intent
+                                                                  │
+                                                                  ▼
+                                                            existing Router
+```
+
+The projection contains bounded presentation metadata, playback/timeline observations and capabilities only; it does
+not become routing identity. Windows button and seek events are translated to the existing Media Command path with the
+current captured target. The mirror's own Session identity is filtered before catalog snapshots reach Core, preventing
+self-selection, recursion and duplicated routing. Adapter disposal disables the mirror, removes event subscriptions
+and clears published state before application shutdown.
+
+Phase 11B remains a disposable feasibility adapter until tests show whether supported Windows builds select and render
+it predictably. A production seam is justified only when both a Windows implementation and deterministic fake are used
+by Application tests. Failure to influence Windows' current-session choice is a probe result, not a reason to introduce
+undocumented API calls or move routing policy into the Windows project.
+
+## 10. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through
 constructor injection, enforces single-instance behavior, and starts services in a defined order. Shutdown stops
@@ -303,7 +350,7 @@ input first, drains or cancels routing work, persists state, removes subscriptio
 The same root injects the Windows environment and desktop-support adapters into Settings; tests replace both through
 their public seams without launching Explorer, a browser or the Clipboard.
 
-## 10. Publication
+## 11. Publication
 
 The release candidate targets `win-x64`, self-contained, single-file publication. Single-file output can be larger
 and may interact with native libraries or extraction behavior, so build success, cold start, tray resources,

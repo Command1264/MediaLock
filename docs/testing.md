@@ -150,6 +150,37 @@ Windows Sandbox results must independently match that commit and archive digest,
 surface, and confirm the existing single-instance, Settings, startup, tray, GSMTC and global-media-key paths. No
 `0.2.0-rc.1` or `0.2.0-rc.2` evidence transfers.
 
+Phase 10D first makes stable-version acceptance red at the packaging seam, then changes only release identity,
+packaging compatibility and documentation. Automated coverage requires project Version and InformationalVersion
+`0.2.0`, stable About/diagnostics classification, continued acceptance of `-rc.N`, dirty-source rejection, exact
+artifact names, one executable, ProductVersion/FileVersion, manifest flags and independently recomputed checksums.
+Run the complete local gate and two-axis review before creating the clean formal artifact. Local-host and Windows
+Sandbox evidence must match that artifact's exact source commit and digest and repeat the RC3 critical paths; no RC
+runtime result transfers. Preserve `release/0.2` as the current stable hotfix baseline after merge and publication.
+
+Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off, both
+desired states and observed Playing, Paused, Stopped, Closed and unavailable states. It requires no correction for a
+matching observation, uses explicit Play/Pause for an opposite observation, and never restarts Stopped or Closed
+playback. Application tests use fake time and controller observations to prove captured-target protection, one
+in-flight correction, confirmation, bounded retry, exhaustion, Stop clearing, Next/Previous preservation and
+Play/Pause desired-state updates. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown
+must cancel or suspend pending work without dispatching to a competing Session. Process restart begins at Off.
+
+Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one visible policy state,
+stable geometry, accessibility names, keyboard operation and English/Traditional Chinese plus Light/Dark rendering.
+Hardware-assisted coverage uses YouTube Music and ordinary YouTube simultaneously. It changes playback both through
+Media Lock and outside it, then repeats Next, Previous, reload/Recovery, focus changes, lock/unlock, sleep/resume and
+physical Play/Pause. Evidence records every requested and observed transition; accepted GSMTC calls alone are not proof
+that the state was enforced.
+
+Phase 11B is a separately scoped feasibility test. Unit tests cover metadata/capability projection, event translation,
+self-session exclusion, target capture, one-dispatch behavior and disposal with a fake media-surface adapter. The
+Windows probe records whether the Media Lock SMTC Session exists, whether Windows makes it current, what the native
+surface renders, and which Session actually changes after each button or seek action. Test YouTube Music against a
+competing ordinary YouTube Session through reload/Recovery, target changes, lock/unlock, sleep/resume and shutdown on
+named Windows builds. A passing adapter lifecycle does not imply current-session selection. Phase 11C is blocked unless
+the evidence supports a precise compatibility claim; unreliable selection produces a limit or reject record instead.
+
 ### Integration tests
 
 Cover:
@@ -278,8 +309,8 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 & .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
 ```
 
-After committing the reviewed source, produce the provenance-clean candidate with
-`eng/Publish-ReleaseCandidate.ps1`; see [Release candidate runbook](release-candidate.md). GitHub Actions capacity is
+After committing the reviewed source, produce the provenance-clean release artifact with
+`eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
 
 For public feedback metadata, additionally run a local YAML parse and relative-link check. Before merging Issue Forms,
@@ -307,6 +338,8 @@ was completed independently for the formal `0.2.0-rc.2` candidate on 2026-08-24;
 preserved in [Phase 9 packaged validation](phase-9/release-candidate-smoke.md). Evidence does not transfer between
 commits or digests. Record `0.2.0-rc.3` evidence independently in
 [Phase 10C packaged validation](phase-10/release-candidate-smoke.md).
+Record stable `0.2.0` evidence independently in
+[Phase 10D packaged validation](phase-10/stable-release-smoke.md).
 
 ## 7. Manual evidence
 

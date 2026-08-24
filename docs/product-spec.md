@@ -233,10 +233,55 @@ separately scoped; candidate versioning does not imply those unfinished features
 
 ### v0.3
 
-Optional Chromium and Firefox adapters that correlate browser tabs with GSMTC Sessions when technically feasible.
+Playback State Lock and a feasibility-gated Windows Media Surface Mirror. Optional Chromium and Firefox adapters that
+correlate browser tabs with GSMTC Sessions remain later `v0.3.x` work when technically feasible.
 
 Before browser integration, Phase 7 establishes localization and visual foundations as independently reviewed
 post-RC work. Localization does not alter Session matching or routing semantics.
+
+The published `0.2.0-rc.3` artifact remains frozen. Phase 11 does not amend that candidate or transfer its evidence;
+stable `0.2.0` keeps its existing release gate, while executable Phase 11 work targets `0.3.0`.
+
+#### Playback State Lock
+
+Playback State Lock is an explicit three-state control on the current-target surface:
+
+- **Off** sends ordinary one-shot media commands and performs no later correction.
+- **Keep Playing** corrects an observed Paused state with an explicit Play request.
+- **Keep Paused** corrects an observed Playing state with an explicit Pause request.
+
+Enforcement never uses TogglePlayPause because a delayed or duplicate toggle could invert the intended state. A Media
+Lock Play, Pause or physical Play/Pause action updates the Desired Playback State when the lock is armed; Next and
+Previous preserve it. Stop first clears Playback State Lock and then stops so enforcement cannot immediately restart
+the target. Keep Playing does not resurrect a Stopped, Closed or unavailable source, including a naturally exhausted
+queue.
+
+The lock is armed against the active target identity at the moment the user selects it. Recovery may resume enforcement
+only for the accepted successor of that same target. Catalog loss, suspend, fallback routing and ambiguous recovery
+suspend correction and must never send it to another Session. An explicit target change clears the lock and requires
+the user to arm it again. Corrections use bounded confirmation and retry; exhaustion leaves an actionable visible status
+instead of fighting the player indefinitely.
+
+The first version is process-lifetime state and is not restored at login or application restart. This prevents a
+background startup from unexpectedly starting audio. Persisted automatic re-arming, if ever added, requires a separate
+opt-in product decision and migration. The current-target surface shows which Play or Pause state is locked so the
+policy is not hidden in Settings.
+
+#### Windows Media Surface Mirror
+
+The documented GSMTC manager can observe Windows Current Session but cannot set it. Media Lock therefore does not
+promise to replace Windows' current-session selection or force the native media flyout to follow a target.
+
+Phase 11 first probes a Media Lock-owned SMTC Media Session created through the documented desktop interop boundary.
+The session mirrors the routed target's title, artist, artwork, playback state, timeline and supported controls, while
+buttons and seek requests received from Windows enter the same serialized Media Lock routing path. The Media Lock-owned
+session must be excluded from discovery and target selection, and every received action must route at most once without
+feeding back into itself.
+
+The feature ships only if named Windows builds reliably surface the mirror and lifecycle evidence proves that target
+changes, Recovery, suspend/resume and shutdown cannot leave stale metadata or a route loop. Otherwise the result is
+documented as limited or rejected; a separate Media Lock-owned on-screen display may later provide guaranteed visual
+feedback, but it must not be described as the Windows native media surface.
 
 ### v1.0
 

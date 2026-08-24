@@ -44,6 +44,7 @@ public sealed class SettingsWindowContractTests
                 UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSelectedAppearanceOptions(window, viewModel);
+                AssertStableReleaseStatus(window);
             }
             finally
             {
@@ -51,6 +52,17 @@ public sealed class SettingsWindowContractTests
                 UiText.Apply(originalLanguage);
             }
         });
+    }
+
+    private static void AssertStableReleaseStatus(SettingsWindow window)
+    {
+        var text = WpfTestHost.FindVisualChildren<TextBlock>(window)
+            .Select(textBlock => textBlock.Text)
+            .ToArray();
+
+        Assert.Contains(text, value => value.Contains(
+            "Stable release",
+            StringComparison.Ordinal));
     }
 
     private static void AssertAboutAndDiagnosticActions(
@@ -74,7 +86,7 @@ public sealed class SettingsWindowContractTests
         var text = WpfTestHost.FindVisualChildren<TextBlock>(window)
             .Select(textBlock => textBlock.Text)
             .ToArray();
-        Assert.Contains("0.2.0-rc.3", text);
+        Assert.Contains("0.2.0", text);
         Assert.Contains(text, value => value.Contains(
             "Windows 11 Enterprise 24H2",
             StringComparison.Ordinal));
@@ -135,7 +147,7 @@ public sealed class SettingsWindowContractTests
     private sealed class FixedEnvironmentInfoProvider : IAppEnvironmentInfoProvider
     {
         public AppEnvironmentInfo GetCurrent() => new(
-            "0.2.0-rc.3",
+            "0.2.0",
             "Windows 11 Enterprise",
             "24H2",
             "26100.9168",

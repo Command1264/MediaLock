@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^\d+\.\d+\.\d+-rc\.\d+$')]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
     [string] $Version,
 
     [string] $OutputRoot,
@@ -64,7 +64,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $initialSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
 $sourceDirty = $initialSource.Dirty
 if ($sourceDirty -and -not $AllowDirty) {
-    throw 'Release candidates require a clean Git worktree. Commit the intended source or pass -AllowDirty for a disclosed test artifact.'
+    throw 'Release artifacts require a clean Git worktree. Commit the intended source or pass -AllowDirty for a disclosed test artifact.'
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
