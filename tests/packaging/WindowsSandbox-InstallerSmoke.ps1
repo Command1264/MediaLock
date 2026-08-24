@@ -38,7 +38,12 @@ function Assert-Condition {
 }
 
 function Get-MediaLockUninstallEntry {
-    Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' |
+    $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+    if (-not (Test-Path -LiteralPath $uninstallRoot)) {
+        return $null
+    }
+
+    Get-ChildItem -LiteralPath $uninstallRoot |
         ForEach-Object { Get-ItemProperty $_.PSPath } |
         Where-Object { $_.DisplayName -eq 'Media Lock' } |
         Select-Object -First 1
