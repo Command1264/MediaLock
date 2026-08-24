@@ -318,7 +318,8 @@ Exit criteria:
 - Because executable behavior changes after `rc.2`, completion feeds an independently built and validated
   `0.2.0-rc.3`; no `rc.2` artifact evidence transfers.
 
-Status: implementation and local acceptance complete on 2026-08-24. Repository Topics were updated and verified;
-automated gates plus the bilingual Light/Dark, support-action, keyboard-focus and physical-media-key host matrix
-passed on `codex/feat/phase-10b-about-diagnostics`. Code review and integration remain pending, and `0.2.0-rc.3`
-still requires an independent packaging and clean-environment validation cycle.
+Status: complete on 2026-08-24. Repository Topics were updated and verified, both review axes finished with zero
+findings, and PR #24 integrated the implementation into `develop`. All 280 automated tests, the isolated packaging
+contract, and the bilingual Light/Dark, support-action, keyboard-focus and physical-media-key host matrix passed.
+This completes the Phase 10B product work only: a formal `0.2.0-rc.3` artifact still requires its own clean build,
+digest, host validation, Windows Sandbox validation and separately approved publication operation.
