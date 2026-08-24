@@ -16,6 +16,7 @@ using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Input;
 using MediaLock.Windows.Input;
+using MediaLock.Windows;
 using Microsoft.Win32;
 
 namespace MediaLock.App;
@@ -104,7 +105,9 @@ public partial class App : System.Windows.Application
                 ShowSettingsWindow,
                 CloseSettingsWindow,
                 UiText.Apply,
-                ApplyTheme);
+                ApplyTheme,
+                environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
+                desktopSupportActions: new DesktopSupportActions());
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;

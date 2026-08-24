@@ -297,3 +297,28 @@ Status: complete on 2026-08-24. The four missing canonical triage labels were cr
 foundation into `develop`, and PR #21 synchronized it to default branch `main`. Authenticated public-surface validation
 confirmed both forms render their required environment, routing and privacy fields, apply the intended labels, link to
 Support, and hide blank issues from non-maintainers. No tag, Release or artifact changed.
+
+### Phase 10B — In-app About and privacy-safe diagnostics
+
+Let a prerelease user identify the running build and collect the minimum useful troubleshooting facts without finding
+files manually or pasting private media metadata.
+
+Exit criteria:
+
+- Settings contains one bilingual, themed About and diagnostics card within its existing scrolling modal surface.
+- Version, Windows product/display/build/architecture, prerelease/stable state and embedded-signature state are visible.
+- Copy diagnostics produces native-line-ending text from an explicit allowlist: environment, Routing Mode/status,
+  catalog status, media-key interception, Session count, Recovery timeout and Fallback Policy.
+- The standard summary omits media title, artist, account name, full path, persisted target identity and complete settings.
+- Open logs creates and opens the bounded log directory; Open support and Report a bug use the canonical GitHub pages.
+- External desktop actions are replaceable in tests and failures remain visible as localized actionable errors.
+- Light/Dark, English/Traditional Chinese, keyboard focus, automation names and narrow wrapped button layout pass the
+  documented manual and automated checks.
+- Repository Topics describe the actual Windows/.NET/WPF/GSMTC/media-routing scope without exceeding GitHub limits.
+- Because executable behavior changes after `rc.2`, completion feeds an independently built and validated
+  `0.2.0-rc.3`; no `rc.2` artifact evidence transfers.
+
+Status: implementation and local acceptance complete on 2026-08-24. Repository Topics were updated and verified;
+automated gates plus the bilingual Light/Dark, support-action, keyboard-focus and physical-media-key host matrix
+passed on `codex/feat/phase-10b-about-diagnostics`. Code review and integration remain pending, and `0.2.0-rc.3`
+still requires an independent packaging and clean-environment validation cycle.

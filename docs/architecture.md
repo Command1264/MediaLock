@@ -55,7 +55,9 @@ MediaLock.sln
 catalog stream, owns Recovery deadline effects and exposes immutable application state plus application-level
 intents. This keeps both WPF and Windows adapters outside Core without duplicating orchestration in ViewModels.
 
-Dependency direction points inward: App and Windows depend on Core abstractions; Core does not depend on them.
+Dependency direction points inward: Application depends on Core; App depends on Application, Core and Windows;
+Windows implements ports owned by Core or Application and therefore may depend on both. Core never depends on the
+outer projects, and Application never depends on WPF or Windows implementations.
 
 ## 3. Core ports
 
@@ -200,6 +202,17 @@ application identity through the same router interface as an interactive App Loc
 the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
 Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
 unless a future explicitly disclosed diagnostic mode supplies them.
+Phase 10B adds a read-only environment adapter at `IAppEnvironmentInfoProvider`. Its Windows implementation owns
+Registry, runtime-architecture, entry-assembly version and embedded Authenticode-certificate inspection, including
+normalizing the stale `Windows 10` Registry product name when build 22000 or later identifies Windows 11. The pure
+`DiagnosticSummary` module combines that immutable environment snapshot with `MediaLockApplicationState`; it emits
+only an invariant allowlist of support facts and never traverses media metadata, target fingerprints, file paths or
+the full settings document.
+
+User-triggered desktop effects cross the single-method `IDesktopSupportActions` seam. Its Windows adapter owns
+Clipboard, Shell and `%LocalAppData%\MediaLock\logs` behavior plus the canonical GitHub support URLs. Settings
+ViewModel supplies diagnostic text only for the copy action, catches adapter failures as localized actionable UI
+errors and otherwise remains independent of Registry, Clipboard and process launch details.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
 fallback and Priority Rule edits take effect on the next process start. A successful explicit main-window Routing
 Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
@@ -287,6 +300,8 @@ sole authority for target identity; the UI bookmark never changes Router state.
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through
 constructor injection, enforces single-instance behavior, and starts services in a defined order. Shutdown stops
 input first, drains or cancels routing work, persists state, removes subscriptions and then exits the tray process.
+The same root injects the Windows environment and desktop-support adapters into Settings; tests replace both through
+their public seams without launching Explorer, a browser or the Clipboard.
 
 ## 10. Publication
 

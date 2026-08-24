@@ -136,6 +136,15 @@ environment and competing-source evidence while warning reporters to redact medi
 settings. Documentation review follows one fresh-download path through digest verification, first run, update,
 rollback and removal. GitHub Actions capacity is not required.
 
+Phase 10B tests `DiagnosticSummary` at its public pure-function seam with deliberately private media metadata and
+requires exact native line separators plus the documented allowlist. Windows adapter tests cover version/build
+projection, Windows 11 normalization, architecture, embedded-signature state, exact clipboard text, log-directory
+creation and canonical support targets without opening interactive applications. Settings ViewModel tests replace
+both adapters, verify all four actions and actionable failure projection; WPF contract coverage requires the version
+facts, four command bindings and accessibility names inside the existing scrollable modal. Manual verification follows
+[Phase 10B About and diagnostics smoke](phase-10/about-diagnostics-smoke.md) in English/Traditional Chinese and
+Light/Dark. This executable change requires a separately built `0.2.0-rc.3` clean-host and Sandbox gate.
+
 ### Integration tests
 
 Cover:
