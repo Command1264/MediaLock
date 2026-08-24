@@ -41,7 +41,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         Action? closeSettings = null,
         Action<string>? applyLanguage = null,
         Action<string>? applyTheme = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IAppEnvironmentInfoProvider? environmentInfoProvider = null,
+        IDesktopSupportActions? desktopSupportActions = null,
+        Func<bool>? isMediaInputRunning = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
@@ -52,7 +55,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             synchronizationContext,
             closeSettings,
             applyLanguage,
-            applyTheme);
+            applyTheme,
+            environmentInfoProvider,
+            desktopSupportActions,
+            isMediaInputRunning);
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();

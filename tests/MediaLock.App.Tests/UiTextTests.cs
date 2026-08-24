@@ -9,6 +9,20 @@ namespace MediaLock.App.Tests;
 public sealed class UiTextTests
 {
     [Theory]
+    [InlineData(UiLanguagePreference.EnglishUnitedStates, "About and diagnostics", "Copy diagnostics")]
+    [InlineData(UiLanguagePreference.TraditionalChinese, "關於與診斷", "複製診斷摘要")]
+    public void AboutAndDiagnosticsActionsAreLocalized(
+        string language,
+        string expectedTitle,
+        string expectedCopyAction)
+    {
+        UiText.Apply(language);
+
+        Assert.Equal(expectedTitle, UiText.Get("Settings_AboutDiagnostics"));
+        Assert.Equal(expectedCopyAction, UiText.Get("Settings_CopyDiagnostics"));
+    }
+
+    [Theory]
     [InlineData(UiLanguagePreference.EnglishUnitedStates, "Intercept global media keys")]
     [InlineData(UiLanguagePreference.TraditionalChinese, "攔截全域媒體鍵")]
     public void MediaKeyInterceptionSettingIsLocalized(string language, string expected)

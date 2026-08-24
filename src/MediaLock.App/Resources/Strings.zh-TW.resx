@@ -128,4 +128,24 @@
   <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>無法使用媒體鍵攔截</value></data>
   <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock 無法啟動全域媒體鍵攔截。應用程式內的媒體控制仍可使用，但實體媒體鍵將交由 Windows 處理。</value></data>
   <data name="App_MediaInputStopped" xml:space="preserve"><value>全域媒體鍵攔截發生錯誤。在重新啟動 Media Lock 前，實體媒體鍵可能會交由 Windows 處理。</value></data>
+  <data name="Settings_ReleasePrerelease" xml:space="preserve"><value>預發行版本</value></data>
+  <data name="Settings_ReleaseStable" xml:space="preserve"><value>穩定版本</value></data>
+  <data name="Settings_SignatureSigned" xml:space="preserve"><value>已簽署</value></data>
+  <data name="Settings_SignatureUnsigned" xml:space="preserve"><value>未簽署</value></data>
+  <data name="Settings_DiagnosticsCopied" xml:space="preserve"><value>已複製診斷摘要。分享前請先檢閱內容。</value></data>
+  <data name="Settings_SupportActionFailed" xml:space="preserve"><value>無法完成支援動作：{0}</value></data>
+  <data name="Settings_AboutDiagnostics" xml:space="preserve"><value>關於與診斷</value></data>
+  <data name="Settings_AboutDescription" xml:space="preserve"><value>檢查目前安裝資訊，並開啟疑難排解所需資源。</value></data>
+  <data name="Settings_Version" xml:space="preserve"><value>版本</value></data>
+  <data name="Settings_Windows" xml:space="preserve"><value>Windows</value></data>
+  <data name="Settings_ReleaseStatus" xml:space="preserve"><value>發行狀態</value></data>
+  <data name="Settings_DiagnosticsPrivacy" xml:space="preserve"><value>複製的摘要不含媒體標題、演出者、帳戶名稱、完整路徑或完整設定。分享前請先檢閱。</value></data>
+  <data name="Settings_CopyDiagnostics" xml:space="preserve"><value>複製診斷摘要</value></data>
+  <data name="Settings_CopyDiagnosticsAutomation" xml:space="preserve"><value>複製保護隱私的 Media Lock 診斷摘要</value></data>
+  <data name="Settings_OpenLogs" xml:space="preserve"><value>開啟記錄</value></data>
+  <data name="Settings_OpenLogsAutomation" xml:space="preserve"><value>開啟 Media Lock 記錄資料夾</value></data>
+  <data name="Settings_OpenSupport" xml:space="preserve"><value>開啟支援</value></data>
+  <data name="Settings_OpenSupportAutomation" xml:space="preserve"><value>開啟 Media Lock 支援頁面</value></data>
+  <data name="Settings_ReportBug" xml:space="preserve"><value>回報問題</value></data>
+  <data name="Settings_ReportBugAutomation" xml:space="preserve"><value>開啟 Media Lock 問題回報表單</value></data>
 </root>
