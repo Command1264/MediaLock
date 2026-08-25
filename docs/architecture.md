@@ -306,9 +306,10 @@ same serialized critical section as catalog and Route intents.
 
 Each correction is an ordinary explicit Play Media Command carrying the captured `ExpectedTarget`. The Router
 still resolves capability and rejects stale targets; the Windows GSMTC adapter remains a one-shot controller. Catalog
-observations trigger policy evaluation, so no polling loop is introduced. Recovery, catalog unavailability and suspend
-make enforcement Suspended; fallback, an unrelated Active Target and shutdown cannot redirect a correction. Locked
-modes reuse the Router-accepted successor. Windows Auto and Priority Rules retain the armed fingerprint while its
+observations trigger policy evaluation, so no polling loop is introduced. Recovery and catalog unavailability make
+enforcement Suspended; a real Power Suspend clears the process-lifetime policy so resume cannot restart audio.
+Fallback, an unrelated Active Target and shutdown cannot redirect a correction. Locked modes reuse the Router-accepted
+successor. Windows Auto and Priority Rules retain the armed fingerprint while its
 Session is absent, refresh that fingerprint from live observations while it remains active, require exactly one
 acceptable candidate and re-arm only when that candidate is also the Router Active Target. A changed Active Target
 while the original Session still exists remains an explicit target change and clears the policy.
@@ -323,7 +324,8 @@ The Core lifecycle port separately exposes workstation Lock/Unlock without depen
 adapter translates Session Switch notifications and requests a fresh GSMTC snapshot after unlock. Application keeps a
 small attribution window across that transition: Playing closes it and preserves Keep Playing, while Paused, Stopped
 or Closed clears the policy without correction. A missing or unknown target remains Suspended and cannot redirect a
-command to a competitor.
+command to a competitor. Power Suspend arrives through catalog lifecycle state instead: Application clears Keep Playing
+on `Suspended`, and later `Reacquiring`／Available snapshots cannot re-arm it.
 
 Settings schema v7 adds `PlaybackStateLockSettings` for the repeated-pause escape hatch. Application keeps a bounded
 queue of distinct direct Playing-to-Paused observation times. Duplicate Paused events never add entries; Changing,

@@ -164,11 +164,13 @@ an explicit Play correction; no policy yields Pause, and Stopped or Closed playb
 tests use controller observations and fresh catalog snapshots to prove captured-target protection, one in-flight
 correction, confirmation, two-attempt exhaustion, Media Lock Pause/Toggle/Stop clearing and Play/Next/Previous
 preservation. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown must cancel,
-suspend or clear work without dispatching to a competing Session. Process restart begins at Off.
+suspend or clear work without dispatching to a competing Session. Power Suspend explicitly turns Keep Playing Off;
+resume must not issue Play or re-arm it. Process restart begins at Off.
 Workstation lifecycle tests distinguish power suspend from Session Lock/Unlock, require an unlock-triggered GSMTC
 refresh, and cover lock-screen Pause arriving on either side of the Unlock event. That explicit override clears Keep
 Playing with zero correction commands; an unchanged Playing refresh preserves the policy and closes the attribution
-window so a later desktop Pause is corrected normally.
+window so a later desktop Pause is corrected normally. Power Suspend tests cover Windows Auto and Priority Rules,
+require Off at the Suspended observation and prove that a paused post-resume target receives zero Play commands.
 Repeated-pause tests use a controllable clock to prove that three distinct Playing-to-Paused transitions in the
 default five-second window release Keep Playing, leave the third pause uncorrected and emit a Released state. They
 also prove window expiry, duplicate Paused suppression, Changing-to-Paused buffering exclusion, sequence resets and

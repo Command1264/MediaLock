@@ -60,6 +60,8 @@ Windows 鎖定畫面上的 Pause 或 Stop 是明確的人為覆寫，會關閉 K
 可設定的 Repeated Pause Override 只計算 Armed Playback Target 明確的 Playing → Paused 轉換；在指定時間內
 達到次數門檻時會關閉 Keep Playing、保留暫停並提示使用者。Changing、Recovery、目標變更與重複的
 Paused 通知不是新的暫停意圖。
+真正的 Windows Power Suspend 是安全邊界：它會關閉 Keep Playing，喚醒後不自動重新播放。單純的
+Workstation Lock／Unlock 不會關閉保護，除非鎖定畫面觀察到明確 Pause、Stop 或 Closed。
 _Avoid_: Playback mode, forced toggle, autoplay
 
 **Armed Playback Target**:

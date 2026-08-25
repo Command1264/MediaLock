@@ -53,6 +53,12 @@ source preserves a missing armed target as Suspended, resumes only for one finge
 also Active Target, and sends no correction to an ambiguous or competing Session. All remaining host rows and the
 corrected-artifact rerun remain pending.
 
+The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
+same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
+product-policy decision: waking left the player paused and Keep Playing off. The accepted policy now treats Power
+Suspend as a safety boundary and forbids automatic audio resume. Source `229c9eb` and its artifacts are therefore also
+superseded; a second replacement build and exact-artifact rerun are required.
+
 Record Windows build, i7-8700 host identity, ASUS ROG STRIX FLARE keyboard, named YouTube Music and ordinary YouTube
 sources, Routing Mode, exact candidate source commit and both container hashes. Verify:
 

@@ -693,8 +693,13 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return catalogResult;
         }
 
-        if (catalogStatus is MediaSessionCatalogStatus.Suspended or
-            MediaSessionCatalogStatus.Reacquiring or
+        if (catalogStatus == MediaSessionCatalogStatus.Suspended)
+        {
+            ClearPlaybackStateLock();
+            return catalogResult;
+        }
+
+        if (catalogStatus is MediaSessionCatalogStatus.Reacquiring or
             MediaSessionCatalogStatus.Unavailable)
         {
             playbackStateCorrectionAttempts = 0;

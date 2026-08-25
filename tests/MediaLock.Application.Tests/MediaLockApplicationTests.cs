@@ -235,7 +235,7 @@ public sealed class MediaLockApplicationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task SystemSuspendPreservesKeepPlayingUntilTheArmedTargetReturns(
+    public async Task SystemSuspendDisarmsKeepPlayingAndDoesNotResumeAudio(
         bool usePriorityRules)
     {
         var music = Session("music", "music");
@@ -258,14 +258,14 @@ public sealed class MediaLockApplicationTests
             new ApplicationIntent.SetPlaybackStateLock(
                 PlaybackStateLockMode.KeepPlaying),
             CancellationToken.None);
-        var suspended = new TaskCompletionSource<MediaLockApplicationState>(
+        var disarmed = new TaskCompletionSource<MediaLockApplicationState>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         application.StateChanged += (_, args) =>
         {
             if (args.State.CatalogStatus == MediaSessionCatalogStatus.Suspended &&
-                args.State.PlaybackStateLock.Status != PlaybackStateLockStatus.Ready)
+                args.State.PlaybackStateLock.Mode == PlaybackStateLockMode.Off)
             {
-                suspended.TrySetResult(args.State);
+                disarmed.TrySetResult(args.State);
             }
         };
 
@@ -274,16 +274,21 @@ public sealed class MediaLockApplicationTests
             null,
             MediaSessionCatalogStatus.Suspended,
             "Media sessions are suspended while Windows sleeps."));
-        var suspendedState = await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var suspendedState = await disarmed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        Assert.Equal(
-            PlaybackStateLockMode.KeepPlaying,
-            suspendedState.PlaybackStateLock.Mode);
-        Assert.Equal(
-            PlaybackStateLockStatus.Suspended,
-            suspendedState.PlaybackStateLock.Status);
+        Assert.Equal(PlaybackStateLockState.Off, suspendedState.PlaybackStateLock);
         Assert.Empty(controller.Commands);
 
+        var resumed = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.CatalogStatus == MediaSessionCatalogStatus.Available &&
+                args.State.Router.Sessions.Any(session => session.Key == music.Key))
+            {
+                resumed.TrySetResult(args.State);
+            }
+        };
         await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
             [],
             null,
@@ -292,16 +297,10 @@ public sealed class MediaLockApplicationTests
         await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
             [music with { PlaybackStatus = PlaybackStatus.Paused }, video],
             music.Key));
-        await controller.WaitForCommandCountAsync(1);
+        var resumedState = await resumed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        Assert.Equal(
-            PlaybackStateLockMode.KeepPlaying,
-            application.State.PlaybackStateLock.Mode);
-        Assert.Equal(
-            PlaybackStateLockStatus.Ready,
-            application.State.PlaybackStateLock.Status);
-        Assert.Equal(music.Key, application.State.PlaybackStateLock.ArmedTarget);
-        Assert.Equal([(music.Key, MediaCommand.Play)], controller.Commands);
+        Assert.Equal(PlaybackStateLockState.Off, resumedState.PlaybackStateLock);
+        Assert.Empty(controller.Commands);
     }
 
     [Theory]
