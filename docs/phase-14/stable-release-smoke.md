@@ -5,30 +5,34 @@ produced after its source commit is reviewed and clean.
 
 ## Release identity
 
-Status: pending formal artifact.
+Status: provenance-clean local formal artifact created; host and Sandbox validation remain pending.
 
 - Version: `0.3.0`.
-- Source commit: pending.
-- Source dirty: must be `false`.
+- Source commit: `3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1`.
+- Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
 - Single-file: must be `true`.
 - Single-file compressed: must be `true`.
-- Signed: expected `false`; verify payload and Setup Authenticode independently.
+- Signed: `false`; payload and Setup both report Authenticode `NotSigned`.
 - Archive: `MediaLock-0.3.0-win-x64.zip`.
 - Installer: `MediaLock-Setup-0.3.0-win-x64.exe`.
-- Archive SHA-256: pending.
-- Installer SHA-256: pending.
-- Shared payload SHA-256: pending.
+- Archive SHA-256: `91f7eb239009a4b9faa82a1b07315b0853f2a2e8c82fa5bb8b87375dfcd64195`.
+- Installer SHA-256: `e56c1fd5970c24aab1a047caf4b1e6cde1a34a8c88f8e31a3c0ffbda6ada692c`.
+- Shared payload SHA-256: `b9711901f31330541a1c96c1fcc7f1b552f45aab20dda189ce92f276d1bda529`.
+- Archive size: 76,500,429 bytes.
+- Installer size: 76,911,985 bytes.
+- Payload size: 82,315,230 bytes.
 
-Before host testing, independently recompute both container digests, compare manifest/checksum files, expand exactly
-one `MediaLock.exe`, and record ProductVersion `0.3.0`, FileVersion `0.3.0.0` and Authenticode status.
+Independent inspection matched both container manifests and checksum files, matched the shared payload hash and found
+exactly one extracted `MediaLock.exe`. Payload and Setup report ProductVersion `0.3.0`, FileVersion `0.3.0.0` and
+Authenticode `NotSigned`.
 
 ## Automated gate and review
 
-Status: automated gate and follow-up two-axis review passed on implementation commit
-`c1908621ba7ca31db0c1958c4bc8bfa47c327e86`; repeat the automated gate on the final artifact-source commit after this
-evidence update.
+Status: automated gate passed on final artifact-source commit
+`3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1`; the implementation and final evidence-only diff both passed the two-axis
+review with zero findings.
 
 Record restore, format, complete tests, Release build, all packaging scripts, Markdown relative-link validation,
 `git diff --check` and the two-axis Standards／Spec review against the Phase 14 plan. GitHub Actions capacity is not
@@ -57,6 +61,9 @@ Gate results on `c1908621ba7ca31db0c1958c4bc8bfa47c327e86`:
 
 The Standards and Spec reviews both reported zero findings. Their follow-up checks specifically closed the earlier
 payload-invariant and duplicated-assertion risks in the downgrade and cancellation transactions.
+
+The same complete automated gate was repeated successfully on final artifact-source commit
+`3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1` before its formal artifacts were built from a clean worktree.
 
 ## Exact-artifact host gate
 
