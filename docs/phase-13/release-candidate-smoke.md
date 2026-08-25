@@ -5,29 +5,43 @@ after the candidate source commit is reviewed and clean.
 
 ## Candidate identity
 
-Status: pending formal artifact build.
+Status: formal local artifacts built and independently inspected on 2026-08-25.
 
 - Version: `0.3.0-rc.1`.
-- Source commit: pending.
-- Source dirty: must be `false`.
+- Source commit: `25690bf138342cdf79ee7b19a4d2e4080e15e38a`.
+- Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
 - Single-file: must be `true`.
 - Single-file compressed: must be `true`.
-- Executable and Setup signatures: expected `NotSigned`; verify independently.
-- ZIP／Setup／payload sizes and SHA-256: pending.
-- ProductVersion: must be `0.3.0-rc.1`.
-- FileVersion: must be `0.3.0.0`.
+- ZIP: `MediaLock-0.3.0-rc.1-win-x64.zip`; 76,499,947 bytes;
+  SHA-256 `4c0d8694fcdd76a7e90452a2ac0d13941281c5b5e44fab8ab337497adf15d042`.
+- Setup: `MediaLock-Setup-0.3.0-rc.1-win-x64.exe`; 76,912,972 bytes;
+  SHA-256 `7b8db4499340729df558a6fe99da865069aef9a093b6b2acbc903aa8d69c66bf`.
+- Payload: `MediaLock.exe`; 82,314,711 bytes;
+  SHA-256 `3868050e0a23079954047c016de25c55500dd14d75f9aba853150ccd2e3d164a`.
+- ProductVersion: `0.3.0-rc.1` for payload and Setup.
+- FileVersion: `0.3.0.0` for payload and Setup.
+- Executable and Setup signatures: independently verified `NotSigned`.
+
+Both recomputed container digests matched manifest schema 3 and their standalone checksum files. The expanded ZIP
+contained exactly one `MediaLock.exe`; its recomputed digest matched the manifest payload digest. Manifest RID,
+self-contained, single-file, compression, trimming and signing fields matched the planned contract.
 
 ## Automated gate
 
-Status: pending final exact-commit run.
+Status: passed on 2026-08-25 against exact source commit
+`25690bf138342cdf79ee7b19a4d2e4080e15e38a`.
 
-- Restore, formatting verification, complete Release tests and Release build.
-- Publish and footprint contract tests, including PowerShell 5.1 prerelease artifact selection.
-- ZIP／Setup one-payload identity, manifest schema, hashes, unsigned state and clean-source guards.
-- Markdown relative links and `git diff --check`.
-- Code review with no unresolved Critical／High finding.
+- Restore and formatting verification passed.
+- All 344 Release tests passed; Release build completed with 0 warnings and 0 errors.
+- Publish and footprint contract tests passed, including PowerShell 7 and Windows PowerShell 5.1 prerelease artifact
+  selection.
+- ZIP／Setup one-payload identity, manifest schema, hashes, unsigned state and clean-source guards passed.
+- Markdown relative links and `git diff --check` passed.
+- Standards review ended with 0 findings. Spec review found one missing post-downgrade startup assertion; commit
+  `25690bf` added a fresh Registry read and ordinal full-command comparison, after which focused re-review ended with
+  0 findings.
 
 ## Local host smoke
 
