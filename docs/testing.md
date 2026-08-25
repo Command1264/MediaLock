@@ -375,6 +375,27 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 & .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
 ```
 
+For Phase 12B publish-footprint work, first run the fast measurement-contract test:
+
+```powershell
+& .\tests\packaging\Measure-PublishFootprint.Tests.ps1
+```
+
+Then close every running Media Lock instance and produce an ignored, machine-specific comparison report:
+
+```powershell
+& .\eng\Measure-PublishFootprint.ps1 `
+    -OutputRoot '.\artifacts\phase-12b-footprint' `
+    -ColdStartIterations 15 `
+    -WarmStartIterations 15
+```
+
+Add `-IncludeLocaleCandidates` only when running the complete English／Traditional Chinese／Windows-language fallback
+matrix. The benchmark alternates variant order and uses isolated bundle extraction caches, but does not flush the
+Windows file cache; preserve a separate reboot-based first-launch smoke for the selected candidate. Generated binaries,
+cache directories and raw host reports remain under ignored `artifacts/` and are not release evidence until tied to an
+exact reviewed source commit. See [Phase 12B footprint plan](phase-12/footprint-optimization-plan.md).
+
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.

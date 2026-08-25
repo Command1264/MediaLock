@@ -375,3 +375,8 @@ desktop UI and reports cleanup failure through its process exit code for the uni
 The release candidate targets `win-x64`, self-contained, single-file publication. Single-file output can be larger
 and may interact with native libraries or extraction behavior, so build success, cold start, tray resources,
 settings paths and clean-machine execution are release gates rather than assumptions.
+
+Phase 12B enables compression for managed assemblies inside the single-file bundle while retaining self-contained
+runtime and native-library self extraction. This reduces the installed executable but can make the outer Inno Setup
+container larger because its LZMA2 compressor receives already-compressed input. Release metadata records the
+single-file-compression state; EXE, ZIP, Setup, extraction cache and startup remain separate gates.

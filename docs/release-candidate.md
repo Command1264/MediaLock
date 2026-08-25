@@ -80,6 +80,8 @@ $manifest.installer.sha256
 
 Each pair must match before extraction or installation. A formal release also requires `sourceDirty: false`, both
 payload and installer `signed: false`, `runtimeIdentifier: win-x64`, `selfContained: true` and `singleFile: true`.
+Phase 12B and later source-built artifacts additionally require `singleFileCompressed: true`; historical `0.2.0`
+artifacts keep their original manifest schema and payload bytes.
 
 ## Host smoke test
 
