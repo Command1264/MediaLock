@@ -23,6 +23,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private readonly Lock recoverySync = new();
     private readonly Dictionary<long, RecoveryDeadline> recoveryDeadlines = [];
     private Task? catalogWorker;
+    private Task? loginStartupWorker;
     private MediaLockApplicationState state = MediaLockApplicationState.Initial;
     private bool disposed;
     private MediaLockSettings settings = MediaLockSettings.Default;
@@ -125,6 +126,13 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 await loginStartupManager.SetEnabledAsync(
                     settings.Desktop.StartWithWindows,
                     cancellationToken);
+            }
+
+            if (loginStartupManager is ILoginStartupChangeSource changeSource)
+            {
+                loginStartupWorker = WatchLoginStartupAsync(
+                    changeSource,
+                    lifetime.Token);
             }
         }
 
@@ -546,6 +554,17 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
         }
 
+        if (loginStartupWorker is not null)
+        {
+            try
+            {
+                await loginStartupWorker;
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+            }
+        }
+
         await dispatchGate.WaitAsync();
         try
         {
@@ -557,6 +576,42 @@ public sealed class MediaLockApplication : IMediaLockApplication
         {
             dispatchGate.Release();
             dispatchGate.Dispose();
+        }
+    }
+
+    private async Task WatchLoginStartupAsync(
+        ILoginStartupChangeSource changeSource,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var enabled in changeSource.WatchEnabledAsync(cancellationToken))
+            {
+                await dispatchGate.WaitAsync(cancellationToken);
+                try
+                {
+                    var desired = settings.Desktop!.StartWithWindows;
+                    if (enabled != desired &&
+                        await loginStartupManager!.IsEnabledAsync(cancellationToken) != desired)
+                    {
+                        await loginStartupManager.SetEnabledAsync(desired, cancellationToken);
+                        await TryWriteDiagnosticAsync(
+                            new DiagnosticEvent("startup.registration.repaired"),
+                            cancellationToken);
+                    }
+                }
+                finally
+                {
+                    dispatchGate.Release();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            PublishError($"Login startup monitoring is unavailable: {exception.Message}");
         }
     }
 

@@ -66,7 +66,9 @@ of acceptance.
 
 Settings tests maintain a runtime-consumer matrix. Recovery and Priority Rules must reach the Router immediately,
 including cancellation and replacement of an active Recovery deadline when its timeout changes. Login startup must
-match the owned Run value, global-key interception and close-to-tray must observe the published application state,
+match the owned Run value and repair an external overwrite after initial synchronization without deleting a
+portable-owned value when startup is disabled. Global-key interception and close-to-tray must observe the published
+application state,
 repeated-pause settings must reset prior observations, and language/theme must apply only after a successful commit.
 Every newly introduced setting adds either an immediate-application test at its owning public seam or an explicit,
 documented startup-only contract. A repository write by itself is never sufficient evidence of a successful runtime

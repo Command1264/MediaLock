@@ -383,6 +383,11 @@ input first, drains or cancels routing work, persists state, removes subscriptio
 The same root injects the Windows environment and desktop-support adapters into Settings; tests replace both through
 their public seams without launching Explorer, a browser or the Clipboard.
 
+The login-startup adapter monitors the current-user Run key with `RegNotifyChangeKeyValue`. Application owns that
+stream and reconciles notifications through its serialized settings boundary: an enabled preference repairs a stale
+or foreign command to the current executable, while a disabled preference does not delete a value owned by another
+portable copy. Shutdown cancels and joins this monitor before disposing Application coordination resources.
+
 An installer-only `--uninstall-cleanup` command is handled before single-instance, GSMTC, tray or input initialization.
 It delegates to the Windows startup adapter, which removes the current-user Run value only when its complete quoted
 command matches the executing installed path. Missing or portable-owned values are preserved. The command produces no

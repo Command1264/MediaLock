@@ -1873,6 +1873,49 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task RunningApplicationRepairsLoginStartupChangedByAnExternalWriter()
+    {
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            Desktop = MediaLockSettings.Default.Desktop! with
+            {
+                StartWithWindows = true,
+            },
+        };
+        var startup = new ObservableLoginStartupManager(enabled: true);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            startup);
+        await application.StartAsync(CancellationToken.None);
+
+        await startup.PublishExternalStateAsync(value: false);
+        await WaitUntilAsync(() => startup.Updates.Count == 1);
+
+        Assert.Equal([true], startup.Updates);
+    }
+
+    [Fact]
+    public async Task DisabledLoginStartupDoesNotDeleteAValueOwnedByAnotherExecutable()
+    {
+        var session = Session("music", "Brave");
+        var startup = new ObservableLoginStartupManager(enabled: false);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            startup);
+        await application.StartAsync(CancellationToken.None);
+
+        await startup.PublishExternalStateAsync(value: false);
+        await WaitUntilAsync(() => startup.ObservedStates.Count == 1);
+
+        Assert.Empty(startup.Updates);
+    }
+
+    [Fact]
     public async Task FailedLoginStartupUpdateRollsSettingsBackToThePreviousValue()
     {
         var session = Session("music", "Brave");
@@ -2428,6 +2471,44 @@ public sealed class MediaLockApplicationTests
         {
             Updates.Add(enabled);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ObservableLoginStartupManager(bool enabled) :
+        ILoginStartupManager,
+        ILoginStartupChangeSource
+    {
+        private readonly Channel<bool> changes = Channel.CreateUnbounded<bool>();
+
+        public List<bool> Updates { get; } = [];
+
+        public List<bool> ObservedStates { get; } = [];
+
+        public ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(enabled);
+
+        public ValueTask SetEnabledAsync(bool value, CancellationToken cancellationToken)
+        {
+            enabled = value;
+            Updates.Add(value);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<bool> WatchEnabledAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            await foreach (var value in changes.Reader.ReadAllAsync(cancellationToken))
+            {
+                ObservedStates.Add(value);
+                yield return value;
+            }
+        }
+
+        public ValueTask PublishExternalStateAsync(bool value)
+        {
+            enabled = value;
+            return changes.Writer.WriteAsync(value);
         }
     }
 
