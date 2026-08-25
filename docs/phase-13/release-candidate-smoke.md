@@ -137,10 +137,11 @@ the exact-artifact host evidence above and were not silently counted as independ
 
 ## Publication
 
-Status: publication notes and exact-asset staging authorized; tag, GitHub Prerelease and uploads are not authorized or
-started.
+Status: published on 2026-08-26.
 
-The exact manifest source commit is integrated into `develop`. A separate approval is still required for the signed
-annotated `v0.3.0-rc.1` tag at `d0fe5583e91204fe98a79b14ae0327e5120af54e`, GitHub Prerelease creation and public
-ZIP／Setup upload. The intended ZIP and Setup sizes and SHA-256 values are fixed in the release notes. Do not upload the
-manifest or standalone checksum files under the current publication policy, and do not mark the prerelease Latest.
+The separately approved operation created GPG-signed annotated tag `v0.3.0-rc.1` at
+`d0fe5583e91204fe98a79b14ae0327e5120af54e` and the
+[public GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1). It is not Draft or
+Latest and contains exactly the ZIP and Setup. GitHub reported the same SHA-256 digests recorded above, and independently
+downloading both public assets reproduced their exact sizes and hashes. Manifest and standalone checksum files remain
+local provenance evidence. Stable `v0.2.0` and the retained `release/0.2` hotfix baseline remain unchanged.
