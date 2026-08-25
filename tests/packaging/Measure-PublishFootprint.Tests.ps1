@@ -26,6 +26,22 @@ $publishProfilePath =
 Assert-Condition (Test-Path -LiteralPath $measurementScript -PathType Leaf) `
     "Footprint measurement script was not found: $measurementScript"
 
+$measurementScriptSource = Get-Content -LiteralPath $measurementScript -Raw
+$requiredMarkdownContracts = @(
+    'Logical processors:',
+    'Total physical memory bytes:',
+    'Extraction cache bytes',
+    'Fresh p95／min／max',
+    'Warm p95／min／max',
+    '## Raw startup samples',
+    'Fresh-cache samples:',
+    'Warm-cache samples:'
+)
+foreach ($requiredMarkdownContract in $requiredMarkdownContracts) {
+    Assert-Condition ($measurementScriptSource.Contains($requiredMarkdownContract)) `
+        "Markdown report must include: $requiredMarkdownContract"
+}
+
 $publishProfile = [xml](Get-Content -LiteralPath $publishProfilePath -Raw)
 $compressionSetting =
     $publishProfile.SelectSingleNode('/Project/PropertyGroup/EnableCompressionInSingleFile')?.InnerText

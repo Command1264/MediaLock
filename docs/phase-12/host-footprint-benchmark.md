@@ -106,6 +106,8 @@ The compressed executable passed the 2026-08-25 host smoke on the same i7-8700 s
   source remained unchanged.
 - Recovery, Tray restore, second-instance activation and Exit passed. One JSONL log contained 5,756 valid entries and
   no Error／Critical entry.
+- The host `%LocalAppData%\MediaLock\settings.json` parsed successfully after the candidate Settings smoke; the
+  persisted state and bounded JSONL log were also valid.
 - Lock／unlock and sleep／wake each retained routing isolation. Sleep／wake entered Recovering and returned to the
   selected source without remaining Unavailable.
 - A single reboot observation was completed. A second reboot solely to create a direct baseline/candidate A/B pair was

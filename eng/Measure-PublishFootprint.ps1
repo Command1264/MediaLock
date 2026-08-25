@@ -555,20 +555,69 @@ $markdown = @(
     '# Media Lock Phase 12B footprint measurement',
     '',
     "- CPU: $($report.Environment.Cpu)",
+    "- Logical processors: $($report.Environment.LogicalProcessorCount)",
+    "- Total physical memory bytes: $($report.Environment.TotalPhysicalMemoryBytes)",
     "- Windows: $($report.Environment.Windows) $($report.Environment.DisplayVersion) ($($report.Environment.FullBuild))",
+    "- Architecture: $($report.Environment.Architecture)",
     "- .NET SDK: $($report.DotnetSdkVersion)",
     "- Inno Setup: $($report.InnoSetupVersion)",
     "- Source commit: ``$($report.SourceCommit)``",
     "- Source dirty: $($report.SourceDirty)",
+    "- Fresh-cache iterations: $($report.Measurement.ColdStartIterations)",
+    "- Warm-cache iterations: $($report.Measurement.WarmStartIterations)",
+    "- Startup timeout: $($report.Measurement.StartupTimeoutSeconds) seconds",
+    "- Alternating variant order: $($report.Measurement.AlternatingVariantOrder)",
+    "- Fresh-cache definition: $($report.Measurement.ColdStartDefinition)",
+    "- Warm-cache definition: $($report.Measurement.WarmStartDefinition)",
     '',
-    '| Variant | EXE bytes | ZIP bytes | Setup bytes | Fresh-cache median | Warm-cache median |',
-    '|---|---:|---:|---:|---:|---:|'
+    '| Variant | EXE bytes | ZIP bytes | Setup bytes | Extraction cache bytes | Fresh median | Fresh p95／min／max | Warm median | Warm p95／min／max |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|---:|'
 )
 foreach ($variantResult in $variantResults) {
     $installerBytes = if ($null -eq $variantResult.InstallerBytes) { 'Skipped' } else { $variantResult.InstallerBytes }
     $coldMedian = if ($null -eq $variantResult.ColdStart) { 'Skipped' } else { "$($variantResult.ColdStart.MedianMilliseconds) ms" }
     $warmMedian = if ($null -eq $variantResult.WarmStart) { 'Skipped' } else { "$($variantResult.WarmStart.MedianMilliseconds) ms" }
-    $markdown += "| $($variantResult.Name) | $($variantResult.ExecutableBytes) | $($variantResult.ArchiveBytes) | $installerBytes | $coldMedian | $warmMedian |"
+    $coldRange = if ($null -eq $variantResult.ColdStart) {
+        'Skipped'
+    }
+    else {
+        "$($variantResult.ColdStart.P95Milliseconds)／$($variantResult.ColdStart.MinimumMilliseconds)／$($variantResult.ColdStart.MaximumMilliseconds) ms"
+    }
+    $warmRange = if ($null -eq $variantResult.WarmStart) {
+        'Skipped'
+    }
+    else {
+        "$($variantResult.WarmStart.P95Milliseconds)／$($variantResult.WarmStart.MinimumMilliseconds)／$($variantResult.WarmStart.MaximumMilliseconds) ms"
+    }
+    $startupSamples = @(
+        if ($null -ne $variantResult.ColdStart) { $variantResult.ColdStart.Samples }
+        if ($null -ne $variantResult.WarmStart) { $variantResult.WarmStart.Samples }
+    )
+    $extractionCacheBytes = if ($startupSamples.Count -eq 0) {
+        'Skipped'
+    }
+    else {
+        ($startupSamples | Measure-Object -Property ExtractionCacheBytes -Maximum).Maximum
+    }
+    $markdown += "| $($variantResult.Name) | $($variantResult.ExecutableBytes) | $($variantResult.ArchiveBytes) | $installerBytes | $extractionCacheBytes | $coldMedian | $coldRange | $warmMedian | $warmRange |"
+}
+$installerReduction = if ($null -eq $comparison.InstallerReductionPercent) {
+    'Skipped'
+}
+else {
+    "$($comparison.InstallerReductionPercent)%"
+}
+$coldMedianComparison = if ($null -eq $comparison.ColdMedianDeltaMilliseconds) {
+    'Skipped'
+}
+else {
+    "$($comparison.ColdMedianDeltaMilliseconds) ms ($($comparison.ColdMedianRegressionPercent)%)"
+}
+$warmMedianComparison = if ($null -eq $comparison.WarmMedianDeltaMilliseconds) {
+    'Skipped'
+}
+else {
+    "$($comparison.WarmMedianDeltaMilliseconds) ms ($($comparison.WarmMedianRegressionPercent)%)"
 }
 $markdown += @(
     '',
@@ -576,11 +625,40 @@ $markdown += @(
     '',
     "- EXE reduction: $($comparison.ExecutableReductionPercent)%",
     "- ZIP reduction: $($comparison.ArchiveReductionPercent)%",
-    "- Setup reduction: $($comparison.InstallerReductionPercent)%",
-    "- Fresh-cache median delta: $($comparison.ColdMedianDeltaMilliseconds) ms ($($comparison.ColdMedianRegressionPercent)%)",
-    "- Warm-cache median delta: $($comparison.WarmMedianDeltaMilliseconds) ms ($($comparison.WarmMedianRegressionPercent)%)",
+    "- Setup reduction: $installerReduction",
+    "- Fresh-cache median delta: $coldMedianComparison",
+    "- Warm-cache median delta: $warmMedianComparison",
     '',
-    '> This benchmark does not flush the Windows file cache. A reboot-based cold-start smoke remains a separate manual gate.'
+    '## Raw startup samples'
+)
+foreach ($variantResult in $variantResults) {
+    $markdown += @('', "### $($variantResult.Name)", '', '- Fresh-cache samples:')
+    if ($null -eq $variantResult.ColdStart) {
+        $markdown += 'Skipped'
+    }
+    else {
+        $markdown += '```text'
+        foreach ($sample in $variantResult.ColdStart.Samples) {
+            $markdown += "iteration=$($sample.Iteration), elapsed=$($sample.ElapsedMilliseconds) ms, extraction-cache=$($sample.ExtractionCacheBytes) bytes"
+        }
+        $markdown += '```'
+    }
+
+    $markdown += @('', '- Warm-cache samples:')
+    if ($null -eq $variantResult.WarmStart) {
+        $markdown += 'Skipped'
+    }
+    else {
+        $markdown += '```text'
+        foreach ($sample in $variantResult.WarmStart.Samples) {
+            $markdown += "iteration=$($sample.Iteration), elapsed=$($sample.ElapsedMilliseconds) ms, extraction-cache=$($sample.ExtractionCacheBytes) bytes"
+        }
+        $markdown += '```'
+    }
+}
+$markdown += @(
+    '',
+    '> This benchmark does not flush the Windows file cache. A reboot-based cold-start comparison is preferred manual evidence; an explicitly accepted waiver must be recorded separately.'
 )
 [IO.File]::WriteAllText(
     $markdownPath,
