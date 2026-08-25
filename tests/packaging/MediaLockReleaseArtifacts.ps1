@@ -135,3 +135,46 @@ function Get-MediaLockArtifactPair {
         Get-MediaLockReleaseArtifact -ArtifactRoot $ArtifactRoot -Version $NewerVersion
     )
 }
+
+function Assert-MediaLockInstallerArtifact {
+    param(
+        [Parameter(Mandatory)]
+        [psobject] $Artifact,
+
+        [ValidatePattern('^[0-9a-fA-F]{64}$')]
+        [string] $ExpectedSha256
+    )
+
+    $installerFileName = [string]$Artifact.Manifest.installer.fileName
+    $manifestSha256 = [string]$Artifact.Manifest.installer.sha256
+    if ([string]::IsNullOrWhiteSpace($installerFileName) -or
+        $manifestSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+        throw "Installer metadata is incomplete for $($Artifact.Manifest.version)."
+    }
+
+    $installerPath = Join-Path $Artifact.Directory $installerFileName
+    if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+        throw "Installer declared by the $($Artifact.Manifest.version) manifest was not found: $installerPath"
+    }
+
+    $actualSha256 = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not [string]::Equals(
+        $actualSha256,
+        $manifestSha256,
+        [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Installer SHA-256 does not match the $($Artifact.Manifest.version) manifest."
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256) -and
+        -not [string]::Equals(
+            $actualSha256,
+            $ExpectedSha256,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Installer SHA-256 does not match the pinned digest for $($Artifact.Manifest.version)."
+    }
+
+    [pscustomobject]@{
+        Path = $installerPath
+        Sha256 = $actualSha256
+    }
+}

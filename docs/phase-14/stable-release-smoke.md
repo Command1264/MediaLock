@@ -46,8 +46,9 @@ Status: pending on a fresh Windows 11 x64 Sandbox.
 
 Record artifact identity, portable launch, per-user install, Search/Start Menu and Installed apps registration,
 startup ownership, `MSEdge` GSMTC routing/Seek, real public portable `0.2.0` data compatibility, exact public RC1 Setup
-upgrade to stable, stable repair, RC1 downgrade block, Ready-page cancellation, uninstall retention/cleanup and final
-process/log state. Real sign-out/sign-in is host-only because Sandbox destroys its environment on sign-out.
+upgrade to stable using the pinned published Setup SHA-256, stable repair with unchanged settings/state, RC1 downgrade
+block, Ready-page cancellation, uninstall retention/cleanup and final process/log state. Real sign-out/sign-in is
+host-only because Sandbox destroys its environment on sign-out.
 
 ## Integration and publication
 

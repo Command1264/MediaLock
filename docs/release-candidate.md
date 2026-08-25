@@ -130,24 +130,26 @@ mapped artifact root, then run:
 ```powershell
 & '.\tests\packaging\WindowsSandbox-InstallerUpgradeSmoke.ps1' `
     -OlderVersion 0.3.0-rc.1 `
-    -NewerVersion 0.3.0
+    -NewerVersion 0.3.0 `
+    -ExpectedOlderInstallerSha256 0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3
 ```
 
 For stable promotion, use the exact public `0.3.0-rc.1` Setup as the installer predecessor. Test the real public
 portable `0.2.0` data/state path separately because it did not ship Setup. The script must report a successful in-place
-upgrade, one Installed apps entry, retained user data and startup command, followed by downgrade exit code 7 with the
-stable payload still installed. Prepare cancellation with:
+upgrade, same-version stable repair, one Installed apps entry, byte-identical settings/state, retained user data and
+startup command, followed by downgrade exit code 7 with the stable payload still installed. Prepare cancellation with:
 
 ```powershell
 & '.\tests\packaging\WindowsSandbox-InstallerCancellationSmoke.ps1' `
     -Mode Prepare `
     -OlderVersion 0.3.0-rc.1 `
-    -NewerVersion 0.3.0
+    -NewerVersion 0.3.0 `
+    -ExpectedOlderInstallerSha256 0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3
 ```
 
 Visibly start the candidate Setup and cancel on its Ready page, then run the same script with `-Mode Verify`, both
-version parameters and `-CancellationExitCode 2`. Record the cancellation stage precisely; this gate does not
-establish rollback after file extraction has begun.
+version parameters, the same pinned older-installer digest and `-CancellationExitCode 2`. Record the cancellation stage
+precisely; this gate does not establish rollback after file extraction has begun.
 
 - cold start without a separately installed .NET runtime;
 - one window/process/icon after second launch;

@@ -11,6 +11,10 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
     [string] $NewerVersion,
 
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9a-fA-F]{64}$')]
+    [string] $ExpectedOlderInstallerSha256,
+
     [string] $ArtifactRoot = 'C:\MediaLockArtifacts',
 
     [int] $CancellationExitCode = -1,
@@ -57,12 +61,20 @@ $manifests = @(Get-MediaLockArtifactPair `
 
 $older = $manifests[0]
 $newer = $manifests[1]
-$olderInstaller = Join-Path $older.Directory $older.Manifest.installer.fileName
+$olderInstallerArtifact = Assert-MediaLockInstallerArtifact `
+    -Artifact $older `
+    -ExpectedSha256 $ExpectedOlderInstallerSha256
+$newerInstallerArtifact = Assert-MediaLockInstallerArtifact -Artifact $newer
+$olderInstaller = $olderInstallerArtifact.Path
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\MediaLock'
 $installedExe = Join-Path $installRoot 'MediaLock.exe'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $userDataRoot = Join-Path $env:LOCALAPPDATA 'MediaLock'
 $retainedMarker = Join-Path $userDataRoot 'cancellation-smoke-retained.txt'
+$settingsPath = Join-Path $userDataRoot 'settings.json'
+$statePath = Join-Path $userDataRoot 'state.json'
+$expectedSettings = '{"schemaVersion":7,"marker":"cancellation-settings"}'
+$expectedState = '{"schemaVersion":1,"marker":"cancellation-state"}'
 $expectedStartupValue = '"{0}" --startup' -f $installedExe
 
 if ($Mode -eq 'Prepare') {
@@ -81,6 +93,8 @@ if ($Mode -eq 'Prepare') {
 
     New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null
     Set-Content -LiteralPath $retainedMarker -Value 'retain' -Encoding ascii -NoNewline
+    [IO.File]::WriteAllText($settingsPath, $expectedSettings, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($statePath, $expectedState, [Text.UTF8Encoding]::new($false))
     Set-ItemProperty -Path $runKey -Name 'MediaLock' -Value $expectedStartupValue
     exit 0
 }
@@ -97,6 +111,10 @@ Assert-Condition ((Get-Item -LiteralPath $installedExe).VersionInfo.ProductVersi
     $older.Manifest.version) 'Cancelled upgrade replaced the installed payload.'
 Assert-Condition (Test-Path -LiteralPath $retainedMarker -PathType Leaf) `
     'Cancelled upgrade removed retained user data.'
+Assert-Condition ((Get-Content -LiteralPath $settingsPath -Raw) -eq $expectedSettings) `
+    'Cancelled upgrade changed settings.json.'
+Assert-Condition ((Get-Content -LiteralPath $statePath -Raw) -eq $expectedState) `
+    'Cancelled upgrade changed state.json.'
 Assert-Condition ($null -ne $startupProperty) `
     'Cancelled upgrade removed the enabled login-startup value.'
 Assert-Condition ([string]::Equals(
@@ -108,11 +126,15 @@ $result = [ordered]@{
     passed = $true
     olderVersion = $older.Manifest.version
     attemptedVersion = $newer.Manifest.version
+    olderInstallerSha256 = $olderInstallerArtifact.Sha256
+    newerInstallerSha256 = $newerInstallerArtifact.Sha256
     cancellationStage = 'BeforeInstall'
     cancellationExitCode = $CancellationExitCode
     installedVersion = $entries[0].DisplayVersion
     installedAppsEntryCount = $entries.Count
     userDataRetained = $true
+    settingsUnchanged = $true
+    stateUnchanged = $true
     startupValuePreserved = $true
 }
 
