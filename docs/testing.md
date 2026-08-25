@@ -203,6 +203,50 @@ cancellation/failure, supported downgrade or an actionable block, uninstall with
 coexistence. Installer, ZIP, source commit and Windows build evidence are inseparable. An unsigned Setup remains an
 explicit test fact, and observed Inno behavior must not be generalized into MSI-level transactional rollback.
 
+The initial implementation pins official Inno Setup `6.7.3`. Local RED → GREEN evidence covers owned and nonowned
+startup values, early non-UI cleanup command parsing, isolated ZIP/Setup publication, schema-2 manifest hashes and
+unsigned installer metadata. A reversible current-user transaction smoke installed without elevation, created the
+fixed executable/Start Menu/Installed apps entries, removed an owned Run value, preserved a portable-owned value and
+left existing user data intact after uninstall. This host evidence does not replace the remaining clean-Windows,
+upgrade, downgrade or full runtime matrix.
+
+`tests/packaging/WindowsSandbox-InstallerSmoke.ps1` is the PowerShell 5.1-compatible clean-environment transaction
+gate. It consumes only a read-only five-file artifact set and writes a JSON result to a separately mapped directory;
+it never treats an installed executable as evidence of a matching payload without independently hashing it.
+
+`tests/packaging/WindowsSandbox-InstallerUpgradeSmoke.ps1` consumes two test-only stable artifact sets. It installs the
+older version, preserves an exact installed-path startup command and user-data marker, upgrades in place, then requires
+the older installer to be rejected with Inno exit code 7. It verifies one uninstall entry and shortcut, the newer
+payload/version, retained data and the unchanged startup command after both operations.
+
+`tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` has explicit `Prepare` and `Verify` phases around a
+visible installer action. The recorded gate cancels on the Ready page before installation begins, requires exit code
+2 and proves the existing version, registration, startup command and user data remain unchanged. It does not claim
+that cancellation during file extraction was observed or that Inno provides MSI-level transaction rollback.
+
+The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
+`6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched
+the installed payload hash, created the Start Menu and Installed apps entries without enabling startup by default,
+removed an installer-owned startup value, preserved a portable-owned startup value, retained user data and finished
+with no Media Lock process. This result covers the scripted install/uninstall transaction only; indexed Search, full
+runtime/media behavior, actual login restart, upgrade, downgrade and controlled cancellation remain separate gates.
+
+The same artifact also passed a visible ordinary-user Sandbox smoke: the English Setup wizard opened without UAC,
+used the fixed per-user destination, launched without a separate .NET installation prompt, opened Settings, appeared
+in the Windows search panel and restored the existing process, and exposed a notification-area icon that restored the
+window on double-click. Windows Sandbox reported that search indexing was disabled, so indexed keyword search remains
+a host/manual gate rather than an inferred pass from the visible shortcut.
+
+The user completed that host/manual gate on 2026-08-25 with the same installer payload. Windows Search discovery,
+single-process launch, Tray restore, startup registration, actual sign-out/sign-in startup, Play/Pause, Next,
+Previous and Recovery all passed. The competing ordinary YouTube source remained unchanged. Uninstall completed,
+user data remained available, and no error or crash was reported. Test-only `0.2.0` and `0.2.1` artifacts from clean
+source commit `ed05c2742bdc6f3b0d5760406c6c3c410533ff9d` then passed the Sandbox matrix: both installer hashes matched
+their manifests, in-place upgrade retained data/startup state, and the older installer was intentionally blocked with
+exit code 7. Cancelling on the Ready page returned exit code 2 and left the old installation unchanged. Cancellation
+during file extraction was attempted, but the single-file payload completed before cancellation was delivered, so
+that stronger rollback claim remains unverified.
+
 ### Integration tests
 
 Cover:

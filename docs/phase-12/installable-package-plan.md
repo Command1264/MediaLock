@@ -6,8 +6,8 @@ Add a per-user Inno Setup installer beside the existing portable ZIP. A successf
 11 user install Media Lock without elevation, find it through Windows Search, upgrade it in place, remove it through
 Installed apps and retain a valid optional login-startup path.
 
-This plan does not authorize implementation, install Inno Setup, add a production dependency, publish an artifact or
-change the public release. Those operations begin only after the proposed packaging decision is approved.
+Implementation was approved on 2026-08-25. Public artifact publication, signing, tag and Release changes remain
+separately authorized operations. Inno Setup is a build-only tool and is not a Media Lock runtime dependency.
 
 ## Fixed product contract
 
@@ -24,6 +24,9 @@ change the public release. Those operations begin only after the proposed packag
   labeled and may be warned about or blocked by Windows security features.
 - Distribution: portable ZIP remains supported until the installed upgrade and rollback matrix passes in a clean
   Windows environment.
+- Installer language: the first package uses Inno Setup's official built-in English messages. Media Lock itself still
+  applies English or Traditional Chinese normally. A reviewed in-repository Traditional Chinese installer language
+  file may be added later; the build must not download an untrusted translation.
 
 ## Implementation slices
 
@@ -61,8 +64,9 @@ After an in-place upgrade, Settings and the registry value must agree without th
 
 Use same-`AppId`, same-directory replacement for compatible upgrades. Prevent duplicate Installed apps entries and
 shortcuts. Explicitly test the previous supported stable installer to the new installer, then test the documented
-rollback direction. If settings-schema compatibility cannot support downgrade, block it with an actionable message
-instead of corrupting or deleting user data.
+rollback direction. Media Lock blocks an installer whose complete release version is older than the Installed apps
+version, including `-rc.N` ordering, with an actionable message instead of risking settings-schema corruption or
+deleting user data. A same-version repair and an upgrade remain allowed.
 
 Normal uninstall removes installed program files, shortcuts, uninstall metadata and only the matching startup value.
 It leaves settings, runtime state and logs. A future optional user-data removal choice requires separate approval and
@@ -84,7 +88,9 @@ Follow RED → GREEN at the packaging and startup seams:
 4. Reject dirty or changing sources, invalid versions, missing/wrong compiler versions and partial final outputs.
 5. Prove exact startup-command matching, including spaces, quotes, case behavior, missing values and a portable path
    that must remain untouched.
-6. Run restore, format verification, all Release tests, Release build, portable packaging inspection and installer
+6. Run the PowerShell 5.1 upgrade matrix against two test-only stable versions and require the older installer to exit
+   with code 7 without changing the newer payload, registration, startup command or user data.
+7. Run restore, format verification, all Release tests, Release build, portable packaging inspection and installer
    packaging inspection.
 
 No GitHub Actions capacity is assumed; the complete local gate remains mandatory and its absence from a PR is stated.

@@ -6,6 +6,8 @@ param(
 
     [string] $OutputRoot,
 
+    [string] $InnoCompilerPath,
+
     [switch] $AllowDirty
 )
 
@@ -60,12 +62,55 @@ function Get-SourceSnapshot {
     }
 }
 
+function Resolve-InnoCompiler {
+    param(
+        [string] $RequestedPath
+    )
+
+    $supportedVersion = '6.7.3'
+    $candidates = if ([string]::IsNullOrWhiteSpace($RequestedPath)) {
+        @(
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+        )
+    }
+    else {
+        @($RequestedPath)
+    }
+
+    $compilerPath = $candidates |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        Select-Object -First 1
+    if ($null -eq $compilerPath) {
+        throw "Inno Setup $supportedVersion compiler was not found. Install it or pass -InnoCompilerPath."
+    }
+
+    $resolvedCompilerPath = (Resolve-Path -LiteralPath $compilerPath).Path
+    $uninstaller = Get-ChildItem `
+        -LiteralPath (Split-Path -Parent $resolvedCompilerPath) `
+        -Filter 'unins*.exe' `
+        -File |
+        Where-Object { $_.VersionInfo.ProductVersion.Trim() -eq $supportedVersion } |
+        Select-Object -First 1
+    if ($null -eq $uninstaller) {
+        throw "Media Lock release packaging requires Inno Setup ${supportedVersion}: $resolvedCompilerPath"
+    }
+
+    [pscustomobject]@{
+        Path = $resolvedCompilerPath
+        Version = $supportedVersion
+    }
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $initialSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
 $sourceDirty = $initialSource.Dirty
 if ($sourceDirty -and -not $AllowDirty) {
     throw 'Release artifacts require a clean Git worktree. Commit the intended source or pass -AllowDirty for a disclosed test artifact.'
 }
+
+$innoCompiler = Resolve-InnoCompiler -RequestedPath $InnoCompilerPath
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot 'artifacts'
@@ -80,14 +125,25 @@ else {
 $versionNumbers = $Version.Split('-', 2)[0].Split('.')
 $binaryVersion = "$($versionNumbers[0]).$($versionNumbers[1]).$($versionNumbers[2]).0"
 $artifactStem = "MediaLock-$Version-win-x64"
+$installerStem = "MediaLock-Setup-$Version-win-x64"
 $archiveName = "$artifactStem.zip"
 $manifestName = "$artifactStem.manifest.json"
 $checksumName = "$artifactStem.sha256"
+$installerName = "$installerStem.exe"
+$installerChecksumName = "$installerStem.sha256"
 $finalArchivePath = Join-Path $OutputRoot $archiveName
 $finalManifestPath = Join-Path $OutputRoot $manifestName
 $finalChecksumPath = Join-Path $OutputRoot $checksumName
+$finalInstallerPath = Join-Path $OutputRoot $installerName
+$finalInstallerChecksumPath = Join-Path $OutputRoot $installerChecksumName
+$finalOutputPaths = @(
+    $finalArchivePath,
+    $finalManifestPath,
+    $finalChecksumPath,
+    $finalInstallerPath,
+    $finalInstallerChecksumPath)
 
-foreach ($outputPath in @($finalArchivePath, $finalManifestPath, $finalChecksumPath)) {
+foreach ($outputPath in $finalOutputPaths) {
     if (Test-Path -LiteralPath $outputPath) {
         throw "Release output already exists; choose a new OutputRoot or remove it explicitly: $outputPath"
     }
@@ -100,6 +156,9 @@ $publishRoot = Join-Path $stagingRoot 'publish'
 $stagedArchivePath = Join-Path $stagingRoot $archiveName
 $stagedManifestPath = Join-Path $stagingRoot $manifestName
 $stagedChecksumPath = Join-Path $stagingRoot $checksumName
+$stagedInstallerPath = Join-Path $stagingRoot $installerName
+$stagedInstallerChecksumPath = Join-Path $stagingRoot $installerChecksumName
+$publicationCompleted = $false
 
 try {
     New-Item -ItemType Directory -Path $publishRoot | Out-Null
@@ -130,9 +189,40 @@ try {
         throw "Published executable ProductVersion '$($executable.VersionInfo.ProductVersion)' does not match '$Version'."
     }
 
+    $payloadHash = (Get-FileHash -LiteralPath $executable.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     Compress-Archive -LiteralPath $executable.FullName -DestinationPath $stagedArchivePath -CompressionLevel Optimal
     $archive = Get-Item -LiteralPath $stagedArchivePath
     $archiveHash = (Get-FileHash -LiteralPath $stagedArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+    $installerScriptPath = Join-Path $repositoryRoot 'installer\MediaLock.iss'
+    & $innoCompiler.Path `
+        '/Qp' `
+        "/DAppVersion=$Version" `
+        "/DBinaryVersion=$binaryVersion" `
+        "/DPayloadPath=$($executable.FullName)" `
+        "/DOutputDirectory=$stagingRoot" `
+        "/DOutputBaseName=$installerStem" `
+        $installerScriptPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
+    }
+
+    if (-not (Test-Path -LiteralPath $stagedInstallerPath -PathType Leaf)) {
+        throw "Inno Setup did not create the expected installer: $stagedInstallerPath"
+    }
+
+    $installer = Get-Item -LiteralPath $stagedInstallerPath
+    $installerSignature = Get-AuthenticodeSignature -LiteralPath $stagedInstallerPath
+    if ($installerSignature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
+        throw "Unsigned packaging expected installer signature status NotSigned, found $($installerSignature.Status)."
+    }
+
+    if ($installer.VersionInfo.ProductVersion.Trim() -ne $Version) {
+        throw "Installer ProductVersion '$($installer.VersionInfo.ProductVersion)' does not match '$Version'."
+    }
+
+    $installerHash =
+        (Get-FileHash -LiteralPath $stagedInstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $finalSource = Get-SourceSnapshot -RepositoryRoot $repositoryRoot
     if ($finalSource.Commit -ne $initialSource.Commit -or
         $finalSource.Fingerprint -ne $initialSource.Fingerprint) {
@@ -153,7 +243,7 @@ try {
     }
 
     $manifest = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         product = 'Media Lock'
         version = $Version
         runtimeIdentifier = 'win-x64'
@@ -164,33 +254,59 @@ try {
         sourceCommit = $initialSource.Commit
         sourceDirty = $sourceDirty
         dotnetSdkVersion = $dotnetSdkVersion
+        innoSetupVersion = $innoCompiler.Version
         generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
         executable = [ordered]@{
             fileName = $executable.Name
             sizeBytes = $executable.Length
+            sha256 = $payloadHash
             productVersion = $executable.VersionInfo.ProductVersion
             fileVersion = $executable.VersionInfo.FileVersion
+            signed = $false
         }
         archive = [ordered]@{
             fileName = $archive.Name
             sizeBytes = $archive.Length
             sha256 = $archiveHash
         }
+        installer = [ordered]@{
+            fileName = $installer.Name
+            sizeBytes = $installer.Length
+            sha256 = $installerHash
+            productVersion = $installer.VersionInfo.ProductVersion.Trim()
+            fileVersion = $installer.VersionInfo.FileVersion.Trim()
+            signed = $false
+        }
     }
     $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stagedManifestPath -Encoding utf8NoBOM
     "$archiveHash  $archiveName" | Set-Content -LiteralPath $stagedChecksumPath -Encoding ascii -NoNewline
+    "$installerHash  $installerName" |
+        Set-Content -LiteralPath $stagedInstallerChecksumPath -Encoding ascii -NoNewline
 
     Move-Item -LiteralPath $stagedArchivePath -Destination $finalArchivePath
     Move-Item -LiteralPath $stagedManifestPath -Destination $finalManifestPath
     Move-Item -LiteralPath $stagedChecksumPath -Destination $finalChecksumPath
+    Move-Item -LiteralPath $stagedInstallerPath -Destination $finalInstallerPath
+    Move-Item -LiteralPath $stagedInstallerChecksumPath -Destination $finalInstallerChecksumPath
+    $publicationCompleted = $true
 
     [pscustomobject]@{
         Archive = $finalArchivePath
         Manifest = $finalManifestPath
         Checksum = $finalChecksumPath
+        Installer = $finalInstallerPath
+        InstallerChecksum = $finalInstallerChecksumPath
     }
 }
 finally {
+    if (-not $publicationCompleted) {
+        foreach ($outputPath in $finalOutputPaths) {
+            if (Test-Path -LiteralPath $outputPath -PathType Leaf) {
+                Remove-Item -LiteralPath $outputPath -Force
+            }
+        }
+    }
+
     if (Test-Path -LiteralPath $stagingRoot) {
         $resolvedStagingRoot = (Resolve-Path -LiteralPath $stagingRoot).Path
         if (-not $resolvedStagingRoot.StartsWith(

@@ -456,8 +456,23 @@ supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSI
 selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
 The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
 
-Status: planning complete; implementation awaiting approval. The proposed decision is a per-user Inno Setup EXE at a
-stable `%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. MSIX is deferred while
+Status: implementation in progress. The accepted decision is a per-user Inno Setup EXE at a stable
+`%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. The first RED → GREEN slices
+produce ZIP and Setup from one payload and protect startup cleanup from deleting a portable-owned Run value. Local
+silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
+default user-data retention. A clean Windows Sandbox transaction gate also passed for commit
+`6233da8bab35e6fcde0858d1fa0a58fe5babfba6`, including payload/digest matching, default-disabled startup, owned versus
+portable startup cleanup and retained user data. The same artifact's visible Sandbox smoke passed the
+ordinary-user wizard without UAC, fixed destination, cold launch without a separate .NET prompt, Settings, search-panel
+shortcut launch, single-instance restore and Tray restore. Indexed keyword search remains unverified because Sandbox
+disabled its search index. The subsequent host/manual gate passed Windows Search, single-instance and Tray restore,
+actual login startup, Play/Pause, Next/Previous, Recovery, competing-source isolation, uninstall and retained user
+data without a reported error or crash. Clean source commit
+`ed05c2742bdc6f3b0d5760406c6c3c410533ff9d` then produced test-only `0.2.0` and `0.2.1` artifacts whose hashes and
+Sandbox matrix passed in-place upgrade with one Installed apps entry, retained user data and an unchanged startup
+command. Older installers are now blocked with exit code 7 and an actionable message; a Ready-page cancellation
+returned exit code 2 and left the old installation unchanged. Cancellation during extraction is not claimed because
+the payload completed before the cancel action arrived. MSIX is deferred while
 direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
 enterprise deployment or repair becomes a concrete requirement. See the
 [Phase 12A plan](phase-12/installable-package-plan.md),

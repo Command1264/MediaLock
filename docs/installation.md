@@ -1,6 +1,8 @@
 # 下載、安裝、更新與移除
 
 Media Lock 目前以 unsigned、portable `win-x64` ZIP 發布，沒有安裝程式，也不需要另外安裝 .NET Runtime。
+Phase 12A 的 per-user installer 正在開發及驗證，尚未加入公開 `0.2.0` Release；在 GitHub Release 明確列出
+Setup 與其 SHA-256 以前，不要把測試用 Setup 當作正式下載。
 
 ## 系統需求與限制
 
