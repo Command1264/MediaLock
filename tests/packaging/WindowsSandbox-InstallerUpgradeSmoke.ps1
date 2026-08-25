@@ -1,11 +1,21 @@
 [CmdletBinding()]
 param(
+    [Parameter(Mandatory)]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
+    [string] $OlderVersion,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
+    [string] $NewerVersion,
+
     [string] $ArtifactRoot = 'C:\MediaLockArtifacts',
     [string] $ResultPath = 'C:\MediaLockResults\installer-upgrade-smoke.json'
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+. (Join-Path $PSScriptRoot 'MediaLockReleaseArtifacts.ps1')
 
 trap {
     $failureResult = [ordered]@{
@@ -47,27 +57,6 @@ function Get-MediaLockUninstallEntries {
     )
 }
 
-function Get-ArtifactPair {
-    $manifests = @(
-        Get-ChildItem -LiteralPath $ArtifactRoot -Filter 'MediaLock-*-win-x64.manifest.json' -Recurse |
-            Where-Object { -not $_.PSIsContainer } |
-            ForEach-Object {
-                [pscustomobject]@{
-                    Manifest = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
-                    Directory = $_.DirectoryName
-                }
-            } |
-            Sort-Object { [version]$_.Manifest.version }
-    )
-
-    Assert-Condition ($manifests.Count -eq 2) `
-        'Exactly two stable-version manifests are required for the upgrade smoke.'
-    Assert-Condition ([version]$manifests[0].Manifest.version -lt [version]$manifests[1].Manifest.version) `
-        'The upgrade smoke requires distinct older and newer versions.'
-
-    return $manifests
-}
-
 function Invoke-Installer {
     param(
         [Parameter(Mandatory)]
@@ -81,7 +70,10 @@ function Invoke-Installer {
         -PassThru
 }
 
-$artifacts = Get-ArtifactPair
+$artifacts = @(Get-MediaLockArtifactPair `
+    -ArtifactRoot $ArtifactRoot `
+    -OlderVersion $OlderVersion `
+    -NewerVersion $NewerVersion)
 $older = $artifacts[0]
 $newer = $artifacts[1]
 $olderInstaller = Join-Path $older.Directory $older.Manifest.installer.fileName
