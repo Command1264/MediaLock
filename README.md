@@ -89,7 +89,8 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`，Setup 預設安裝至
 `%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。目前公開的
 `0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
-Windows Sandbox gate，仍然只發布既有 portable ZIP；Phase 12A 產生的 installer 尚未公開。完整驗證、證據與回復流程見
+Windows Sandbox gate，仍然只發布既有 portable ZIP；Phase 12A installer 已完成實作與驗證，但尚未公開。
+第一個公開候選 Setup 規劃於 `0.3.0-rc.1`，在正式發布以前仍不是使用者下載管道。完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
 [0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。正式版透過
