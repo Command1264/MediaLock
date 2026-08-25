@@ -59,7 +59,10 @@ YouTube and produced no error or crash. The default repeated-pause override also
 pauses were corrected, the third pause within five seconds remained paused, Keep Playing turned Off, one notification
 sound played, ordinary YouTube did not change and no error or crash occurred. A lock-screen media-card Pause also left
 YouTube Music paused, turned Keep Playing Off, recovered Priority Rules after unlock, did not change ordinary YouTube
-and produced no Unavailable, error or crash.
+and produced no Unavailable, error or crash. The four-mode selection indicator, stable button sizing, one-shot
+Play／Pause／Toggle／Next／Previous／Stop, release-only Seek and competing-source isolation all passed. Windows Auto
+Keep Playing also behaved as specified: with two playing Sessions, Windows promoted the competitor after the armed
+target paused, so the Active Target change safely ended protection; with only one Session, Keep Playing remained usable.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
