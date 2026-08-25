@@ -63,6 +63,11 @@ and produced no Unavailable, error or crash. The four-mode selection indicator, 
 Play／Pause／Toggle／Next／Previous／Stop, release-only Seek and competing-source isolation all passed. Windows Auto
 Keep Playing also behaved as specified: with two playing Sessions, Windows promoted the competitor after the armed
 target paused, so the Active Target change safely ended protection; with only one Session, Keep Playing remained usable.
+Second launch restored the existing window while retaining one process. English／Light and Traditional Chinese／Dark
+applied immediately, Windows language／theme were restored, About reported `0.3.0-rc.1`, and the diagnostics notice
+expired automatically. Close-to-Tray, Tray restore and Tray Exit passed. After Exit the process count was zero;
+settings and state parsed as JSON, one JSONL log contained zero invalid lines and zero Error／Critical entries, and the
+persisted language and theme were both `system`.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
