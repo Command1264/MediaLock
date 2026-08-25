@@ -475,6 +475,8 @@ commits or digests. Record `0.2.0-rc.3` evidence independently in
 [Phase 10C packaged validation](phase-10/release-candidate-smoke.md).
 Record stable `0.2.0` evidence independently in
 [Phase 10D packaged validation](phase-10/stable-release-smoke.md).
+Record stable `0.3.0` evidence independently in
+[Phase 14 packaged validation](phase-14/stable-release-smoke.md).
 
 ## 7. Manual evidence
 

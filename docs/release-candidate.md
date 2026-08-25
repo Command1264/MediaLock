@@ -2,14 +2,14 @@
 
 ## Scope and release status
 
-The published Prerelease is `0.3.0-rc.1`, targeting `win-x64` as a compressed self-contained single-file WPF
-application. It consolidates the completed one-way Playback State Lock, per-user Inno Setup package and Phase 12B
-publish profile without adding another product feature. Volume, customizable shortcuts, Windows Media Surface Mirror
-production integration and browser integration remain outside this release.
+The current source targets an unpublished stable `0.3.0` candidate for `win-x64` as a compressed self-contained
+single-file WPF application. It promotes the published `0.3.0-rc.1` feature set without adding another product
+feature. Volume, customizable shortcuts, Windows Media Surface Mirror production integration and browser integration
+remain outside this release.
 
-The published `v0.2.0` assets remain frozen and portable-only. The candidate publishes a per-user installer beside its
-portable ZIP while leaving `v0.2.0` Stable／Latest. Re-running the command with version `0.2.0` is development evidence
-only and must not mutate or be attached to the existing GitHub Release.
+The published `v0.2.0` assets remain frozen and portable-only, and `v0.2.0` remains Stable／Latest until separately
+approved stable publication. Public `v0.3.0-rc.1` assets also remain immutable. Re-running the command with a published
+version is development evidence only and must not mutate or be attached to an existing GitHub Release.
 
 The release is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. Phase 11／12 development
@@ -44,7 +44,7 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 Then create the formal artifact:
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.3.0-rc.1
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.3.0
 ```
 
 The command refuses to overwrite existing outputs and refuses dirty source by default. It fingerprints tracked and
@@ -54,11 +54,11 @@ during the build. `-AllowDirty` exists only for explicitly disclosed test artifa
 
 Expected files:
 
-- `artifacts\MediaLock-0.3.0-rc.1-win-x64.zip`
-- `artifacts\MediaLock-0.3.0-rc.1-win-x64.manifest.json`
-- `artifacts\MediaLock-0.3.0-rc.1-win-x64.sha256`
-- `artifacts\MediaLock-Setup-0.3.0-rc.1-win-x64.exe`
-- `artifacts\MediaLock-Setup-0.3.0-rc.1-win-x64.sha256`
+- `artifacts\MediaLock-0.3.0-win-x64.zip`
+- `artifacts\MediaLock-0.3.0-win-x64.manifest.json`
+- `artifacts\MediaLock-0.3.0-win-x64.sha256`
+- `artifacts\MediaLock-Setup-0.3.0-win-x64.exe`
+- `artifacts\MediaLock-Setup-0.3.0-win-x64.sha256`
 
 The ZIP must contain exactly one file named `MediaLock.exe`. Manifest schema 3 is the source of truth for current
 source-built artifacts: version, source commit, SDK, Inno version, RID, dirty/signing state, compression state, payload
@@ -70,9 +70,9 @@ bytes. ZIP and Setup must be produced from one staged payload; neither may indep
 Place all five files in one directory and run:
 
 ```powershell
-$archive = '.\MediaLock-0.3.0-rc.1-win-x64.zip'
-$installer = '.\MediaLock-Setup-0.3.0-rc.1-win-x64.exe'
-$manifest = Get-Content '.\MediaLock-0.3.0-rc.1-win-x64.manifest.json' -Raw | ConvertFrom-Json
+$archive = '.\MediaLock-0.3.0-win-x64.zip'
+$installer = '.\MediaLock-Setup-0.3.0-win-x64.exe'
+$manifest = Get-Content '.\MediaLock-0.3.0-win-x64.manifest.json' -Raw | ConvertFrom-Json
 $archiveHash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
 $installerHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 $archiveHash
@@ -129,20 +129,20 @@ mapped artifact root, then run:
 
 ```powershell
 & '.\tests\packaging\WindowsSandbox-InstallerUpgradeSmoke.ps1' `
-    -OlderVersion 0.2.0 `
-    -NewerVersion 0.3.0-rc.1
+    -OlderVersion 0.3.0-rc.1 `
+    -NewerVersion 0.3.0
 ```
 
-The formal predecessor for installer-to-installer automation is generated test evidence because public `0.2.0` did
-not ship Setup; test the real public portable data/state path separately. The script must report a successful in-place
+For stable promotion, use the exact public `0.3.0-rc.1` Setup as the installer predecessor. Test the real public
+portable `0.2.0` data/state path separately because it did not ship Setup. The script must report a successful in-place
 upgrade, one Installed apps entry, retained user data and startup command, followed by downgrade exit code 7 with the
-newer payload still installed. Prepare cancellation with:
+stable payload still installed. Prepare cancellation with:
 
 ```powershell
 & '.\tests\packaging\WindowsSandbox-InstallerCancellationSmoke.ps1' `
     -Mode Prepare `
-    -OlderVersion 0.2.0 `
-    -NewerVersion 0.3.0-rc.1
+    -OlderVersion 0.3.0-rc.1 `
+    -NewerVersion 0.3.0
 ```
 
 Visibly start the candidate Setup and cancel on its Ready page, then run the same script with `-Mode Verify`, both
@@ -168,10 +168,10 @@ routine rollback. If login startup was enabled, disable it from the running rele
 or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
-approval after all release gates pass. That approval published `v0.3.0-rc.1` on 2026-08-26 as a GitHub Prerelease with
-only ZIP and Setup, and listed both SHA-256 values in its body. Manifest and standalone checksum files remain trusted
-local provenance evidence. The candidate is not Latest; published stable `v0.2.0` and its retained `release/0.2`
-hotfix baseline remain unchanged.
+approval after all release gates pass. No stable `v0.3.0` tag or Release exists yet. The approved RC1 publication
+created `v0.3.0-rc.1` on 2026-08-26 with only ZIP and Setup and listed both SHA-256 values in its body. Manifest and
+standalone checksum files remain trusted local provenance evidence. Published stable `v0.2.0` and its retained
+`release/0.2` hotfix baseline remain unchanged during Phase 14.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md), and `0.2.0-rc.2` evidence is preserved in
@@ -180,3 +180,4 @@ always requires new evidence. Historical `0.2.0-rc.3` results remain in
 [Phase 10C packaged validation](phase-10/release-candidate-smoke.md); record stable results separately in
 [Phase 10D packaged validation](phase-10/stable-release-smoke.md). Record the new candidate independently in
 [Phase 13B packaged validation](phase-13/release-candidate-smoke.md).
+Record stable `0.3.0` independently in [Phase 14 stable validation](phase-14/stable-release-smoke.md).

@@ -12,7 +12,7 @@ Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸�
 `0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
 Stable／Latest 版本。`0.3.0-rc.1` 已公開為 Prerelease，加入單向 Keep Playing、per-user Setup 與壓縮後的
 self-contained single-file payload；其 exact-artifact 自動、主機與 Windows Sandbox 驗證均已完成。
-Phase 14 已開始規劃將相同功能範圍晉升為 `0.3.0` stable；尚未完成新的 stable artifact 或公開發布。
+Phase 14B 正在將相同功能範圍晉升為 `0.3.0` stable；目前只是本機候選，尚未完成正式 Artifact 驗證或公開發布。
 Windows 原生媒體卡片同步仍不在產品承諾內。
 
 已驗證的基礎能力包括：
@@ -90,7 +90,7 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 官方 Inno Setup `6.7.3`；這只是 build-only 工具，使用者不需要安裝它。
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.3.0-rc.1
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.3.0
 ```
 
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
@@ -99,12 +99,13 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 `0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
 Windows Sandbox gate，該 Stable Release 仍只提供既有 portable ZIP。第一個公開候選 Setup 已隨
 `0.3.0-rc.1` GitHub Prerelease 發布；正式 ZIP／Setup 來自同一份已驗證 payload，Stable／Latest 仍維持
-`0.2.0`。
+`0.2.0`。`0.3.0` stable 目前只在本機準備，尚不是官方下載。
 完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
 [0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)，目前公開候選內容見
-[0.3.0-rc.1 release notes](docs/releases/0.3.0-rc.1.md)。正式版與候選版分別透過
+[0.3.0-rc.1 release notes](docs/releases/0.3.0-rc.1.md)，未發布的 stable 候選內容見
+[0.3.0 release notes](docs/releases/0.3.0.md)。目前正式版與候選版分別透過
 [Stable Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 與
 [0.3.0-rc.1 Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1) 公開；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。

@@ -594,7 +594,8 @@ After separate approval, change only stable identity, transition automation and 
 local gate and two-axis review, then create and validate one provenance-clean `0.3.0` ZIP／Setup pair on the host and a
 fresh Windows Sandbox. Record results in `docs/phase-14/stable-release-smoke.md` without rebuilding the artifact.
 
-Status: not started.
+Status: in progress. Phase 14B implementation was approved on 2026-08-26. Stable identity and transition tests run on
+`codex/release/phase-14b-0.3-stable`; remote integration, `release/0.3`, tag and publication remain separately gated.
 
 ### Phase 14C — integration and stable publication
 
