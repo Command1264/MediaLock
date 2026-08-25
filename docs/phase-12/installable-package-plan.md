@@ -64,8 +64,9 @@ After an in-place upgrade, Settings and the registry value must agree without th
 
 Use same-`AppId`, same-directory replacement for compatible upgrades. Prevent duplicate Installed apps entries and
 shortcuts. Explicitly test the previous supported stable installer to the new installer, then test the documented
-rollback direction. If settings-schema compatibility cannot support downgrade, block it with an actionable message
-instead of corrupting or deleting user data.
+rollback direction. Media Lock blocks an installer whose complete release version is older than the Installed apps
+version, including `-rc.N` ordering, with an actionable message instead of risking settings-schema corruption or
+deleting user data. A same-version repair and an upgrade remain allowed.
 
 Normal uninstall removes installed program files, shortcuts, uninstall metadata and only the matching startup value.
 It leaves settings, runtime state and logs. A future optional user-data removal choice requires separate approval and
@@ -87,7 +88,9 @@ Follow RED → GREEN at the packaging and startup seams:
 4. Reject dirty or changing sources, invalid versions, missing/wrong compiler versions and partial final outputs.
 5. Prove exact startup-command matching, including spaces, quotes, case behavior, missing values and a portable path
    that must remain untouched.
-6. Run restore, format verification, all Release tests, Release build, portable packaging inspection and installer
+6. Run the PowerShell 5.1 upgrade matrix against two test-only stable versions and require the older installer to exit
+   with code 7 without changing the newer payload, registration, startup command or user data.
+7. Run restore, format verification, all Release tests, Release build, portable packaging inspection and installer
    packaging inspection.
 
 No GitHub Actions capacity is assumed; the complete local gate remains mandatory and its absence from a PR is stated.

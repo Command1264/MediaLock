@@ -467,7 +467,11 @@ ordinary-user wizard without UAC, fixed destination, cold launch without a separ
 shortcut launch, single-instance restore and Tray restore. Indexed keyword search remains unverified because Sandbox
 disabled its search index. The subsequent host/manual gate passed Windows Search, single-instance and Tray restore,
 actual login startup, Play/Pause, Next/Previous, Recovery, competing-source isolation, uninstall and retained user
-data without a reported error or crash. Upgrade, downgrade and controlled cancellation remain. MSIX is deferred while
+data without a reported error or crash. A test-only `0.2.0` to `0.2.1` Sandbox matrix subsequently passed in-place
+upgrade with one Installed apps entry, retained user data and an unchanged startup command. Older installers are now
+blocked with exit code 7 and an actionable message; a Ready-page cancellation returned exit code 2 and left the old
+installation unchanged. Cancellation during extraction is not claimed because the payload completed before the
+cancel action arrived. MSIX is deferred while
 direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
 enterprise deployment or repair becomes a concrete requirement. See the
 [Phase 12A plan](phase-12/installable-package-plan.md),

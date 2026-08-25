@@ -311,7 +311,9 @@ Login startup remains an explicit Settings choice. In-place upgrades must preser
 uninstall may remove only a matching installed-path value and must not disturb a portable copy. Until a trusted signing
 path is separately approved, documentation must identify both installer and executable as unsigned and must not imply
 that installer format suppresses SmartScreen or Smart App Control. Portable distribution remains available until
-clean-Windows upgrade, rollback and uninstall evidence passes.
+clean-Windows upgrade, rollback and uninstall evidence passes. The installer permits same-version repair and upgrades,
+but blocks a complete release version older than the registered installation with an actionable message so it cannot
+silently expose persisted settings to an older schema.
 
 ### v1.0
 

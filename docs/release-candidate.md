@@ -119,6 +119,13 @@ Sandbox. Its JSON result covers hashes, installed payload identity, Start Menu/I
 startup state, owned/nonowned startup cleanup, user-data retention and final process count. It does not replace the
 interactive runtime items below.
 
+For a two-version compatibility gate, place exactly two stable artifact sets under the mapped artifact root and run
+`tests\packaging\WindowsSandbox-InstallerUpgradeSmoke.ps1`. It must report a successful in-place upgrade, one
+Installed apps entry, retained user data and startup command, followed by downgrade exit code 7 with the newer payload
+still installed. Use `tests\packaging\WindowsSandbox-InstallerCancellationSmoke.ps1 -Mode Prepare`, visibly cancel
+the newer Setup on its Ready page, then run `-Mode Verify -CancellationExitCode 2`. Record the cancellation stage
+precisely; this gate does not establish rollback after file extraction has begun.
+
 - cold start without a separately installed .NET runtime;
 - one window/process/icon after second launch;
 - Settings save and user-file creation;
@@ -131,11 +138,11 @@ enumeration and one routed command. A host-only pass is not a clean-environment 
 ## Rollback and cleanup
 
 The ZIP remains portable and has no installer transaction. To roll it back, exit the release and start the previous
-trusted executable. An installed release uses same-`AppId`, same-directory replacement; its previous-version upgrade
-and supported downgrade require separate Sandbox evidence. In either path, preserve `%LocalAppData%\MediaLock\`
-before investigating a failure and do not delete user settings as routine rollback. If login startup was enabled,
-disable it from the running release before rollback or remove only the exact current-user `MediaLock` startup entry
-after confirming its target.
+trusted executable. An installed release uses same-`AppId`, same-directory replacement for upgrades and same-version
+repair. Setup rejects an older complete release version, including RC ordering, because a newer settings schema may not
+be backward compatible. Use the currently installed version or a newer installer; do not delete user settings as
+routine rollback. If login startup was enabled, disable it from the running release before changing distribution mode,
+or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
 approval after all release gates pass. That approval was granted for `0.2.0`: the GPG-signed annotated `v0.2.0` tag

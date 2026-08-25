@@ -45,7 +45,8 @@ Uninstallable=yes
 UninstallDisplayName=Media Lock
 UninstallDisplayIcon={app}\MediaLock.exe
 VersionInfoVersion={#BinaryVersion}
-VersionInfoProductVersion={#AppVersion}
+VersionInfoProductVersion={#BinaryVersion}
+VersionInfoProductTextVersion={#AppVersion}
 VersionInfoCompany=Command1264
 VersionInfoDescription=Media Lock installer
 VersionInfoProductName=Media Lock
@@ -66,3 +67,138 @@ Filename: "{app}\MediaLock.exe"; Description: "{cm:LaunchProgram,Media Lock}"; \
 [UninstallRun]
 Filename: "{app}\MediaLock.exe"; Parameters: "--uninstall-cleanup"; \
     Flags: runhidden skipifdoesntexist; RunOnceId: "MediaLockStartupCleanup"
+
+[Code]
+function TryParseReleaseVersion(
+  const VersionText: String;
+  var BasePackedVersion: Int64;
+  var IsStable: Boolean;
+  var PrereleaseNumber: Int64): Boolean;
+var
+  BaseVersion: String;
+  PrereleaseText: String;
+  PrereleasePosition: Integer;
+begin
+  PrereleasePosition := Pos('-rc.', VersionText);
+  if PrereleasePosition = 0 then
+  begin
+    BaseVersion := VersionText;
+    IsStable := True;
+    PrereleaseNumber := 0;
+  end
+  else
+  begin
+    BaseVersion := Copy(VersionText, 1, PrereleasePosition - 1);
+    IsStable := False;
+    PrereleaseText := Copy(
+      VersionText,
+      PrereleasePosition + Length('-rc.'),
+      MaxInt);
+    PrereleaseNumber := StrToInt64Def(PrereleaseText, -1);
+  end;
+
+  Result :=
+    (IsStable or (PrereleaseNumber >= 0)) and
+    StrToVersion(BaseVersion + '.0', BasePackedVersion);
+end;
+
+function CompareReleaseVersions(
+  const LeftBasePackedVersion: Int64;
+  const LeftIsStable: Boolean;
+  const LeftPrereleaseNumber: Int64;
+  const RightBasePackedVersion: Int64;
+  const RightIsStable: Boolean;
+  const RightPrereleaseNumber: Int64): Integer;
+begin
+  Result := ComparePackedVersion(
+    LeftBasePackedVersion,
+    RightBasePackedVersion);
+  if Result <> 0 then
+  begin
+    exit;
+  end;
+
+  if LeftIsStable and not RightIsStable then
+  begin
+    Result := 1;
+    exit;
+  end;
+
+  if not LeftIsStable and RightIsStable then
+  begin
+    Result := -1;
+    exit;
+  end;
+
+  if LeftPrereleaseNumber < RightPrereleaseNumber then
+    Result := -1
+  else if LeftPrereleaseNumber > RightPrereleaseNumber then
+    Result := 1
+  else
+    Result := 0;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  CandidateBasePackedVersion: Int64;
+  CandidateIsStable: Boolean;
+  CandidatePrereleaseNumber: Int64;
+  InstalledBasePackedVersion: Int64;
+  InstalledIsStable: Boolean;
+  InstalledPrereleaseNumber: Int64;
+  InstalledVersion: String;
+  UninstallKey: String;
+begin
+  Result := '';
+  UninstallKey :=
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{' +
+    '{#MediaLockAppId}' + '}_is1';
+
+  if not RegQueryStringValue(
+    HKEY_CURRENT_USER,
+    UninstallKey,
+    'DisplayVersion',
+    InstalledVersion) then
+  begin
+    exit;
+  end;
+
+  if not TryParseReleaseVersion(
+    InstalledVersion,
+    InstalledBasePackedVersion,
+    InstalledIsStable,
+    InstalledPrereleaseNumber) then
+  begin
+    Result :=
+      'Media Lock cannot verify the installed version (' + InstalledVersion +
+      '). Repair or uninstall the existing installation before continuing.';
+    exit;
+  end;
+
+  if not TryParseReleaseVersion(
+    '{#AppVersion}',
+    CandidateBasePackedVersion,
+    CandidateIsStable,
+    CandidatePrereleaseNumber) then
+  begin
+    Result :=
+      'Media Lock cannot verify this installer version. Download a new installer ' +
+      'from the official release page.';
+    exit;
+  end;
+
+  if CompareReleaseVersions(
+    InstalledBasePackedVersion,
+    InstalledIsStable,
+    InstalledPrereleaseNumber,
+    CandidateBasePackedVersion,
+    CandidateIsStable,
+    CandidatePrereleaseNumber) > 0 then
+  begin
+    Result :=
+      'Media Lock ' + InstalledVersion + ' is already installed. This installer ' +
+      'contains the older version {#AppVersion}. Install version ' +
+      InstalledVersion + ' or a newer release instead; Media Lock will not ' +
+      'overwrite a newer installation because doing so could damage its settings.';
+  end;
+end;

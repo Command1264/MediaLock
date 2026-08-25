@@ -214,6 +214,16 @@ upgrade, downgrade or full runtime matrix.
 gate. It consumes only a read-only five-file artifact set and writes a JSON result to a separately mapped directory;
 it never treats an installed executable as evidence of a matching payload without independently hashing it.
 
+`tests/packaging/WindowsSandbox-InstallerUpgradeSmoke.ps1` consumes two test-only stable artifact sets. It installs the
+older version, preserves an exact installed-path startup command and user-data marker, upgrades in place, then requires
+the older installer to be rejected with Inno exit code 7. It verifies one uninstall entry and shortcut, the newer
+payload/version, retained data and the unchanged startup command after both operations.
+
+`tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` has explicit `Prepare` and `Verify` phases around a
+visible installer action. The recorded gate cancels on the Ready page before installation begins, requires exit code
+2 and proves the existing version, registration, startup command and user data remain unchanged. It does not claim
+that cancellation during file extraction was observed or that Inno provides MSI-level transaction rollback.
+
 The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
 `6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched
 the installed payload hash, created the Start Menu and Installed apps entries without enabling startup by default,
@@ -230,8 +240,10 @@ a host/manual gate rather than an inferred pass from the visible shortcut.
 The user completed that host/manual gate on 2026-08-25 with the same installer payload. Windows Search discovery,
 single-process launch, Tray restore, startup registration, actual sign-out/sign-in startup, Play/Pause, Next,
 Previous and Recovery all passed. The competing ordinary YouTube source remained unchanged. Uninstall completed,
-user data remained available, and no error or crash was reported. Upgrade, downgrade and controlled cancellation are
-the remaining Phase 12A package-behavior gates.
+user data remained available, and no error or crash was reported. The subsequent test-only `0.2.0` to `0.2.1`
+Sandbox matrix passed in-place upgrade, retained data/startup state and an intentional downgrade block; cancelling on
+the Ready page also left the old installation unchanged. Cancellation during file extraction was attempted but the
+single-file payload completed before cancellation was delivered, so that stronger rollback claim remains unverified.
 
 ### Integration tests
 

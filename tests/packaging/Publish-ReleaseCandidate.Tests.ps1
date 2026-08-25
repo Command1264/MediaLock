@@ -183,6 +183,23 @@ try {
     Assert-Condition ($manifest.executable.sha256 -eq `
         (Get-FileHash -LiteralPath $archiveFiles[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()) `
         'Manifest payload SHA-256 does not match the portable executable.'
+
+    $rcVersion = '0.2.0-rc.99'
+    $rcInstallerStem = "MediaLock-Setup-$rcVersion-win-x64-test"
+    $rcInstallerPath = Join-Path $artifactOutputRoot "$rcInstallerStem.exe"
+    $installerScriptPath = Join-Path $isolatedSourceRoot 'installer\MediaLock.iss'
+    & $InnoCompilerPath `
+        '/Qp' `
+        "/DAppVersion=$rcVersion" `
+        '/DBinaryVersion=0.2.0.0' `
+        "/DPayloadPath=$($archiveFiles[0].FullName)" `
+        "/DOutputDirectory=$artifactOutputRoot" `
+        "/DOutputBaseName=$rcInstallerStem" `
+        $installerScriptPath
+    Assert-Condition ($LASTEXITCODE -eq 0) `
+        'Installer source must compile a prerelease version.'
+    Assert-Condition ((Get-Item -LiteralPath $rcInstallerPath).VersionInfo.ProductVersion.Trim() -eq `
+        $rcVersion) 'Prerelease installer ProductVersion must retain the complete release version.'
 }
 finally {
     [IO.File]::Delete($dirtyMarkerPath)
