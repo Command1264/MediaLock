@@ -495,4 +495,5 @@ of 4.32% and 2.29%, but increased the Inno Setup download by 37.26%. The accepte
 compression while retaining all language resources; the manifest records this explicitly. Supported-locale filtering
 reduced EXE, ZIP and Setup by 9.11%, 6.98% and 3.46%, but remains test-only rather than shipping in this phase. See the
 [Phase 12B plan](phase-12/footprint-optimization-plan.md) and
-[official-source research](research/dotnet-wpf-publish-footprint.md).
+[official-source research](research/dotnet-wpf-publish-footprint.md). The exact clean-commit i7-8700 evidence and raw
+samples are preserved in the [host footprint benchmark](phase-12/host-footprint-benchmark.md).

@@ -395,6 +395,9 @@ matrix. The benchmark alternates variant order and uses isolated bundle extracti
 Windows file cache; preserve a separate reboot-based first-launch smoke for the selected candidate. Generated binaries,
 cache directories and raw host reports remain under ignored `artifacts/` and are not release evidence until tied to an
 exact reviewed source commit. See [Phase 12B footprint plan](phase-12/footprint-optimization-plan.md).
+Preserve the sanitized exact-commit result using the structure in
+[Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md); do not commit executables, extraction caches
+or machine-specific absolute paths.
 
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
