@@ -117,7 +117,7 @@ On a fresh supported Windows 11 x64 Sandbox, preserve Windows edition/build and 
 
 - portable cold start with no separately installed .NET runtime;
 - per-user install without UAC, Windows Search／Start Menu discovery and one Installed apps entry;
-- default-disabled login startup, enable/relogin behavior and exact installed-path command;
+- default-disabled login startup, enable behavior and exact installed-path command;
 - Edge GSMTC discovery plus one routed command and one Seek where supported;
 - real portable `0.2.0` to `0.3.0-rc.1` settings/state compatibility, plus generated predecessor-installer transition
   behavior;
@@ -125,8 +125,10 @@ On a fresh supported Windows 11 x64 Sandbox, preserve Windows edition/build and 
 - uninstall cleanup, owned versus portable startup preservation and retained user data; and
 - final zero process count, no Tray residue, valid JSON/logs and no Error／Critical entry.
 
-Host evidence does not replace Sandbox evidence, and earlier Phase 11／12 artifacts do not transfer to a different
-source commit or digest.
+Windows Sandbox terminates its environment on sign-out. When that prevents a real sign-out／sign-in check, record the
+row as unavailable in Sandbox and run it on a persistent supported Windows host with the exact same reviewed artifact;
+the host result may close only this environment-impossible lifecycle row. Other host evidence does not replace Sandbox
+evidence, and earlier Phase 11／12 artifacts do not transfer to a different source commit or digest.
 
 ## Review and publication boundaries
 

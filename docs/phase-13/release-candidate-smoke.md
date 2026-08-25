@@ -71,10 +71,12 @@ expired automatically. Close-to-Tray, Tray restore and Tray Exit passed. After E
 settings and state parsed as JSON, one JSONL log contained zero invalid lines and zero Error／Critical entries, and the
 persisted language and theme were both `system`.
 Enabling startup persisted `true` and created an ordinally exact Registry command pointing to the candidate executable
-with `--startup`. Disabling it persisted `false`, removed the Registry value and remained unchecked after reopening
-Settings. Final Tray Exit left zero processes; settings, state and the single JSONL log remained valid with zero invalid
-or Error／Critical lines. No qualitative responsiveness regression was observed during the smoke; the quantitative
-Phase 12B benchmark was not repeated and no new performance claim is made.
+with `--startup`. After an actual host sign-out／sign-in, the notification-area icon appeared without a manual launch;
+exactly one process ran from the reviewed `d0fe558` payload path at ProductVersion `0.3.0-rc.1`, while the Registry
+command and persisted setting remained exact. Disabling startup then persisted `false`, removed the Registry value and
+remained unchecked after reopening Settings. Final Tray Exit left zero processes; settings, state and the single JSONL
+log remained valid with zero invalid or Error／Critical lines. No qualitative responsiveness regression was observed
+during the smoke; the quantitative Phase 12B benchmark was not repeated and no new performance claim is made.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
@@ -97,7 +99,8 @@ sources, Routing Mode, exact candidate source commit and both container hashes. 
 
 ## Windows Sandbox gate
 
-Status: passed on Windows 11 Enterprise 24H2 build `26100.9168` x64 against source
+Status: passed with one documented Sandbox lifecycle exception completed on the exact-artifact host. Sandbox ran on
+Windows 11 Enterprise 24H2 build `26100.9168` x64 against source
 `d0fe5583e91204fe98a79b14ae0327e5120af54e`. The recomputed ZIP, Setup and payload hashes matched the candidate values
 above and their standalone checksum files. Manifest identity, clean-source state, self-contained compressed single-file
 profile, payload and Setup versions, and unsigned signatures all matched. The archive expanded to one `MediaLock.exe`.
@@ -108,15 +111,18 @@ error or crash. The per-user Setup required no UAC, installed to
 `%LOCALAPPDATA%\Programs\MediaLock`, created the Windows Search／Start Menu entry and exactly one Installed apps entry,
 and left startup disabled by default. Enabling startup persisted `true` and produced the ordinally exact installed-path
 command with `--startup`; disabling it removed the value. Windows Sandbox terminates the Sandbox when the user signs
-out, so a real sign-out／sign-in startup run is unavailable in this environment rather than passed or failed.
+out, so a real sign-out／sign-in startup run was unavailable there. The persistent host completed that otherwise
+impossible row using the exact same payload as recorded above; no other host result substituted for Sandbox evidence.
 
 Settings and state created by the actual public portable `0.2.0` remained readable after installing the candidate;
 English, Light, a 17-second recovery timeout and disabled startup were preserved. Same-version repair kept one Installed
 apps entry and preserved those values. A generated test-only `0.2.9` predecessor upgraded in place to `0.3.0-rc.1`
 while preserving settings, state, a retained marker and its startup command. Attempting to downgrade an installed RC1
-with the older Setup returned exit code 7 and did not change the payload or data. Cancelling the RC1 Setup on the Ready
-to Install page returned exit code 2 and likewise preserved the older installation, data and startup command. The
-generated `0.2.9` artifacts are test fixtures and are not publication assets.
+with the older Setup returned exit code 7. The payload, Installed apps identity/version/install location/uninstall
+command, Start Menu shortcut, exact startup command, settings and state all remained unchanged, with zero Media Lock
+processes afterward. Cancelling the RC1 Setup on the Ready to Install page returned exit code 2 and likewise preserved
+the older installation, data and startup command. The generated `0.2.9` artifacts are test fixtures and are not
+publication assets.
 
 Edge appeared as `MSEdge`; title and timeline were correct, Session Lock succeeded, Pause and Play each executed once,
 and supported Seek executed once without an error or crash. Uninstall removed the installed executable, Search／Start
