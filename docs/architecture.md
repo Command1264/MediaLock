@@ -307,8 +307,11 @@ same serialized critical section as catalog and Route intents.
 Each correction is an ordinary explicit Play Media Command carrying the captured `ExpectedTarget`. The Router
 still resolves capability and rejects stale targets; the Windows GSMTC adapter remains a one-shot controller. Catalog
 observations trigger policy evaluation, so no polling loop is introduced. Recovery, catalog unavailability and suspend
-make enforcement Suspended; fallback, an unrelated Active Target and shutdown cannot redirect a correction. Only the
-Router-accepted successor of the armed identity may resume enforcement.
+make enforcement Suspended; fallback, an unrelated Active Target and shutdown cannot redirect a correction. Locked
+modes reuse the Router-accepted successor. Windows Auto and Priority Rules retain the armed fingerprint while its
+Session is absent, refresh that fingerprint from live observations while it remains active, require exactly one
+acceptable candidate and re-arm only when that candidate is also the Router Active Target. A changed Active Target
+while the original Session still exists remains an explicit target change and clears the policy.
 
 Application state exposes the selected policy, armed target continuity and Ready, Suspended or Failed result for WPF
 projection. The current-target ViewModel submits intents and renders state but neither compares playback observations

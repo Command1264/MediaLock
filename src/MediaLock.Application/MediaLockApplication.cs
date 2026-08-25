@@ -287,7 +287,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 State.Router.LockedTarget is { } lockedTarget &&
                 lockedTarget.ResolvedSession == activeSession.Key
                     ? lockedTarget.Fingerprint
-                    : null;
+                    : SessionFingerprint.From(activeSession);
             playbackStateCorrectionAttempts = 0;
             ResetRepeatedPauseObservations();
             lastArmedPlaybackStatus = activeSession.PlaybackStatus;
@@ -721,6 +721,30 @@ public sealed class MediaLockApplication : IMediaLockApplication
             playbackStateLockRecoveryFingerprint = refreshedFingerprint;
         }
 
+        var armedSession = catalogResult.State.Sessions.FirstOrDefault(
+            session => session.Key == armedTarget);
+        if (armedSession is not null &&
+            catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+            catalogResult.State.ActiveTarget == armedTarget)
+        {
+            playbackStateLockRecoveryFingerprint = SessionFingerprint.From(armedSession);
+        }
+
+        var armedSessionIsMissing = armedSession is null;
+        if (armedSessionIsMissing &&
+            catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+            catalogResult.State.ActiveTarget == armedTarget)
+        {
+            playbackStateCorrectionAttempts = 0;
+            ResetRepeatedPauseObservations();
+            PublishPlaybackStateLock(playbackStateLock with
+            {
+                Status = PlaybackStateLockStatus.Suspended,
+                Message = null,
+            });
+            return catalogResult;
+        }
+
         if (catalogResult.State.ActiveTarget != armedTarget)
         {
             if (Volatile.Read(ref workstationObservationPending) != 0)
@@ -755,7 +779,15 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 playbackStateLockRecoveryFingerprint is not null &&
                 catalogResult.State.Status == RouterStatus.Locked &&
                 catalogResult.State.LockedTarget?.ResolvedSession == successor;
-            if (acceptedSuccessor)
+            var acceptedAutomaticSuccessor =
+                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                catalogResult.State.ActiveTarget is { } automaticSuccessor &&
+                playbackStateLock.Status == PlaybackStateLockStatus.Suspended &&
+                playbackStateLockRecoveryFingerprint is { } automaticFingerprint &&
+                ResolveUniquePlaybackStateSuccessor(
+                    automaticFingerprint,
+                    catalogResult.State.Sessions) == automaticSuccessor;
+            if (acceptedSuccessor || acceptedAutomaticSuccessor)
             {
                 armedTarget = catalogResult.State.ActiveTarget!.Value;
                 playbackStateCorrectionAttempts = 0;
@@ -767,6 +799,19 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     Message = null,
                 };
                 PublishPlaybackStateLock(playbackStateLock);
+            }
+            else if (
+                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                armedSessionIsMissing)
+            {
+                playbackStateCorrectionAttempts = 0;
+                ResetRepeatedPauseObservations();
+                PublishPlaybackStateLock(playbackStateLock with
+                {
+                    Status = PlaybackStateLockStatus.Suspended,
+                    Message = null,
+                });
+                return catalogResult;
             }
             else
             {
@@ -879,6 +924,29 @@ public sealed class MediaLockApplication : IMediaLockApplication
             cancellationToken);
         Apply(correction);
         return correction;
+    }
+
+    private static SessionKey? ResolveUniquePlaybackStateSuccessor(
+        SessionFingerprint fingerprint,
+        IReadOnlyList<MediaSessionSnapshot> sessions)
+    {
+        SessionKey? successor = null;
+        foreach (var session in sessions)
+        {
+            if (!fingerprint.IsAcceptableSuccessor(session))
+            {
+                continue;
+            }
+
+            if (successor is not null)
+            {
+                return null;
+            }
+
+            successor = session.Key;
+        }
+
+        return successor;
     }
 
     private bool ShouldReleaseForRepeatedPause()

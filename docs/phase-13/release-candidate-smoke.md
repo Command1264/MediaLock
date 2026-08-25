@@ -5,7 +5,8 @@ after the candidate source commit is reviewed and clean.
 
 ## Candidate identity
 
-Status: formal local artifacts built and independently inspected on 2026-08-25.
+Status: replacement artifacts pending after the host smoke found and fixed an automatic-routing Keep Playing Recovery
+defect. The following `25690bf` artifacts are retained only as pre-fix provenance and are not publishable candidates.
 
 - Version: `0.3.0-rc.1`.
 - Source commit: `25690bf138342cdf79ee7b19a4d2e4080e15e38a`.
@@ -30,8 +31,8 @@ self-contained, single-file, compression, trimming and signing fields matched th
 
 ## Automated gate
 
-Status: passed on 2026-08-25 against exact source commit
-`25690bf138342cdf79ee7b19a4d2e4080e15e38a`.
+Status: replacement full gate pending. The pre-fix gate passed on 2026-08-25 against exact source commit
+`25690bf138342cdf79ee7b19a4d2e4080e15e38a`, but its result does not transfer to the corrected source.
 
 - Restore and formatting verification passed.
 - All 344 Release tests passed; Release build completed with 0 warnings and 0 errors.
@@ -45,7 +46,12 @@ Status: passed on 2026-08-25 against exact source commit
 
 ## Local host smoke
 
-Status: pending.
+Status: in progress; the pre-fix artifact failed the automatic-routing Keep Playing Recovery row on 2026-08-25.
+Windows Auto cleared the policy when the armed Session disappeared, while Priority Rules could retain a stale Ready
+state before later losing the policy. A deterministic Application regression test reproduced both paths. Replacement
+source preserves a missing armed target as Suspended, resumes only for one fingerprint-acceptable successor that is
+also Active Target, and sends no correction to an ambiguous or competing Session. All remaining host rows and the
+corrected-artifact rerun remain pending.
 
 Record Windows build, i7-8700 host identity, ASUS ROG STRIX FLARE keyboard, named YouTube Music and ordinary YouTube
 sources, Routing Mode, exact candidate source commit and both container hashes. Verify:

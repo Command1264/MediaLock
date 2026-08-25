@@ -175,6 +175,13 @@ also prove window expiry, duplicate Paused suppression, Changing-to-Paused buffe
 settings bounds. ViewModel tests verify one optional system-sound request and a localized notice that clears after
 five seconds or disposal.
 
+Automatic-routing Recovery tests cover Windows Auto and Priority Rules separately. When the Armed Playback Target
+temporarily disappears, both must publish Suspended without dispatching to the competing Session. A unique acceptable
+successor that becomes Active Target re-arms Keep Playing and receives at most one correction; ambiguous same-source
+successors and an inactive successor remain Suspended with zero correction commands. A long-running-target case proves
+that live observations refresh the fingerprint before a later recreation. The existing unrelated-target test continues
+to prove that an Active Target change while the original Session is still present clears the policy.
+
 Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one of Off/Keep Playing,
 stable geometry, accessibility names, keyboard operation and English/Traditional Chinese plus Light/Dark rendering.
 Hardware-assisted coverage uses YouTube Music and ordinary YouTube simultaneously. It changes playback both through
