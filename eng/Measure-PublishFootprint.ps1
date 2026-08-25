@@ -7,11 +7,11 @@ param(
     [string] $OutputRoot,
 
     [Parameter(ParameterSetName = 'Measure')]
-    [ValidateRange(3, 50)]
+    [ValidateRange(7, 50)]
     [int] $ColdStartIterations = 7,
 
     [Parameter(ParameterSetName = 'Measure')]
-    [ValidateRange(3, 50)]
+    [ValidateRange(7, 50)]
     [int] $WarmStartIterations = 7,
 
     [Parameter(ParameterSetName = 'Measure')]
@@ -33,64 +33,58 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+function New-VariantDescription {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [bool] $CompressionEnabled,
+
+        [AllowNull()]
+        $SatelliteResourceLanguages
+    )
+
+    [pscustomobject]@{
+        Name = $Name
+        PublishSelfContained = $true
+        PublishSingleFile = $true
+        IncludeNativeLibrariesForSelfExtract = $true
+        EnableCompressionInSingleFile = $CompressionEnabled
+        PublishTrimmed = $false
+        PublishReadyToRun = $false
+        SatelliteResourceLanguages = $SatelliteResourceLanguages
+        DefaultColdStartIterations = 7
+        DefaultWarmStartIterations = 7
+    }
+}
+
 function Get-VariantDescriptions {
     param(
         [bool] $IncludeLocales
     )
 
     $descriptions = @(
-        [pscustomobject]@{
-            Name = 'baseline'
-            PublishSelfContained = $true
-            PublishSingleFile = $true
-            IncludeNativeLibrariesForSelfExtract = $true
-            EnableCompressionInSingleFile = $false
-            PublishTrimmed = $false
-            PublishReadyToRun = $false
-            SatelliteResourceLanguages = $null
-            DefaultColdStartIterations = 7
-            DefaultWarmStartIterations = 7
-        },
-        [pscustomobject]@{
-            Name = 'single-file-compressed'
-            PublishSelfContained = $true
-            PublishSingleFile = $true
-            IncludeNativeLibrariesForSelfExtract = $true
-            EnableCompressionInSingleFile = $true
-            PublishTrimmed = $false
-            PublishReadyToRun = $false
-            SatelliteResourceLanguages = $null
-            DefaultColdStartIterations = 7
-            DefaultWarmStartIterations = 7
-        }
+        New-VariantDescription `
+            -Name 'baseline' `
+            -CompressionEnabled $false `
+            -SatelliteResourceLanguages $null
+        New-VariantDescription `
+            -Name 'single-file-compressed' `
+            -CompressionEnabled $true `
+            -SatelliteResourceLanguages $null
     )
 
     if ($IncludeLocales) {
         $descriptions += @(
-            [pscustomobject]@{
-                Name = 'supported-locales'
-                PublishSelfContained = $true
-                PublishSingleFile = $true
-                IncludeNativeLibrariesForSelfExtract = $true
-                EnableCompressionInSingleFile = $false
-                PublishTrimmed = $false
-                PublishReadyToRun = $false
-                SatelliteResourceLanguages = 'zh-Hant;zh-TW'
-                DefaultColdStartIterations = 7
-                DefaultWarmStartIterations = 7
-            },
-            [pscustomobject]@{
-                Name = 'supported-locales-single-file-compressed'
-                PublishSelfContained = $true
-                PublishSingleFile = $true
-                IncludeNativeLibrariesForSelfExtract = $true
-                EnableCompressionInSingleFile = $true
-                PublishTrimmed = $false
-                PublishReadyToRun = $false
-                SatelliteResourceLanguages = 'zh-Hant;zh-TW'
-                DefaultColdStartIterations = 7
-                DefaultWarmStartIterations = 7
-            }
+            New-VariantDescription `
+                -Name 'supported-locales' `
+                -CompressionEnabled $false `
+                -SatelliteResourceLanguages 'zh-Hant;zh-TW'
+            New-VariantDescription `
+                -Name 'supported-locales-single-file-compressed' `
+                -CompressionEnabled $true `
+                -SatelliteResourceLanguages 'zh-Hant;zh-TW'
         )
     }
 

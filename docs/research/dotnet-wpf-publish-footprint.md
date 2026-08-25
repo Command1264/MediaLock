@@ -50,13 +50,24 @@ Microsoft 說明 self-contained single-file 會包含 runtime 與 framework libr
 目錄，不是移除 runtime。
 [Microsoft：Single-file deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
 
-本機展開 self-contained publish 共 `206,688,652` bytes／482 個檔案，其中：
+以正式 profile 只覆寫 `PublishSingleFile=false` 的展開 publish 共 `206,631,512` bytes／478 個檔案。依 PE
+metadata 與具名 Windows Desktop assemblies 做互斥分類後：
 
-| 類別 | 檔案數 | Bytes | MiB |
-| --- | ---: | ---: | ---: |
-| Managed assemblies／resources | 455 | 181,146,000 | 172.75 |
-| Native libraries | 19 | 25,136,576 | 23.97 |
-| 其他 EXE／PDB／JSON | 8 | 406,076 | 0.39 |
+| 類別 | 檔案數 | Bytes | MiB | 占比 |
+| --- | ---: | ---: | ---: | ---: |
+| .NET／runtime managed | 232 | 74,019,200 | 70.59 | 35.82% |
+| WPF managed／resources | 168 | 46,633,368 | 44.47 | 22.57% |
+| WinForms managed／resources | 48 | 33,180,200 | 31.64 | 16.06% |
+| WinRT projection managed | 2 | 26,870,352 | 25.63 | 13.00% |
+| .NET／runtime native | 17 | 17,279,536 | 16.48 | 8.36% |
+| WPF native | 4 | 8,090,856 | 7.72 | 3.92% |
+| Media Lock managed | 5 | 518,144 | 0.49 | 0.25% |
+| 其他 JSON | 2 | 39,856 | 0.04 | 0.02% |
+
+WinRT projection 類別是 `Microsoft.Windows.SDK.NET.dll` 與 `WinRT.Runtime.dll`。WPF 類別涵蓋
+`Presentation*`、`WindowsBase`、XAML、Reach／Ribbon、UIAutomation、printing 與具名 WPF native libraries；
+WinForms 類別涵蓋 `System.Windows.Forms*`、`System.Drawing*` 與 `Accessibility.dll`。剩餘 managed／native
+檔案保守歸入 .NET runtime，不把無法可靠歸屬的 shared Windows Desktop assembly 誤報為產品程式碼。
 
 單檔 baseline 與壓縮候選的 fresh extraction cache 都是 `8,215,400` bytes；single-file compression
 沒有移除 native extraction 成本。

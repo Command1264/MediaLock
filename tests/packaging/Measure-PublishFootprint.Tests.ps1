@@ -79,4 +79,19 @@ foreach ($variant in $localeCandidates) {
         "$($variant.Name) must retain the supported Traditional Chinese resource cultures."
 }
 
+$undersampledRunRejected = $false
+try {
+    & $measurementScript `
+        -OutputRoot $repositoryRoot `
+        -ColdStartIterations 6 `
+        -SkipStartup `
+        -SkipInstaller
+}
+catch {
+    $undersampledRunRejected =
+        $_.Exception.Message -like '*greater than or equal to 7*'
+}
+Assert-Condition $undersampledRunRejected `
+    'Footprint measurement must reject a primary run with fewer than seven startup samples.'
+
 Write-Output 'Phase 12B footprint measurement contract passed.'
