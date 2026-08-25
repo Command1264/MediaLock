@@ -572,8 +572,7 @@ Phase 11B Limit decision and does not mutate any published `v0.2.0` or `v0.3.0-r
 Freeze stable identity, RC1-to-stable transition coverage, exact-artifact host／Sandbox evidence, release-branch
 retention and publication boundaries before changing version metadata.
 
-Status: planned on `codex/docs/phase-14-0.3-stable-plan`; complete only after the plan is reviewed and integrated into
-`develop`.
+Status: complete. PR #44 integrated the reviewed scope and gate definition into `develop` on 2026-08-26.
 
 Exit criteria:
 
