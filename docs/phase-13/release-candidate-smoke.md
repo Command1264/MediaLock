@@ -53,7 +53,9 @@ reported an error or crash. A subsequent Priority Rules YouTube Music reload ent
 retained Keep Playing, resumed playback without changing ordinary YouTube and produced no Unavailable, error or crash.
 An ordinary workstation Lock／Unlock without lock-screen media-card input also retained Keep Playing and Priority Rules,
 kept YouTube Music playing, did not change ordinary YouTube and produced no Unavailable, error or crash. The remaining
-exact-artifact host rows are pending.
+exact-artifact host rows are pending. With ordinary YouTube in the foreground, one physical Play/Pause press routed
+exactly one Pause to YouTube Music, turned Keep Playing Off, left Priority Rules selected, did not change ordinary
+YouTube and produced no error or crash.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
