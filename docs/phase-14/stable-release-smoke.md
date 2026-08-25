@@ -5,10 +5,11 @@ produced after its source commit is reviewed and clean.
 
 ## Release identity
 
-Status: provenance-clean local formal artifact created; host and Sandbox validation remain pending.
+Status: replacement provenance-clean local formal artifact created after the approved settings-synchronization stable
+blocker fix; the full host and Sandbox matrices remain pending.
 
 - Version: `0.3.0`.
-- Source commit: `3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1`.
+- Source commit: `cb1817e225f888d6397ce61c4a398b6db1c6018c`.
 - Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
@@ -17,12 +18,12 @@ Status: provenance-clean local formal artifact created; host and Sandbox validat
 - Signed: `false`; payload and Setup both report Authenticode `NotSigned`.
 - Archive: `MediaLock-0.3.0-win-x64.zip`.
 - Installer: `MediaLock-Setup-0.3.0-win-x64.exe`.
-- Archive SHA-256: `91f7eb239009a4b9faa82a1b07315b0853f2a2e8c82fa5bb8b87375dfcd64195`.
-- Installer SHA-256: `e56c1fd5970c24aab1a047caf4b1e6cde1a34a8c88f8e31a3c0ffbda6ada692c`.
-- Shared payload SHA-256: `b9711901f31330541a1c96c1fcc7f1b552f45aab20dda189ce92f276d1bda529`.
-- Archive size: 76,500,429 bytes.
-- Installer size: 76,911,985 bytes.
-- Payload size: 82,315,230 bytes.
+- Archive SHA-256: `bd55f3c05983432a448f399ca1c013f421b592b6f27583150daa198cff070367`.
+- Installer SHA-256: `8b0fd26697d5a6a25bc2f7f2ed1c19dc33f0ab4485a6ef3c7be31d309b263384`.
+- Shared payload SHA-256: `9c65c9c080201f3770d82dd52316facc07105906ac11a3ece89993cb72b69a56`.
+- Archive size: 76,501,780 bytes.
+- Installer size: 76,911,884 bytes.
+- Payload size: 82,316,705 bytes.
 
 Independent inspection matched both container manifests and checksum files, matched the shared payload hash and found
 exactly one extracted `MediaLock.exe`. Payload and Setup report ProductVersion `0.3.0`, FileVersion `0.3.0.0` and
@@ -30,9 +31,9 @@ Authenticode `NotSigned`.
 
 ## Automated gate and review
 
-Status: automated gate passed on final artifact-source commit
-`3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1`; the implementation and final evidence-only diff both passed the two-axis
-review with zero findings.
+Status: automated gate passed on replacement artifact-source commit
+`cb1817e225f888d6397ce61c4a398b6db1c6018c`; the settings-synchronization blocker diff passed the final two-axis
+review with zero findings after every review finding was closed.
 
 Record restore, format, complete tests, Release build, all packaging scripts, Markdown relative-link validation,
 `git diff --check` and the two-axis Standards／Spec review against the Phase 14 plan. GitHub Actions capacity is not
@@ -62,12 +63,30 @@ Gate results on `c1908621ba7ca31db0c1958c4bc8bfa47c327e86`:
 The Standards and Spec reviews both reported zero findings. Their follow-up checks specifically closed the earlier
 payload-invariant and duplicated-assertion risks in the downgrade and cancellation transactions.
 
-The same complete automated gate was repeated successfully on final artifact-source commit
-`3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1` before its formal artifacts were built from a clean worktree.
+The first formal artifact from `3a014accfbfcdd8f793ee1cf6d85fe94e5ff0ec1` was invalidated before publication
+after exact-host use revealed that saved Priority Rules were not sent to the running Router. RED coverage reproduced
+the stale Brave target while persisted rules preferred Chrome. The fix now applies Router-owned settings immediately,
+replaces an active Recovery deadline when its timeout changes, uses the current Fallback Policy, publishes target and
+Playback State Lock atomically, and rolls back durable／platform／presentation state when a consumer fails.
+
+The complete automated gate was repeated successfully on replacement artifact-source commit
+`cb1817e225f888d6397ce61c4a398b6db1c6018c` before its formal artifacts were built from a clean worktree:
+
+- 360/360 Release tests passed;
+- Release build completed with zero warnings and zero errors;
+- publish, artifact-selection and footprint packaging contracts passed;
+- the artifact-selection contract passed in PowerShell 7 and Windows PowerShell 5.1; and
+- Markdown relative-link validation plus `git diff --check` passed.
 
 ## Exact-artifact host gate
 
-Status: pending on the i7-8700 Windows 11 x64 reference host.
+Status: replacement-artifact blocker regression passed; the remaining full host matrix is pending.
+
+The exact ZIP payload from `cb1817e225f888d6397ce61c4a398b6db1c6018c` launched as one process. With Priority
+Rules already active and Brave PWA initially first, Settings moved Chrome to the first rule and saved. Without restart
+or reselecting Priority Rules, the background accessibility projection immediately changed Current media target to
+`Chrome — 回不去的夏天`. This closes the reported runtime settings-synchronization blocker without relying on the
+persisted JSON alone.
 
 Use the formal ZIP/Setup and record the full Phase 14 plan matrix: identity, launch/single instance, localization/theme,
 Settings/diagnostics, four Routing Modes and controls, Playback State Lock safety/override paths, competing-source
