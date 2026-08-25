@@ -86,9 +86,11 @@ WinForms 類別涵蓋 `System.Windows.Forms*`、`System.Drawing*` 與 `Accessibi
 | baseline | 200,339,490 | 78,687,769 | 56,041,226 | 1,658.47／1,710.25 ms | 1,611.87／1,685.45 ms |
 | single-file compressed | 82,314,522 | 76,499,762 | 76,911,021 | 1,705.92／1,919.01 ms | 1,644.71／1,735.57 ms |
 
-這不是清除 Windows 檔案快取或重新開機後的真正 cold boot benchmark。正式採用前仍須在同一台
+這不是清除 Windows 檔案快取或重新開機後的真正 cold boot benchmark。偏好的補充證據是在同一台
 i7-8700 上重新開機，各執行 baseline 與 candidate，記錄從啟動到主視窗可操作的人工 smoke；自動結果只用於
-同機相對比較。
+同機相對比較。若產品負責人明確拒絕第二次重開機，可依
+[Phase 12B 計畫](../phase-12/footprint-optimization-plan.md)記錄 waiver，並以通過的 15 + 15 sample 與普通候選
+啟動 smoke 完成風險接受，不得宣稱已完成 reboot A/B。
 
 ## 候選比較
 
