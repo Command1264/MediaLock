@@ -55,7 +55,7 @@ reported an error or crash. A subsequent Priority Rules YouTube Music reload ent
 retained Keep Playing, resumed playback without changing ordinary YouTube and produced no Unavailable, error or crash.
 An ordinary workstation Lock／Unlock without lock-screen media-card input also retained Keep Playing and Priority Rules,
 kept YouTube Music playing, did not change ordinary YouTube and produced no Unavailable, error or crash. The remaining
-exact-artifact host rows are pending. With ordinary YouTube in the foreground, one physical Play/Pause press routed
+exact-artifact host rows also passed. With ordinary YouTube in the foreground, one physical Play/Pause press routed
 exactly one Pause to YouTube Music, turned Keep Playing Off, left Priority Rules selected, did not change ordinary
 YouTube and produced no error or crash. The default repeated-pause override also passed: the first two direct player UI
 pauses were corrected, the third pause within five seconds remained paused, Keep Playing turned Off, one notification
@@ -80,7 +80,8 @@ The first replacement artifact from source `229c9eb` passed the controlled Prior
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
 product-policy decision: waking left the player paused and Keep Playing off. The accepted policy now treats Power
 Suspend as a safety boundary and forbids automatic audio resume. Source `229c9eb` and its artifacts are therefore also
-superseded; a second replacement build and exact-artifact rerun are required.
+superseded. Source `d0fe558` implemented that policy, and the second replacement artifact completed the exact-artifact
+host rerun recorded above.
 
 Record Windows build, i7-8700 host identity, ASUS ROG STRIX FLARE keyboard, named YouTube Music and ordinary YouTube
 sources, Routing Mode, exact candidate source commit and both container hashes. Verify:
@@ -96,24 +97,37 @@ sources, Routing Mode, exact candidate source commit and both container hashes. 
 
 ## Windows Sandbox gate
 
-Status: pending.
+Status: passed on Windows 11 Enterprise 24H2 build `26100.9168` x64 against source
+`d0fe5583e91204fe98a79b14ae0327e5120af54e`. The recomputed ZIP, Setup and payload hashes matched the candidate values
+above and their standalone checksum files. Manifest identity, clean-source state, self-contained compressed single-file
+profile, payload and Setup versions, and unsigned signatures all matched. The archive expanded to one `MediaLock.exe`.
 
-Record Windows edition/display version/full build/architecture and the exact candidate hashes. Verify:
+Portable cold start succeeded without a separately installed .NET runtime, a security prompt or an application error.
+The second launch restored the existing window and retained one Media Lock process; Tray Exit completed without an
+error or crash. The per-user Setup required no UAC, installed to
+`%LOCALAPPDATA%\Programs\MediaLock`, created the Windows Search／Start Menu entry and exactly one Installed apps entry,
+and left startup disabled by default. Enabling startup persisted `true` and produced the ordinally exact installed-path
+command with `--startup`; disabling it removed the value. Windows Sandbox terminates the Sandbox when the user signs
+out, so a real sign-out／sign-in startup run is unavailable in this environment rather than passed or failed.
 
-1. ZIP and Setup hashes, manifest fields, one-file extraction, ProductVersion/FileVersion and unsigned state.
-2. Portable cold start without a separately installed .NET runtime.
-3. Per-user Setup without UAC, fixed path, Search／Start Menu, Installed apps and single-instance behavior.
-4. Startup disabled by default; enabling and actual relogin use the exact installed path.
-5. Settings/state created by the real public portable `0.2.0` remain readable after installing the candidate.
-6. Generated predecessor Setup upgrades in place to `0.3.0-rc.1`; the older installer is blocked with exit code 7,
-   same-version repair is allowed, and Ready-page cancellation preserves the installed version/data/startup command.
-7. Edge appears as `MSEdge`; one routed command and supported Seek work without a competing source changing.
-8. Uninstall removes installed files/registration and only an installer-owned startup value while retaining user data
-   and a portable-owned startup value.
-9. Final process count is zero; settings/state/log JSON remain valid with no unexpected Error／Critical entry.
+Settings and state created by the actual public portable `0.2.0` remained readable after installing the candidate;
+English, Light, a 17-second recovery timeout and disabled startup were preserved. Same-version repair kept one Installed
+apps entry and preserved those values. A generated test-only `0.2.9` predecessor upgraded in place to `0.3.0-rc.1`
+while preserving settings, state, a retained marker and its startup command. Attempting to downgrade an installed RC1
+with the older Setup returned exit code 7 and did not change the payload or data. Cancelling the RC1 Setup on the Ready
+to Install page returned exit code 2 and likewise preserved the older installation, data and startup command. The
+generated `0.2.9` artifacts are test fixtures and are not publication assets.
 
-Host evidence does not replace Sandbox evidence. Record inherited or unavailable hardware rows explicitly instead of
-silently treating them as passed.
+Edge appeared as `MSEdge`; title and timeline were correct, Session Lock succeeded, Pause and Play each executed once,
+and supported Seek executed once without an error or crash. Uninstall removed the installed executable, Search／Start
+Menu registration, Installed apps entry and installer-owned startup value while preserving user data. A separate
+portable-owned startup value survived uninstall as required and was then removed as test cleanup. Final state had zero
+Media Lock processes and no installed registration or startup value. Settings and state remained valid JSON; the one
+JSONL log had zero invalid lines and zero Error／Critical entries. The final `zh-TW`／Dark preference was an intentional
+manual accessibility change during the Sandbox run, while the 17-second compatibility value remained intact.
+
+Sandbox does not expose the host keyboard or faithfully reproduce host lock／sleep hardware paths, so those rows inherit
+the exact-artifact host evidence above and were not silently counted as independent Sandbox passes.
 
 ## Publication
 
