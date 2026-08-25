@@ -20,26 +20,95 @@ function Assert-Condition {
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $measurementScript = Join-Path $repositoryRoot 'eng\Measure-PublishFootprint.ps1'
+$markdownRenderer = Join-Path $repositoryRoot 'eng\FootprintMarkdownReport.ps1'
 $publishProfilePath =
     Join-Path $repositoryRoot 'src\MediaLock.App\Properties\PublishProfiles\win-x64.pubxml'
 
 Assert-Condition (Test-Path -LiteralPath $measurementScript -PathType Leaf) `
     "Footprint measurement script was not found: $measurementScript"
+Assert-Condition (Test-Path -LiteralPath $markdownRenderer -PathType Leaf) `
+    "Footprint Markdown renderer was not found: $markdownRenderer"
+. $markdownRenderer
 
-$measurementScriptSource = Get-Content -LiteralPath $measurementScript -Raw
-$requiredMarkdownContracts = @(
-    'Logical processors:',
-    'Total physical memory bytes:',
-    'Extraction cache bytes',
-    'Fresh p95／min／max',
-    'Warm p95／min／max',
+$measuredStatistics = [pscustomobject]@{
+    SampleCount = 1
+    MedianMilliseconds = 10.5
+    P95Milliseconds = 12.25
+    MinimumMilliseconds = 9.75
+    MaximumMilliseconds = 12.25
+    Samples = @(
+        [pscustomobject]@{
+            Iteration = 1
+            ElapsedMilliseconds = 10.5
+            ExtractionCacheBytes = 222
+        }
+    )
+}
+$reportFixture = [pscustomobject]@{
+    DotnetSdkVersion = '10.0.test'
+    InnoSetupVersion = '6.7.3'
+    SourceCommit = 'fixture-commit'
+    SourceDirty = $false
+    Environment = [pscustomobject]@{
+        Cpu = 'Fixture CPU'
+        LogicalProcessorCount = 8
+        TotalPhysicalMemoryBytes = 123456
+        Windows = 'Fixture Windows'
+        DisplayVersion = '25H2'
+        FullBuild = '26200.1'
+        Architecture = 'X64'
+    }
+    Measurement = [pscustomobject]@{
+        ColdStartDefinition = 'Fixture fresh definition.'
+        WarmStartDefinition = 'Fixture warm definition.'
+        ColdStartIterations = 15
+        WarmStartIterations = 15
+        StartupTimeoutSeconds = 30
+        AlternatingVariantOrder = $true
+    }
+    Variants = @(
+        [pscustomobject]@{
+            Name = 'measured'
+            ExecutableBytes = 1000
+            ArchiveBytes = 800
+            InstallerBytes = 700
+            ColdStart = $measuredStatistics
+            WarmStart = $measuredStatistics
+        },
+        [pscustomobject]@{
+            Name = 'skipped'
+            ExecutableBytes = 900
+            ArchiveBytes = 750
+            InstallerBytes = $null
+            ColdStart = $null
+            WarmStart = $null
+        }
+    )
+    Comparison = [pscustomobject]@{
+        ExecutableReductionPercent = 10
+        ArchiveReductionPercent = 6.25
+        InstallerReductionPercent = $null
+        ColdMedianDeltaMilliseconds = 1.5
+        ColdMedianRegressionPercent = 2.5
+        WarmMedianDeltaMilliseconds = $null
+        WarmMedianRegressionPercent = $null
+    }
+}
+$markdownFixture = ConvertTo-FootprintMarkdown -Report $reportFixture
+foreach ($expectedMarkdownContent in @(
+    '- Logical processors: 8',
+    '- Total physical memory bytes: 123456',
+    '- Architecture: X64',
+    '| measured | 1000 | 800 | 700 | 222 | 10.5 ms | 12.25／9.75／12.25 ms | 10.5 ms | 12.25／9.75／12.25 ms |',
+    '| skipped | 900 | 750 | Skipped | Skipped | Skipped | Skipped | Skipped | Skipped |',
+    '- Setup reduction: Skipped',
+    '- Fresh-cache median delta: 1.5 ms (2.5%)',
+    '- Warm-cache median delta: Skipped',
     '## Raw startup samples',
-    'Fresh-cache samples:',
-    'Warm-cache samples:'
-)
-foreach ($requiredMarkdownContract in $requiredMarkdownContracts) {
-    Assert-Condition ($measurementScriptSource.Contains($requiredMarkdownContract)) `
-        "Markdown report must include: $requiredMarkdownContract"
+    'iteration=1, elapsed=10.5 ms, extraction-cache=222 bytes'
+)) {
+    Assert-Condition ($markdownFixture.Contains($expectedMarkdownContent)) `
+        "Rendered Markdown did not include: $expectedMarkdownContent"
 }
 
 $publishProfile = [xml](Get-Content -LiteralPath $publishProfilePath -Raw)
