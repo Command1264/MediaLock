@@ -58,9 +58,10 @@ Expected files:
 - `artifacts\MediaLock-Setup-0.2.0-win-x64.exe`
 - `artifacts\MediaLock-Setup-0.2.0-win-x64.sha256`
 
-The ZIP must contain exactly one file named `MediaLock.exe`. Manifest schema 2 is the source of truth for version,
-source commit, SDK, Inno version, RID, dirty/signing state, payload hash and each container's size/hash. ZIP and Setup
-must be produced from that one staged payload; neither may independently rebuild it.
+The ZIP must contain exactly one file named `MediaLock.exe`. Manifest schema 3 is the source of truth for current
+source-built artifacts: version, source commit, SDK, Inno version, RID, dirty/signing state, compression state, payload
+hash and each container's size/hash. Historical stable `0.2.0` artifacts retain their original schema 2 manifests and
+bytes. ZIP and Setup must be produced from one staged payload; neither may independently rebuild it.
 
 ## Verify a transferred artifact
 
@@ -80,6 +81,8 @@ $manifest.installer.sha256
 
 Each pair must match before extraction or installation. A formal release also requires `sourceDirty: false`, both
 payload and installer `signed: false`, `runtimeIdentifier: win-x64`, `selfContained: true` and `singleFile: true`.
+Phase 12B and later source-built artifacts additionally require `singleFileCompressed: true`; historical `0.2.0`
+artifacts keep their original manifest schema and payload bytes.
 
 ## Host smoke test
 

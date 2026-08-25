@@ -89,7 +89,9 @@ $archivePath = Join-Path $ArtifactRoot $manifest.archive.fileName
 $installerPath = Join-Path $ArtifactRoot $manifest.installer.fileName
 $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-Assert-Condition ($manifest.schemaVersion -eq 2) 'Manifest schemaVersion must be 2.'
+Assert-Condition ($manifest.schemaVersion -eq 3) 'Manifest schemaVersion must be 3.'
+Assert-Condition ($manifest.singleFileCompressed -eq $true) `
+    'Manifest must declare single-file compression.'
 Assert-Condition (-not $manifest.sourceDirty) 'Sandbox artifacts must come from a clean source.'
 Assert-Condition ($archiveHash -eq $manifest.archive.sha256) 'Archive SHA-256 mismatch.'
 Assert-Condition ($installerHash -eq $manifest.installer.sha256) 'Installer SHA-256 mismatch.'

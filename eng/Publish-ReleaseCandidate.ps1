@@ -243,12 +243,13 @@ try {
     }
 
     $manifest = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         product = 'Media Lock'
         version = $Version
         runtimeIdentifier = 'win-x64'
         selfContained = $true
         singleFile = $true
+        singleFileCompressed = $true
         trimmed = $false
         signed = $false
         sourceCommit = $initialSource.Commit

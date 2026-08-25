@@ -135,12 +135,14 @@ try {
         "Installer checksum was not created: $installerChecksumPath"
 
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    Assert-Condition ($manifest.schemaVersion -eq 2) 'Manifest schemaVersion must be 2.'
+    Assert-Condition ($manifest.schemaVersion -eq 3) 'Manifest schemaVersion must be 3.'
     Assert-Condition ($manifest.product -eq 'Media Lock') 'Manifest product must be Media Lock.'
     Assert-Condition ($manifest.version -eq $version) "Manifest version must be $version."
     Assert-Condition ($manifest.runtimeIdentifier -eq 'win-x64') 'Manifest runtimeIdentifier must be win-x64.'
     Assert-Condition ($manifest.selfContained -eq $true) 'Manifest must declare a self-contained artifact.'
     Assert-Condition ($manifest.singleFile -eq $true) 'Manifest must declare a single-file artifact.'
+    Assert-Condition ($manifest.singleFileCompressed -eq $true) `
+        'Manifest must declare that bundled assemblies use single-file compression.'
     Assert-Condition ($manifest.signed -eq $false) 'Manifest must disclose that the executable is unsigned.'
     Assert-Condition ($manifest.innoSetupVersion -eq '6.7.3') `
         'Manifest must record the pinned Inno Setup version.'

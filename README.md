@@ -28,8 +28,10 @@ Stable／Latest 版本。
 - SHA-256：`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`
 - [下載、驗證、更新、回復與移除說明](docs/installation.md)
 
-ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。由於執行檔尚未 code signing，
-Windows SmartScreen 或信譽警告仍可能出現；請只從官方 GitHub Release 下載並在執行前比對 SHA-256。
+ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。目前公開的 `0.2.0` 保留原始 payload；
+Phase 12B 之後的 source-built 候選會壓縮單檔 bundle 內的 managed assemblies，以降低解壓或安裝後的 EXE
+體積，功能、語言資源與隨附 runtime 不會因此被裁剪。由於執行檔尚未 code signing，Windows SmartScreen
+或信譽警告仍可能出現；請只從官方 GitHub Release 下載並在執行前比對 SHA-256。
 
 ## 從原始碼執行
 
