@@ -48,19 +48,6 @@ function Assert-Condition {
     }
 }
 
-function Get-MediaLockUninstallEntries {
-    $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
-    if (-not (Test-Path -LiteralPath $uninstallRoot)) {
-        return @()
-    }
-
-    @(
-        Get-ChildItem -LiteralPath $uninstallRoot |
-            ForEach-Object { Get-ItemProperty $_.PSPath } |
-            Where-Object { $_.DisplayName -eq 'Media Lock' }
-    )
-}
-
 function Invoke-Installer {
     param(
         [Parameter(Mandatory)]
@@ -180,11 +167,25 @@ Assert-Condition ([string]::Equals(
     [string]$repairStartupProperty.Value,
     $expectedStartupValue,
     [StringComparison]::Ordinal)) 'Same-version repair changed the login-startup command.'
+$preDowngradeSnapshot = Get-MediaLockInstalledStateSnapshot `
+    -InstalledExe $installedExe `
+    -ShortcutPath $shortcut `
+    -RunKey $runKey `
+    -SettingsPath $settingsPath `
+    -StatePath $statePath `
+    -RetainedMarkerPath $retainedMarker
 
 $downgrade = Invoke-Installer -Path $olderInstaller
 $postDowngradeEntries = @(Get-MediaLockUninstallEntries)
 $postDowngradeStartupProperty =
     (Get-ItemProperty -Path $runKey).PSObject.Properties['MediaLock']
+$postDowngradeSnapshot = Get-MediaLockInstalledStateSnapshot `
+    -InstalledExe $installedExe `
+    -ShortcutPath $shortcut `
+    -RunKey $runKey `
+    -SettingsPath $settingsPath `
+    -StatePath $statePath `
+    -RetainedMarkerPath $retainedMarker
 Assert-Condition ($downgrade.ExitCode -eq 7) `
     "Downgrade must be blocked with exit code 7, but returned $($downgrade.ExitCode)."
 Assert-Condition ($postDowngradeEntries.Count -eq 1) `
@@ -205,6 +206,10 @@ Assert-Condition ([string]::Equals(
     [string]$postDowngradeStartupProperty.Value,
     $expectedStartupValue,
     [StringComparison]::Ordinal)) 'Blocked downgrade changed the login-startup command.'
+Assert-MediaLockInstalledStateUnchanged `
+    -Expected $preDowngradeSnapshot `
+    -Actual $postDowngradeSnapshot `
+    -Context 'Blocked downgrade'
 
 $result = [ordered]@{
     passed = $true
@@ -217,6 +222,9 @@ $result = [ordered]@{
     downgradeExitCode = $downgrade.ExitCode
     installedAppsEntryCount = $postDowngradeEntries.Count
     installedVersion = $postDowngradeEntries[0].DisplayVersion
+    payloadUnchanged = $true
+    registrationUnchanged = $true
+    shortcutUnchanged = $true
     userDataRetained = $true
     settingsUnchanged = $true
     stateUnchanged = $true

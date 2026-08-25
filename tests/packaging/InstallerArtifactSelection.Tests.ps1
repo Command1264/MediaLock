@@ -59,7 +59,12 @@ foreach ($scriptName in @(
         "$scriptName must not cast release candidates to [version]."
     Assert-Condition ($scriptText -match 'Get-MediaLockArtifactPair') `
         "$scriptName must use the shared explicit artifact-selection seam."
-    foreach ($resultField in @('settingsUnchanged', 'stateUnchanged')) {
+    foreach ($resultField in @(
+        'payloadUnchanged',
+        'registrationUnchanged',
+        'shortcutUnchanged',
+        'settingsUnchanged',
+        'stateUnchanged')) {
         Assert-Condition ($scriptText -match $resultField) `
             "$scriptName must report $resultField."
     }
@@ -68,6 +73,14 @@ foreach ($scriptName in @(
             'The upgrade smoke must execute the newer installer again for same-version repair.'
         Assert-Condition ($scriptText -match 'repairExitCode') `
             'The upgrade-smoke result must report repairExitCode.'
+        Assert-Condition ($scriptText -match 'Assert-MediaLockInstalledStateUnchanged') `
+            'The upgrade smoke must compare the complete installed-state snapshot after blocked downgrade.'
+    }
+    else {
+        Assert-Condition ($scriptText -match '\$preparationPath') `
+            'The cancellation smoke must persist a preparation snapshot across its two phases.'
+        Assert-Condition ($scriptText -match 'Assert-MediaLockInstalledStateUnchanged') `
+            'The cancellation smoke must compare the complete installed-state snapshot after cancellation.'
     }
 }
 

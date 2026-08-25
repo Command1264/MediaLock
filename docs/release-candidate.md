@@ -137,7 +137,8 @@ mapped artifact root, then run:
 For stable promotion, use the exact public `0.3.0-rc.1` Setup as the installer predecessor. Test the real public
 portable `0.2.0` data/state path separately because it did not ship Setup. The script must report a successful in-place
 upgrade, same-version stable repair, one Installed apps entry, byte-identical settings/state, retained user data and
-startup command, followed by downgrade exit code 7 with the stable payload still installed. Prepare cancellation with:
+startup command, followed by downgrade exit code 7 with the installed EXE, Start Menu shortcut, complete uninstall
+registration, startup command and user data unchanged. Prepare cancellation with:
 
 ```powershell
 & '.\tests\packaging\WindowsSandbox-InstallerCancellationSmoke.ps1' `
@@ -149,7 +150,9 @@ startup command, followed by downgrade exit code 7 with the stable payload still
 
 Visibly start the candidate Setup and cancel on its Ready page, then run the same script with `-Mode Verify`, both
 version parameters, the same pinned older-installer digest and `-CancellationExitCode 2`. Record the cancellation stage
-precisely; this gate does not establish rollback after file extraction has begun.
+precisely. Verify must load the preparation snapshot bound to both installer hashes and confirm that the installed EXE,
+shortcut, complete uninstall registration, startup command and user data are unchanged; this gate does not establish
+rollback after file extraction has begun.
 
 - cold start without a separately installed .NET runtime;
 - one window/process/icon after second launch;

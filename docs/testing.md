@@ -229,14 +229,16 @@ versions. Its shared PowerShell 5.1-compatible release parser orders stable and 
 cast. Both installer files must match their manifests, and the older file must also match the caller's trusted digest.
 The script installs the older version, preserves exact settings/state bytes, an installed-path startup command and a
 user-data marker, upgrades in place, performs same-version repair, then requires the older installer to be rejected
-with Inno exit code 7. It verifies one uninstall entry and shortcut, the newer payload/version, retained data and the
-unchanged startup command after every operation.
+with Inno exit code 7. Before that blocked transaction it captures the installed EXE and shortcut SHA-256 values, the
+complete Media Lock uninstall-registration properties, startup command, settings/state and retained-marker hashes;
+the post-attempt snapshot must match every field exactly.
 
 `tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` uses the same explicit version and pinned-digest seam
 and has `Prepare` and `Verify` phases around a visible installer action. The recorded gate cancels on the Ready page
-before installation begins, requires exit code 2 and proves the existing version, registration, startup command and
-user data remain unchanged. It does not claim that cancellation during file extraction was observed or that Inno
-provides MSI-level transaction rollback.
+before installation begins, requires exit code 2 and persists a trusted preparation snapshot beside the result. The
+Verify phase binds that snapshot to both selected installer hashes, then proves the installed EXE, Start Menu shortcut,
+complete uninstall registration, startup command and user data remain byte-for-byte unchanged. It does not claim that
+cancellation during file extraction was observed or that Inno provides MSI-level transaction rollback.
 
 The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
 `6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched

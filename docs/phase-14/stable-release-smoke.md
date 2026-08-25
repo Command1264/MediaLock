@@ -42,6 +42,9 @@ Observed RED → GREEN sequence:
   PowerShell 5.1.
 - The repair contract first failed because the upgrade script did not execute the newer installer a second time. The
   script now performs stable same-version repair and reports repair exit code plus settings/state invariants.
+- The transaction-integrity contract then failed because blocked downgrade and Ready-page cancellation did not report
+  a payload invariant. Both paths now compare installed EXE and shortcut SHA-256 values, complete uninstall
+  registration, startup and user-data snapshots; cancellation persists and validates its pre-action snapshot.
 
 Gate results on `f5e13838e5fe35c423ef202334206c00c3e89b54`:
 
@@ -66,8 +69,9 @@ Status: pending on a fresh Windows 11 x64 Sandbox.
 Record artifact identity, portable launch, per-user install, Search/Start Menu and Installed apps registration,
 startup ownership, `MSEdge` GSMTC routing/Seek, real public portable `0.2.0` data compatibility, exact public RC1 Setup
 upgrade to stable using the pinned published Setup SHA-256, stable repair with unchanged settings/state, RC1 downgrade
-block, Ready-page cancellation, uninstall retention/cleanup and final process/log state. Real sign-out/sign-in is
-host-only because Sandbox destroys its environment on sign-out.
+block with all transaction state unchanged, Ready-page cancellation with all preparation state unchanged, uninstall
+retention/cleanup and final process/log state. Real sign-out/sign-in is host-only because Sandbox destroys its
+environment on sign-out.
 
 ## Integration and publication
 

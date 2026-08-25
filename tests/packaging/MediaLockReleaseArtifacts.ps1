@@ -178,3 +178,118 @@ function Assert-MediaLockInstallerArtifact {
         Sha256 = $actualSha256
     }
 }
+
+function Get-MediaLockUninstallEntries {
+    $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+    if (-not (Test-Path -LiteralPath $uninstallRoot)) {
+        return @()
+    }
+
+    @(
+        Get-ChildItem -LiteralPath $uninstallRoot |
+            ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object { $_.DisplayName -eq 'Media Lock' }
+    )
+}
+
+function Get-MediaLockFileSha256 {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Required Media Lock transaction file was not found: $Path"
+    }
+
+    (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-MediaLockUninstallRegistrationSnapshot {
+    $snapshots = @(
+        Get-MediaLockUninstallEntries |
+            ForEach-Object {
+                $entry = $_
+                $snapshot = [ordered]@{
+                    keyName = [string]$entry.PSChildName
+                }
+
+                @($entry.PSObject.Properties |
+                    Where-Object { $_.Name -notlike 'PS*' } |
+                    Sort-Object Name) |
+                    ForEach-Object {
+                        $snapshot[$_.Name] = $_.Value
+                    }
+
+                [pscustomobject]$snapshot
+            } |
+            Sort-Object keyName
+    )
+
+    ConvertTo-Json -InputObject $snapshots -Depth 8 -Compress
+}
+
+function Get-MediaLockInstalledStateSnapshot {
+    param(
+        [Parameter(Mandatory)]
+        [string] $InstalledExe,
+
+        [Parameter(Mandatory)]
+        [string] $ShortcutPath,
+
+        [Parameter(Mandatory)]
+        [string] $RunKey,
+
+        [Parameter(Mandatory)]
+        [string] $SettingsPath,
+
+        [Parameter(Mandatory)]
+        [string] $StatePath,
+
+        [Parameter(Mandatory)]
+        [string] $RetainedMarkerPath
+    )
+
+    $startupProperty = (Get-ItemProperty -Path $RunKey).PSObject.Properties['MediaLock']
+    [pscustomobject][ordered]@{
+        payloadSha256 = Get-MediaLockFileSha256 -Path $InstalledExe
+        shortcutSha256 = Get-MediaLockFileSha256 -Path $ShortcutPath
+        uninstallRegistration = Get-MediaLockUninstallRegistrationSnapshot
+        startupValue = if ($null -eq $startupProperty) { $null } else { [string]$startupProperty.Value }
+        settingsSha256 = Get-MediaLockFileSha256 -Path $SettingsPath
+        stateSha256 = Get-MediaLockFileSha256 -Path $StatePath
+        retainedMarkerSha256 = Get-MediaLockFileSha256 -Path $RetainedMarkerPath
+    }
+}
+
+function Assert-MediaLockInstalledStateUnchanged {
+    param(
+        [Parameter(Mandatory)]
+        [psobject] $Expected,
+
+        [Parameter(Mandatory)]
+        [psobject] $Actual,
+
+        [Parameter(Mandatory)]
+        [string] $Context
+    )
+
+    $fields = [ordered]@{
+        payloadSha256 = 'installed payload'
+        shortcutSha256 = 'Start Menu shortcut'
+        uninstallRegistration = 'uninstall registration'
+        startupValue = 'login-startup command'
+        settingsSha256 = 'settings.json'
+        stateSha256 = 'state.json'
+        retainedMarkerSha256 = 'retained user-data marker'
+    }
+
+    foreach ($field in $fields.Keys) {
+        if (-not [string]::Equals(
+            [string]$Expected.$field,
+            [string]$Actual.$field,
+            [StringComparison]::Ordinal)) {
+            throw "$Context changed the $($fields[$field])."
+        }
+    }
+}
