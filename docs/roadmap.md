@@ -456,8 +456,9 @@ supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSI
 selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
 The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
 
-Status: implementation in progress. The accepted decision is a per-user Inno Setup EXE at a stable
-`%LocalAppData%\Programs\MediaLock\` path, published beside the existing portable ZIP. The first RED → GREEN slices
+Status: complete on 2026-08-25. PR #38 integrated a per-user Inno Setup EXE at a stable
+`%LocalAppData%\Programs\MediaLock\` path that the release command produces beside the existing portable ZIP. The
+first RED → GREEN slices
 produce ZIP and Setup from one payload and protect startup cleanup from deleting a portable-owned Run value. Local
 silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
 default user-data retention. A clean Windows Sandbox transaction gate also passed for commit
@@ -505,3 +506,46 @@ The product owner explicitly waived a second reboot solely for a direct A/B pair
 result and ordinary candidate startup smoke. Full Phase 12A upgrade／downgrade／cancellation and login-startup
 transactions were inherited because their owning installer and startup code did not change; the exact compressed
 payload repeated clean install／launch／uninstall and critical runtime routing instead.
+
+## Phase 13 — `0.3.0` release preparation
+
+Phase 13 turns the completed Phase 11A, 12A and 12B work into a reviewable `0.3.0-rc.1` candidate. It does not reopen
+the Phase 11B Limit decision, add a best-effort Windows media-surface mirror or mutate the published `0.2.0` release.
+The retained `release/0.2` branch remains the current stable hotfix baseline until a later verified `release/0.3`
+stable baseline exists.
+
+### Phase 13A — `0.3.0-rc.1` scope and gate definition
+
+Freeze the candidate contents, compatibility boundary, artifact policy and repeatable host／Windows Sandbox evidence
+before changing product version metadata or producing a formal candidate.
+
+Status: plan defined; Phase 13B execution awaits separate approval. See the
+[Phase 13 release-candidate plan](phase-13/release-candidate-plan.md).
+
+Exit criteria:
+
+- Candidate scope contains the completed one-way Keep Playing feature, per-user Inno Setup installer and accepted
+  single-file compression profile, without adding another product feature.
+- The documented Phase 11B Limit remains explicit: `0.3.0-rc.1` does not promise to own or remain first on Windows'
+  native media surface.
+- Upgrade coverage is defined from public portable `0.2.0` and, separately, from a clean per-user installation to the
+  candidate installer. The existing two-stable-version Sandbox helper must be extended before it is used with an RC.
+- README, installation guidance, release runbook, release notes and testing evidence are all named deliverables of
+  candidate execution rather than being updated piecemeal after publication.
+- Public candidate assets are limited to portable ZIP and Setup EXE. Their SHA-256 values appear in the Release body;
+  manifest and standalone checksum files remain local provenance evidence unless a later publication decision changes
+  that policy.
+- ZIP, Setup and contained executable remain explicitly unsigned. No package format is presented as suppressing
+  SmartScreen, Smart App Control or reputation warnings.
+- Local gates are authoritative because GitHub Actions capacity is unavailable. Tagging, GitHub Prerelease creation
+  and public artifact upload remain separately approved remote operations.
+
+### Phase 13B — `0.3.0-rc.1` implementation and validation
+
+After approval, change version and candidate documentation on one task branch, extend prerelease upgrade automation,
+run the complete automated gate, then build one provenance-clean ZIP／Setup pair from the reviewed exact commit. Repeat
+the named host and clean Windows Sandbox matrices and preserve exact digests and outcomes before review or publication.
+
+No `release/0.3` branch is created for the prerelease. Create and retain that long-lived hotfix baseline only when a
+verified `0.3.0` stable release is ready. Push, PR, merge, tag, GitHub Prerelease and public upload follow their normal
+separate authorization boundaries.

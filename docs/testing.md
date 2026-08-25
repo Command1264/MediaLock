@@ -407,6 +407,18 @@ and uninstall cleanup. A separate fresh Sandbox launch reached a visible main wi
 second launch. See the exact sizes, digests, host results and explicitly skipped direct reboot A/B pair in the
 [Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md).
 
+Phase 13 uses the frozen [0.3.0-rc.1 release-candidate plan](phase-13/release-candidate-plan.md). Before the candidate
+can consume the installer transition gate, extend `WindowsSandbox-InstallerUpgradeSmoke.ps1` to accept an explicitly
+named stable predecessor and prerelease successor; its current two-stable-manifest discovery and `[version]` ordering
+are not valid evidence for `0.3.0-rc.1`. Candidate evidence must cover both the exact public `0.2.0` compatibility path
+and test-only automated version transitions. The formal ZIP and Setup, host checks and clean Windows Sandbox checks
+must all identify one reviewed source commit and independently matching hashes.
+
+Because GitHub Actions capacity is unavailable, Phase 13B requires the full local automated gate. It does not infer a
+pass from earlier Phase 11／12 commits, and it does not publish until separately authorized. Public candidate assets
+are ZIP and Setup only; record their hashes in the GitHub Prerelease body while retaining manifest and standalone
+checksum files as local provenance evidence.
+
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
