@@ -57,7 +57,9 @@ exact-artifact host rows are pending. With ordinary YouTube in the foreground, o
 exactly one Pause to YouTube Music, turned Keep Playing Off, left Priority Rules selected, did not change ordinary
 YouTube and produced no error or crash. The default repeated-pause override also passed: the first two direct player UI
 pauses were corrected, the third pause within five seconds remained paused, Keep Playing turned Off, one notification
-sound played, ordinary YouTube did not change and no error or crash occurred.
+sound played, ordinary YouTube did not change and no error or crash occurred. A lock-screen media-card Pause also left
+YouTube Music paused, turned Keep Playing Off, recovered Priority Rules after unlock, did not change ordinary YouTube
+and produced no Unavailable, error or crash.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
