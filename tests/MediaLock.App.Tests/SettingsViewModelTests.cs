@@ -444,6 +444,44 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task PresentationFailureRollsBackTheCommittedSettingsAndKeepsSettingsOpen()
+    {
+        var initial = MediaLockApplicationState.Initial;
+        var application = new FakeApplication(initial);
+        var closeRequests = 0;
+        var appliedLanguages = new List<string>();
+        var appliedThemes = new List<string>();
+        using var viewModel = new SettingsViewModel(
+            application,
+            requestClose: () => closeRequests++,
+            applyLanguage: appliedLanguages.Add,
+            applyTheme: theme =>
+            {
+                appliedThemes.Add(theme);
+                if (theme == UiThemePreference.Dark)
+                {
+                    throw new InvalidOperationException("Theme could not be applied.");
+                }
+            });
+        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
+        viewModel.SelectedTheme = UiThemePreference.Dark;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, closeRequests);
+        Assert.Equal(initial.Settings, application.State.Settings);
+        Assert.Equal(2, application.Intents.Count);
+        Assert.Equal(
+            [UiLanguagePreference.TraditionalChinese, UiLanguagePreference.System],
+            appliedLanguages);
+        Assert.Equal([UiThemePreference.Dark, UiThemePreference.System], appliedThemes);
+        Assert.Contains(
+            "Settings presentation could not be applied",
+            viewModel.ErrorMessage,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PriorityRulesCanBeAddedOrderedDisabledRemovedAndSaved()
     {
         var state = MediaLockApplicationState.Initial with

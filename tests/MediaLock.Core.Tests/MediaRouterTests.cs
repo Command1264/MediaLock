@@ -39,6 +39,82 @@ public sealed class MediaRouterTests
     }
 
     [Fact]
+    public async Task UpdatedRecoveryTimeoutReschedulesAnActiveRecovery()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(
+            controller,
+            new RouterOptions(
+                FallbackPolicy.Wait,
+                TimeSpan.FromSeconds(15)));
+        var locked = Session("locked", "music");
+
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([locked], locked.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.LockSession(locked.Key),
+            CancellationToken.None);
+        var lost = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+        var original = Assert.Single(
+            lost.Effects.OfType<RouterEffect.ScheduleRecoveryTimeout>());
+
+        var updated = await router.DispatchAsync(
+            new RouterIntent.UpdateOptions(new RouterOptions(
+                FallbackPolicy.DisableRouting,
+                TimeSpan.FromSeconds(3))),
+            CancellationToken.None);
+
+        var canceled = Assert.Single(
+            updated.Effects.OfType<RouterEffect.CancelRecoveryTimeout>());
+        var rescheduled = Assert.Single(
+            updated.Effects.OfType<RouterEffect.ScheduleRecoveryTimeout>());
+        Assert.Equal(original.RecoveryEpoch, canceled.RecoveryEpoch);
+        Assert.NotEqual(original.RecoveryEpoch, rescheduled.RecoveryEpoch);
+        Assert.Equal(TimeSpan.FromSeconds(3), rescheduled.Delay);
+        Assert.Equal(rescheduled.RecoveryEpoch, updated.State.RecoveryEpoch);
+    }
+
+    [Fact]
+    public async Task UpdatedFallbackPolicyAppliesToTheExistingRecoveryEpoch()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(
+            controller,
+            new RouterOptions(
+                FallbackPolicy.Wait,
+                TimeSpan.FromSeconds(15)));
+        var locked = Session("locked", "music");
+
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([locked], locked.Key),
+            CancellationToken.None);
+        await router.DispatchAsync(
+            new RouterIntent.LockSession(locked.Key),
+            CancellationToken.None);
+        var lost = await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([], null),
+            CancellationToken.None);
+        var epoch = lost.State.RecoveryEpoch!.Value;
+        var updated = await router.DispatchAsync(
+            new RouterIntent.UpdateOptions(new RouterOptions(
+                FallbackPolicy.DisableRouting,
+                TimeSpan.FromSeconds(15))),
+            CancellationToken.None);
+
+        var timedOut = await router.DispatchAsync(
+            new RouterIntent.RecoveryTimedOut(epoch),
+            CancellationToken.None);
+
+        Assert.Equal(epoch, updated.State.RecoveryEpoch);
+        Assert.Empty(updated.Effects);
+        Assert.Equal(RouterStatus.Unavailable, timedOut.State.Status);
+        Assert.Equal(FallbackPolicy.DisableRouting, timedOut.State.ActiveFallback);
+    }
+
+    [Fact]
     public async Task WindowsAutoRoutesToCurrentSessionAtCommandTime()
     {
         var controller = new RecordingMediaController(MediaControlResult.Succeeded);

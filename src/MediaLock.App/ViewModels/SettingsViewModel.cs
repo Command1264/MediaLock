@@ -359,6 +359,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
     private async Task SaveAsync()
     {
+        var previousSettings = application.State.Settings;
         try
         {
             var settings = new MediaLockSettings(
@@ -384,8 +385,48 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
-            applyLanguage?.Invoke(SelectedLanguage);
-            applyTheme?.Invoke(SelectedTheme);
+            try
+            {
+                applyLanguage?.Invoke(SelectedLanguage);
+                applyTheme?.Invoke(SelectedTheme);
+            }
+            catch (Exception exception)
+            {
+                var failures = new List<Exception> { exception };
+                try
+                {
+                    await application.DispatchAsync(
+                        new ApplicationIntent.UpdateSettings(previousSettings),
+                        CancellationToken.None);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                try
+                {
+                    applyLanguage?.Invoke(previousSettings.Desktop!.Language);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                try
+                {
+                    applyTheme?.Invoke(previousSettings.Desktop!.Theme);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                throw new AggregateException(
+                    "Settings presentation could not be applied; rollback was attempted.",
+                    failures);
+            }
+
             ErrorMessage = null;
             ClearSupportStatus();
             requestClose?.Invoke();

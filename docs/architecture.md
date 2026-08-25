@@ -202,6 +202,19 @@ application identity through the same router interface as an interactive App Loc
 the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
 Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
 unless a future explicitly disclosed diagnostic mode supplies them.
+
+`MediaLockApplication` owns the successful-settings-application transaction. It validates one immutable settings
+snapshot, persists it, synchronizes owned platform state such as login startup, sends Router-owned values through
+`RouterIntent.UpdateOptions`, and only then publishes application state with that same snapshot. Presentation and
+input consumers observe the published state or their explicit post-commit callback; they do not reread
+`settings.json`. If a platform or Router application step fails, the application attempts to restore the prior
+durable and platform values and does not publish the candidate snapshot as successful.
+
+Router options are a live seam. Priority Rule changes recalculate the Priority Rules target in the serialized Router
+queue. A Recovery-timeout change during an active Recovery advances its epoch, cancels the old deadline and schedules
+one replacement using the new duration; the eventual timeout evaluates the current Fallback Policy. New settings must
+be assigned to an owning runtime module here (or be explicitly documented as startup-only) before they are exposed by
+Settings.
 Phase 10B adds a read-only environment adapter at `IAppEnvironmentInfoProvider`. Its Windows implementation owns
 Registry, runtime-architecture, entry-assembly version and embedded Authenticode-certificate inspection, including
 normalizing the stale `Windows 10` Registry product name when build 22000 or later identifies Windows 11. The pure
@@ -214,7 +227,7 @@ Clipboard, Shell and `%LocalAppData%\MediaLock\logs` behavior plus the canonical
 ViewModel supplies diagnostic text only for the copy action, catches adapter failures as localized actionable UI
 errors and otherwise remains independent of Registry, Clipboard and process launch details.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
-fallback and Priority Rule edits take effect on the next process start. A successful explicit main-window Routing
+fallback and Priority Rule edits also update the running router immediately. A successful explicit main-window Routing
 Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
 corresponding startup setting last inside the same serialized application dispatch. A failed transition or target
 save leaves the prior startup setting intact; a settings save failure keeps the current-run transition observable,

@@ -60,6 +60,17 @@ enable/disable, move, remove and schema-v3 round trips, including v1/v2 migratio
 mode explicitly; tray Windows Auto remains a current-run action.
 Application regression coverage also keeps runtime autosave suppressed after that tray override across later media
 commands, and restores the prior runtime document if the startup-settings commit fails.
+Saving reordered, enabled, disabled or removed Priority Rules while Priority Rules is active must immediately
+recalculate the routed target through `IMediaLockApplication`; restarting or reselecting the Routing Mode is not part
+of acceptance.
+
+Settings tests maintain a runtime-consumer matrix. Recovery and Priority Rules must reach the Router immediately,
+including cancellation and replacement of an active Recovery deadline when its timeout changes. Login startup must
+match the owned Run value, global-key interception and close-to-tray must observe the published application state,
+repeated-pause settings must reset prior observations, and language/theme must apply only after a successful commit.
+Every newly introduced setting adds either an immediate-application test at its owning public seam or an explicit,
+documented startup-only contract. A repository write by itself is never sufficient evidence of a successful runtime
+settings change.
 
 Phase 6 tests packaging at the release-command seam. `tests/packaging/Publish-ReleaseCandidate.Tests.ps1` invokes
 the public publish script against an isolated temporary output, verifies the versioned ZIP/manifest/checksum set,

@@ -971,6 +971,45 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task UpdatedRepeatedPauseOverrideAppliesWithoutRestarting()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var updated = application.State.Settings with
+        {
+            PlaybackStateLock = application.State.Settings.PlaybackStateLock! with
+            {
+                RepeatedPauseOverrideEnabled = false,
+            },
+        };
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }], session.Key));
+            await controller.WaitForCommandCountAsync(episode);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(3, controller.Commands.Count);
+    }
+
+    [Fact]
     public async Task ExplicitTargetChangeClearsKeepPlayingImmediately()
     {
         var music = Session("music", "music");
@@ -1024,6 +1063,141 @@ public sealed class MediaLockApplicationTests
             PlaybackStateLockMode.KeepPlaying,
             result.State.PlaybackStateLock.Mode);
         Assert.Equal(session.Key, result.State.PlaybackStateLock.ArmedTarget);
+    }
+
+    [Fact]
+    public async Task UpdatedPriorityRulesImmediatelyRecalculateTheApplicationTarget()
+    {
+        var brave = Session("brave", "Brave");
+        var chrome = Session("chrome", "Chrome");
+        var initial = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("Brave"), new PriorityRule("Chrome")],
+        };
+        var repository = new RecordingSettingsRepository(initial);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([brave, chrome], brave.Key)),
+            new MediaRouter(new SuccessfulController()),
+            repository,
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        var updated = initial with
+        {
+            PriorityRules = [new PriorityRule("Chrome"), new PriorityRule("Brave")],
+        };
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
+        Assert.Equal(chrome.Key, result.State.Router.ActiveTarget);
+        Assert.Equal(updated, result.State.Settings);
+    }
+
+    [Fact]
+    public async Task PriorityRuleTargetChangePublishesPlaybackLockReleaseAtomically()
+    {
+        var brave = Session("brave", "Brave");
+        var chrome = Session("chrome", "Chrome");
+        var initial = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("Brave"), new PriorityRule("Chrome")],
+        };
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([brave, chrome], brave.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(initial),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var observed = new List<MediaLockApplicationState>();
+        application.StateChanged += (_, args) => observed.Add(args.State);
+        var updated = initial with
+        {
+            PriorityRules = [new PriorityRule("Chrome"), new PriorityRule("Brave")],
+        };
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(chrome.Key, result.State.Router.ActiveTarget);
+        Assert.Equal(PlaybackStateLockState.Off, result.State.PlaybackStateLock);
+        Assert.DoesNotContain(observed, state =>
+            state.Router.ActiveTarget == chrome.Key &&
+            state.PlaybackStateLock.Mode == PlaybackStateLockMode.KeepPlaying);
+    }
+
+    [Fact]
+    public async Task UpdatedRecoveryAndPrioritySettingsAreSentToTheRouter()
+    {
+        var session = Session("music", "Brave");
+        var router = new RecordingIntentRouter();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([session], session.Key)),
+            router,
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        var updated = MediaLockSettings.Default with
+        {
+            Recovery = new RecoverySettings(
+                TimeSpan.FromSeconds(27),
+                FallbackPolicy.DisableRouting),
+            PriorityRules = [new PriorityRule("Chrome")],
+        };
+
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        var options = Assert.IsType<RouterIntent.UpdateOptions>(router.Intents[^1]).Options;
+        Assert.Equal(TimeSpan.FromSeconds(27), options.RecoveryTimeout);
+        Assert.Equal(FallbackPolicy.DisableRouting, options.FallbackPolicy);
+        Assert.Equal(updated.PriorityRules, options.PriorityRules);
+    }
+
+    [Fact]
+    public async Task UpdatedRecoveryTimeoutReplacesTheActiveApplicationDeadline()
+    {
+        var locked = Session("music", "Brave");
+        var initial = MediaLockSettings.Default with
+        {
+            Recovery = new RecoverySettings(TimeSpan.FromSeconds(5), FallbackPolicy.Wait),
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([locked], locked.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(initial),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(locked.Key),
+            CancellationToken.None);
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot([], null));
+        await WaitUntilAsync(() => application.State.Router.Status == RouterStatus.Recovering);
+        var updated = initial with
+        {
+            Recovery = new RecoverySettings(TimeSpan.Zero, FallbackPolicy.DisableRouting),
+        };
+
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+        await WaitUntilAsync(() => application.State.Router.Status == RouterStatus.Unavailable);
+
+        Assert.Equal(FallbackPolicy.DisableRouting, application.State.Router.ActiveFallback);
+        Assert.Equal(updated, application.State.Settings);
     }
 
     [Fact]

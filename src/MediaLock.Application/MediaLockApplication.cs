@@ -181,10 +181,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         if (settingsRepository is not null)
         {
             await DispatchRouterAsync(
-                new RouterIntent.UpdateOptions(new RouterOptions(
-                    settings.Recovery!.FallbackPolicy,
-                    settings.Recovery.Timeout,
-                    settings.PriorityRules)),
+                new RouterIntent.UpdateOptions(ToRouterOptions(settings)),
                 cancellationToken,
                 persistRuntimeState: startupRestoreIntent is null);
         }
@@ -314,10 +311,15 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private void ClearPlaybackStateLock()
     {
+        PublishPlaybackStateLock(ResetPlaybackStateLock());
+    }
+
+    private PlaybackStateLockState ResetPlaybackStateLock()
+    {
         playbackStateLockRecoveryFingerprint = null;
         playbackStateCorrectionAttempts = 0;
         ResetRepeatedPauseObservations();
-        PublishPlaybackStateLock(PlaybackStateLockState.Off);
+        return PlaybackStateLockState.Off;
     }
 
     private void ReleasePlaybackStateLock()
@@ -367,45 +369,29 @@ public sealed class MediaLockApplication : IMediaLockApplication
         await dispatchGate.WaitAsync(updateCancellation.Token);
         try
         {
+            var previousSettings = settings;
+            var startupChanged =
+                loginStartupManager is not null &&
+                previousSettings.Desktop!.StartWithWindows != updated.Desktop!.StartWithWindows;
             if (settingsRepository is not null)
             {
                 await settingsRepository.SaveAsync(updated, updateCancellation.Token);
             }
 
-            if (loginStartupManager is not null &&
-                settings.Desktop!.StartWithWindows != updated.Desktop!.StartWithWindows)
+            if (startupChanged)
             {
                 try
                 {
-                    await loginStartupManager.SetEnabledAsync(
-                        updated.Desktop.StartWithWindows,
+                    await loginStartupManager!.SetEnabledAsync(
+                        updated.Desktop!.StartWithWindows,
                         updateCancellation.Token);
                 }
                 catch (Exception exception)
                 {
                     var failures = new List<Exception> { exception };
-                    try
-                    {
-                        await loginStartupManager.SetEnabledAsync(
-                            settings.Desktop.StartWithWindows,
-                            CancellationToken.None);
-                    }
-                    catch (Exception rollbackException)
-                    {
-                        failures.Add(rollbackException);
-                    }
-
-                    if (settingsRepository is not null)
-                    {
-                        try
-                        {
-                            await settingsRepository.SaveAsync(settings, CancellationToken.None);
-                        }
-                        catch (Exception rollbackException)
-                        {
-                            failures.Add(rollbackException);
-                        }
-                    }
+                    failures.AddRange(await RollbackSettingsSideEffectsAsync(
+                        previousSettings,
+                        rollbackStartup: true));
 
                     if (exception is OperationCanceledException && failures.Count == 1)
                     {
@@ -418,28 +404,100 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 }
             }
 
+            RouterResult routerResult;
+            var previousRevision = State.Router.Revision;
+            try
+            {
+                routerResult = await router.DispatchAsync(
+                    new RouterIntent.UpdateOptions(ToRouterOptions(updated)),
+                    updateCancellation.Token);
+            }
+            catch (Exception exception)
+            {
+                var failures = new List<Exception> { exception };
+                failures.AddRange(await RollbackSettingsSideEffectsAsync(
+                    previousSettings,
+                    rollbackStartup: startupChanged));
+
+                if (exception is OperationCanceledException && failures.Count == 1)
+                {
+                    throw;
+                }
+
+                throw new AggregateException(
+                    "Runtime settings could not be applied; rollback was attempted.",
+                    failures);
+            }
+
             settings = updated;
             ResetRepeatedPauseObservations();
             settingsLoadWarning = null;
-            State = new MediaLockApplicationState(
-                State.Router,
-                PersistenceWarnings,
-                settings,
-                catalogStatus,
-                catalogStatusMessage)
+            if (State.PlaybackStateLock is
+                {
+                    Mode: PlaybackStateLockMode.KeepPlaying,
+                    ArmedTarget: { } armedTarget,
+                } && routerResult.State.ActiveTarget != armedTarget)
             {
-                PlaybackStateLock = State.PlaybackStateLock,
-            };
-            StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
+                State = State with
+                {
+                    PlaybackStateLock = ResetPlaybackStateLock(),
+                };
+            }
+            Apply(routerResult);
+            await RecordStateTransitionAsync(
+                previousRevision,
+                routerResult.State,
+                CancellationToken.None);
             await TryWriteDiagnosticAsync(
                 new DiagnosticEvent("settings.saved"),
-                updateCancellation.Token);
+                CancellationToken.None);
             return new ApplicationResult(State, RouteDecision.StateUpdated);
         }
         finally
         {
             dispatchGate.Release();
         }
+    }
+
+    private static RouterOptions ToRouterOptions(MediaLockSettings source) => new(
+        source.Recovery!.FallbackPolicy,
+        source.Recovery.Timeout,
+        source.PriorityRules);
+
+    private async ValueTask<List<Exception>> RollbackSettingsSideEffectsAsync(
+        MediaLockSettings previousSettings,
+        bool rollbackStartup)
+    {
+        var failures = new List<Exception>();
+        if (rollbackStartup && loginStartupManager is not null)
+        {
+            try
+            {
+                await loginStartupManager.SetEnabledAsync(
+                    previousSettings.Desktop!.StartWithWindows,
+                    CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        if (settingsRepository is not null)
+        {
+            try
+            {
+                await settingsRepository.SaveAsync(
+                    previousSettings,
+                    CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        return failures;
     }
 
     public async ValueTask DisposeAsync()
@@ -1071,7 +1129,6 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private void Apply(RouterResult result)
     {
-        Publish(result.State);
         foreach (var effect in result.Effects)
         {
             switch (effect)
@@ -1086,6 +1143,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     throw new ArgumentOutOfRangeException(nameof(result));
             }
         }
+
+        Publish(result.State);
     }
 
     private void ScheduleRecoveryTimeout(RouterEffect.ScheduleRecoveryTimeout effect)
