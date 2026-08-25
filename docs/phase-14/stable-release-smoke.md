@@ -26,8 +26,9 @@ one `MediaLock.exe`, and record ProductVersion `0.3.0`, FileVersion `0.3.0.0` an
 
 ## Automated gate and review
 
-Status: automated gate passed on implementation commit `f5e13838e5fe35c423ef202334206c00c3e89b54`; repeat on the
-final artifact-source commit after this evidence update. Follow-up two-axis review is pending.
+Status: automated gate and follow-up two-axis review passed on implementation commit
+`c1908621ba7ca31db0c1958c4bc8bfa47c327e86`; repeat the automated gate on the final artifact-source commit after this
+evidence update.
 
 Record restore, format, complete tests, Release build, all packaging scripts, Markdown relative-link validation,
 `git diff --check` and the two-axis Standards／Spec review against the Phase 14 plan. GitHub Actions capacity is not
@@ -46,13 +47,16 @@ Observed RED → GREEN sequence:
   a payload invariant. Both paths now compare installed EXE and shortcut SHA-256 values, complete uninstall
   registration, startup and user-data snapshots; cancellation persists and validates its pre-action snapshot.
 
-Gate results on `f5e13838e5fe35c423ef202334206c00c3e89b54`:
+Gate results on `c1908621ba7ca31db0c1958c4bc8bfa47c327e86`:
 
 - restore and format verification passed;
 - 351/351 Release tests passed;
 - Release build completed with zero warnings and zero errors;
 - publish, artifact-selection and footprint packaging contracts passed; and
 - the artifact-selection contract independently passed in PowerShell 7 and Windows PowerShell 5.1.
+
+The Standards and Spec reviews both reported zero findings. Their follow-up checks specifically closed the earlier
+payload-invariant and duplicated-assertion risks in the downgrade and cancellation transactions.
 
 ## Exact-artifact host gate
 
