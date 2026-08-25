@@ -240,10 +240,12 @@ a host/manual gate rather than an inferred pass from the visible shortcut.
 The user completed that host/manual gate on 2026-08-25 with the same installer payload. Windows Search discovery,
 single-process launch, Tray restore, startup registration, actual sign-out/sign-in startup, Play/Pause, Next,
 Previous and Recovery all passed. The competing ordinary YouTube source remained unchanged. Uninstall completed,
-user data remained available, and no error or crash was reported. The subsequent test-only `0.2.0` to `0.2.1`
-Sandbox matrix passed in-place upgrade, retained data/startup state and an intentional downgrade block; cancelling on
-the Ready page also left the old installation unchanged. Cancellation during file extraction was attempted but the
-single-file payload completed before cancellation was delivered, so that stronger rollback claim remains unverified.
+user data remained available, and no error or crash was reported. Test-only `0.2.0` and `0.2.1` artifacts from clean
+source commit `ed05c2742bdc6f3b0d5760406c6c3c410533ff9d` then passed the Sandbox matrix: both installer hashes matched
+their manifests, in-place upgrade retained data/startup state, and the older installer was intentionally blocked with
+exit code 7. Cancelling on the Ready page returned exit code 2 and left the old installation unchanged. Cancellation
+during file extraction was attempted, but the single-file payload completed before cancellation was delivered, so
+that stronger rollback claim remains unverified.
 
 ### Integration tests
 
