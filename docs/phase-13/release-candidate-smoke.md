@@ -137,8 +137,10 @@ the exact-artifact host evidence above and were not silently counted as independ
 
 ## Publication
 
-Status: not authorized and not started.
+Status: publication notes and exact-asset staging authorized; tag, GitHub Prerelease and uploads are not authorized or
+started.
 
-After the exact manifest source commit is integrated into `develop`, a separate approval is required for signed
-annotated tag `v0.3.0-rc.1`, GitHub Prerelease creation and public ZIP／Setup upload. Do not upload manifest or standalone
-checksum files under the current publication policy, and do not mark the prerelease Latest.
+The exact manifest source commit is integrated into `develop`. A separate approval is still required for the signed
+annotated `v0.3.0-rc.1` tag at `d0fe5583e91204fe98a79b14ae0327e5120af54e`, GitHub Prerelease creation and public
+ZIP／Setup upload. The intended ZIP and Setup sizes and SHA-256 values are fixed in the release notes. Do not upload the
+manifest or standalone checksum files under the current publication policy, and do not mark the prerelease Latest.

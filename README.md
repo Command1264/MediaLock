@@ -11,7 +11,8 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
 `0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
 Stable／Latest 版本。原始碼目前準備未公開的 `0.3.0-rc.1`，加入單向 Keep Playing、per-user Setup 與
-壓縮後的 self-contained single-file payload；Windows 原生媒體卡片同步仍不在產品承諾內。
+壓縮後的 self-contained single-file payload；其 exact-artifact 自動、主機與 Windows Sandbox 驗證已完成，
+正等待另行核准的 GitHub Prerelease。Windows 原生媒體卡片同步仍不在產品承諾內。
 
 已驗證的基礎能力包括：
 
@@ -94,7 +95,8 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 `%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。目前公開的
 `0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
 Windows Sandbox gate，仍然只發布既有 portable ZIP；Phase 12A installer 已完成實作與驗證，但尚未公開。
-第一個公開候選 Setup 規劃於 `0.3.0-rc.1`，目前仍在本機驗證，在正式發布以前不是使用者下載管道。
+第一個公開候選 Setup 規劃於 `0.3.0-rc.1`，其正式 ZIP／Setup 與發布說明已完成驗證及準備，但在另行
+核准並建立 GitHub Prerelease 以前仍不是使用者下載管道。
 完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
