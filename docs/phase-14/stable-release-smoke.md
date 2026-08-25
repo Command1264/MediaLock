@@ -117,14 +117,41 @@ The remaining release blocker is the fresh Windows Sandbox matrix below, using o
 
 ## Windows Sandbox gate
 
-Status: pending on a fresh Windows 11 x64 Sandbox.
+Status: passed on fresh Windows 11 Enterprise 24H2 x64 Sandboxes, build `26100.9168`.
 
-Record artifact identity, portable launch, per-user install, Search/Start Menu and Installed apps registration,
-startup ownership, `MSEdge` GSMTC routing/Seek, real public portable `0.2.0` data compatibility, exact public RC1 Setup
-upgrade to stable using the pinned published Setup SHA-256, stable repair with unchanged settings/state, RC1 downgrade
-block with all transaction state unchanged, Ready-page cancellation with all preparation state unchanged, uninstall
-retention/cleanup and final process/log state. Real sign-out/sign-in is host-only because Sandbox destroys its
-environment on sign-out.
+The mapped formal artifacts independently matched source commit
+`7273165234a418d1334fc2075adc7e876db89db2`, the archive and installer digests recorded above, ProductVersion
+`0.3.0`, FileVersion `0.3.0.0` and Authenticode `NotSigned`. The self-contained single-file portable payload launched
+without installing .NET, and a second launch retained one process.
+
+Public predecessor identity was checked against the GitHub asset digests before copying it into Sandbox. Public
+portable `v0.2.0` wrote `English`, `Light`, a 17-second Recovery timeout and disabled login startup. Installing stable
+preserved all four values and valid settings/state JSON. Per-user Setup completed without UAC; its payload matched the
+manifest, Start Menu and Installed apps registration existed, and a second clean Sandbox visibly returned Media Lock
+as the best Windows Search application result.
+
+The automated installer transactions passed with these exact results:
+
+- default login startup remained disabled;
+- uninstall removed the owned startup value but preserved an unrelated portable startup value;
+- user data was retained and the final installer-smoke process count was zero;
+- public `0.3.0-rc.1` Setup SHA-256
+  `0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3` upgraded to stable with exit code 0;
+- same-version stable repair returned exit code 0 and preserved payload, registration, shortcut, settings, state and
+  startup command;
+- stable-to-RC1 downgrade was blocked with exit code 7 and every captured transaction invariant stayed unchanged; and
+- cancelling stable on the Ready to Install page returned exit code 2 and left the installed RC1 payload,
+  registration, shortcut, startup, settings and state unchanged.
+
+Edge exposed one `MSEdge` session with title, artwork and timeline. Lock session, Pause and Play each succeeded once.
+The advertisement correctly rejected Seek and produced a dismissible actionable notice; after skipping it, one
+release-only Seek moved the actual song from approximately `0:18` to `2:25`. Final uninstall left zero Media Lock
+processes, no installed payload, shortcut, Installed apps entry or startup value. Settings/state remained valid, and
+the one JSONL log contained zero invalid lines and zero Error/Critical entries.
+
+Real sign-out/sign-in remains a host-only lifecycle row because Sandbox destroys its environment on sign-out. The
+installer and application startup ownership contracts passed here; final stable publication must not claim a new
+exact-artifact sign-in result unless that host row is also executed or explicitly accepted as inherited risk.
 
 ## Integration and publication
 
