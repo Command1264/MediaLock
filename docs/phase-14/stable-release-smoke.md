@@ -26,11 +26,30 @@ one `MediaLock.exe`, and record ProductVersion `0.3.0`, FileVersion `0.3.0.0` an
 
 ## Automated gate and review
 
-Status: pending.
+Status: automated gate passed on implementation commit `f5e13838e5fe35c423ef202334206c00c3e89b54`; repeat on the
+final artifact-source commit after this evidence update. Follow-up two-axis review is pending.
 
 Record restore, format, complete tests, Release build, all packaging scripts, Markdown relative-link validation,
 `git diff --check` and the two-axis Standards／Spec review against the Phase 14 plan. GitHub Actions capacity is not
 assumed and no RC test count or result transfers.
+
+Observed RED → GREEN sequence:
+
+- The stable publish contract first failed against the unchanged RC1 project with `MediaLock.App Version must be
+  0.3.0`; changing only Version/InformationalVersion made the same contract build and validate stable ZIP／Setup.
+- The exact-predecessor contract first failed because the Sandbox scripts did not require a pinned older-installer
+  SHA-256. The shared helper now rejects manifest mismatch and pinned-digest mismatch in PowerShell 7 and Windows
+  PowerShell 5.1.
+- The repair contract first failed because the upgrade script did not execute the newer installer a second time. The
+  script now performs stable same-version repair and reports repair exit code plus settings/state invariants.
+
+Gate results on `f5e13838e5fe35c423ef202334206c00c3e89b54`:
+
+- restore and format verification passed;
+- 351/351 Release tests passed;
+- Release build completed with zero warnings and zero errors;
+- publish, artifact-selection and footprint packaging contracts passed; and
+- the artifact-selection contract independently passed in PowerShell 7 and Windows PowerShell 5.1.
 
 ## Exact-artifact host gate
 
