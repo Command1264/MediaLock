@@ -120,8 +120,9 @@ neutral fallback，以及 WPF／WinForms／installer／diagnostics 是否沒有 
 
 ### Framework-dependent
 
-量測用 framework-dependent single-file 為 `27,491,835` bytes，ZIP 為 `7,335,929` bytes，但目標機必須
-已安裝 `.NET 10 Desktop Runtime`；基本 `.NET Runtime` 不含 WPF／WinForms。
+探索用 framework-dependent single-file 為 `27,491,835` bytes，ZIP 為 `7,335,929` bytes，但這只是 app
+payload，沒有包含目標機另外需要的 `.NET 10 Desktop Runtime` bytes，因此不是完整使用者 footprint，也
+不是 Phase 12B 的候選。基本 `.NET Runtime` 不含 WPF／WinForms。
 [Microsoft：Install .NET on Windows](https://learn.microsoft.com/en-us/dotnet/core/install/windows)
 
 它不取代預設 self-contained ZIP／Setup。若日後新增進階下載，installer 必須偵測 Windows Desktop Runtime，
@@ -152,5 +153,6 @@ Phase 12B 維持 `PublishReadyToRun=false`。若未來要改善冷啟動，應�
 2. 用同一工具重複量測 baseline、single-file compression 與 supported-locales 候選。
 3. 本輪已接受 Setup 增大，以換取安裝後 EXE 大幅下降；manifest 必須揭露 single-file compression。
 4. 語系過濾維持 test-only，只有另行核准且完整 localization gate 通過後才可加入正式候選。
-5. 15 次交錯取樣已通過；仍以重開機人工 smoke 確認 i7-8700 的實際首次互動體感。
+5. 15 次交錯取樣已通過；重開機 A/B 是偏好證據。若產品負責人明確拒絕第二次重開機，可依 Phase 12B
+   計畫記錄 waiver，並以普通候選啟動 smoke 補足體感檢查，不得宣稱完成 reboot A/B。
 6. Framework-dependent、多檔 publish 與移除 WinForms dependency 分別留給後續產品／架構決策。

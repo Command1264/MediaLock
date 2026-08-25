@@ -482,8 +482,9 @@ enterprise deployment or repair becomes a concrete requirement. See the
 ### Phase 12B — Footprint measurement and optimization
 
 Measure the compressed archive, single-file executable, managed framework, native WPF/WinRT payload and runtime
-extraction separately before choosing an optimization. Compare the existing self-contained package with an optional
-framework-dependent package and safe publish settings. Trimming, native-library exclusion or compression changes do
+extraction separately before choosing an optimization. Research an optional framework-dependent package and compare
+safe publish settings; a complete framework-dependent footprint remains deferred until it includes the separately
+required Desktop Runtime. Trimming, native-library exclusion or compression changes do
 not ship unless WPF resources, GSMTC, tray, localization, startup and clean-machine tests pass; reducing bytes must not
 silently remove the current no-runtime-install promise from the portable package.
 
@@ -500,3 +501,7 @@ samples are preserved in the [host footprint benchmark](phase-12/host-footprint-
 candidate subsequently passed host routing, Recovery, lock／unlock, sleep／wake, Tray and localization smoke. A fresh
 Windows Sandbox independently passed artifact identity, clean install, visible launch, single-instance, uninstall,
 owned-startup cleanup and user-data retention checks.
+The product owner explicitly waived a second reboot solely for a direct A/B pair after accepting the 15 + 15 sample
+result and ordinary candidate startup smoke. Full Phase 12A upgrade／downgrade／cancellation and login-startup
+transactions were inherited because their owning installer and startup code did not change; the exact compressed
+payload repeated clean install／launch／uninstall and critical runtime routing instead.

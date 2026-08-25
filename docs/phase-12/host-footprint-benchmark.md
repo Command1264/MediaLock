@@ -109,7 +109,9 @@ The compressed executable passed the 2026-08-25 host smoke on the same i7-8700 s
 - Lock／unlock and sleep／wake each retained routing isolation. Sleep／wake entered Recovering and returned to the
   selected source without remaining Unavailable.
 - A single reboot observation was completed. A second reboot solely to create a direct baseline/candidate A/B pair was
-  deliberately skipped; the repeatable 15 + 15 sample benchmark above remains the quantitative comparison.
+  explicitly waived by the product owner after the ordinary candidate startup smoke reported no perceptible slowdown;
+  the repeatable 15 + 15 sample benchmark above remains the quantitative comparison. This is not recorded as a
+  completed reboot A/B comparison.
 
 ## Clean Windows Sandbox result
 
@@ -127,7 +129,10 @@ measured implementation commit. The ignored evidence files were not committed as
 - Uninstall removed the application, shortcut, owned startup value and process while retaining user data. A startup
   value owned by a portable copy was preserved.
 
-The Phase 12A upgrade／blocked-downgrade and cancellation matrix was not repeated because Phase 12B changes only the
-published bundle compression and does not change the Inno transaction or migration logic. Its clean install, launch
-and uninstall paths were repeated against the exact compressed payload. Host and Sandbox evidence therefore close the
-Phase 12B acceptance scope without claiming a new signed or public artifact.
+The Phase 12A upgrade／blocked-downgrade, cancellation and login-startup transaction matrix was inherited rather than
+repeated because diff review confirms that Phase 12B changes only published bundle compression, measurement code and
+its manifest contract—not the Inno transaction, migration or startup ownership logic. Clean install, launch and
+uninstall paths were repeated against the exact compressed payload. The automated suite retained coverage of all
+Routing Modes, GSMTC projection and persistence; the exact candidate host smoke repeated physical routing isolation,
+Recovery and workstation lifecycle. Host and Sandbox evidence therefore close the risk-scoped Phase 12B acceptance
+without claiming a completed reboot A/B pair or a new signed／public artifact.

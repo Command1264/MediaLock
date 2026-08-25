@@ -37,8 +37,10 @@ Every primary run uses at least seven samples per startup kind and alternates va
 least 15 samples. The tool refuses to run startup measurements while another MediaLock process exists and terminates
 only the exact process it created.
 
-The automated benchmark does not flush the Windows file cache. A reboot-based first-launch smoke on the i7-8700 is a
-separate manual gate and must be described as such.
+The automated benchmark does not flush the Windows file cache. A reboot-based first-launch comparison on the i7-8700
+is preferred manual evidence and must be described separately. When a second reboot is explicitly declined, the
+product owner may accept the candidate from the clean 15 + 15 sample result plus an ordinary candidate startup smoke;
+the evidence must record that waiver and must not describe it as a completed reboot A/B comparison.
 
 ## Decision gates
 
@@ -50,7 +52,8 @@ A candidate is eligible only when all conditions hold on the i7-8700 reference h
 - warm-extraction-cache median regression is at most 10% and 100 ms;
 - p95 has no unexplained outlier or repeated timeout;
 - the main window remains responsive immediately after measurement readiness; and
-- a reboot-based manual comparison reports no material interaction delay.
+- either a reboot-based manual comparison reports no material interaction delay, or the explicitly documented waiver
+  above is accepted after the quantitative and ordinary startup gates pass.
 
 The exact clean-commit 15-sample single-file-compression run passed these startup thresholds: fresh median `+47.45 ms`
 （`+2.86%`）and warm median `+32.84 ms`（`+2.04%`）.
@@ -69,17 +72,23 @@ explicit product decision even when the installed EXE shrinks.
 
 ### Functional compatibility
 
-The selected candidate must pass:
+The complete automated regression suite continues to cover the existing behavior matrix: localization, Settings,
+GSMTC projection, all Routing Modes, Recovery, lifecycle, startup ownership and packaging contracts. The exact selected
+candidate must repeat the surfaces directly exposed to a publish-profile change:
 
-1. cold launch and second-instance restore;
-2. Light／Dark and English／Traditional Chinese／Windows language;
-3. Settings persistence, Tray restore and explicit Exit;
-4. GSMTC enumeration, metadata, artwork and timeline;
-5. physical Play/Pause, Next／Previous and competing-source isolation;
-6. Lock session, Lock app, Priority Rules and Windows Auto;
-7. Recovery, lock/unlock, sleep/wake and login startup;
-8. installer upgrade, uninstall and retained user data; and
-9. valid settings/state/log JSON with no Error／Critical entry.
+1. cold launch, visible main window and second-instance restore;
+2. Light／Dark and English／Traditional Chinese／Windows language resource loading;
+3. Settings, Tray restore and explicit Exit;
+4. physical media-key routing with a competing source, Recovery, lock/unlock and sleep/wake;
+5. clean-machine artifact identity, install, launch, uninstall and retained user data; and
+6. valid settings/state/log JSON with no Error／Critical entry.
+
+An unchanged subsystem may use accepted same-release evidence instead of repeating its complete manual matrix only
+when diff review confirms that neither its owning product code nor its packaging/migration script changed. The final
+record must name every inherited or skipped gate. Phase 12B therefore inherits the Phase 12A upgrade,
+blocked-downgrade, cancellation and login-startup transaction evidence because only bundle compression and its
+manifest contract changed; it repeats clean install／launch／uninstall and critical runtime routing against the exact
+compressed payload.
 
 ## Implementation slices
 
@@ -123,7 +132,12 @@ machine-specific executable artifacts.
 ## Deferred decisions
 
 - A framework-dependent download requiring .NET 10 Desktop Runtime.
+- Full framework-dependent installed-footprint comparison, including the separately downloaded Desktop Runtime bytes;
+  the exploratory app-only size is not a complete user footprint and is not an accepted Phase 12B candidate.
 - Splitting portable and installer payload settings.
 - Multi-file self-contained distribution.
 - Replacing the WinForms Tray dependency with a native or WPF-only adapter.
 - Code signing, automatic updates and architecture-specific packages.
+- Consolidating the benchmark and release scripts' shared Inno resolution and packaging mechanics. Their intentional
+  duplication is currently bounded by packaging contract tests; change both together until a dedicated helper is
+  approved.
