@@ -127,6 +127,8 @@ Assert-Condition ([string]::Equals(
 
 $downgrade = Invoke-Installer -Path $olderInstaller
 $postDowngradeEntries = @(Get-MediaLockUninstallEntries)
+$postDowngradeStartupProperty =
+    (Get-ItemProperty -Path $runKey).PSObject.Properties['MediaLock']
 Assert-Condition ($downgrade.ExitCode -eq 7) `
     "Downgrade must be blocked with exit code 7, but returned $($downgrade.ExitCode)."
 Assert-Condition ($postDowngradeEntries.Count -eq 1) `
@@ -137,6 +139,12 @@ Assert-Condition ((Get-Item -LiteralPath $installedExe).VersionInfo.ProductVersi
     $newer.Manifest.version) 'Blocked downgrade replaced the newer payload.'
 Assert-Condition (Test-Path -LiteralPath $retainedMarker -PathType Leaf) `
     'Blocked downgrade removed retained user data.'
+Assert-Condition ($null -ne $postDowngradeStartupProperty) `
+    'Blocked downgrade removed the enabled login-startup value.'
+Assert-Condition ([string]::Equals(
+    [string]$postDowngradeStartupProperty.Value,
+    $expectedStartupValue,
+    [StringComparison]::Ordinal)) 'Blocked downgrade changed the login-startup command.'
 
 $result = [ordered]@{
     passed = $true
