@@ -12,6 +12,7 @@ Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸�
 `0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
 Stable／Latest 版本。`0.3.0-rc.1` 已公開為 Prerelease，加入單向 Keep Playing、per-user Setup 與壓縮後的
 self-contained single-file payload；其 exact-artifact 自動、主機與 Windows Sandbox 驗證均已完成。
+Phase 14 已開始規劃將相同功能範圍晉升為 `0.3.0` stable；尚未完成新的 stable artifact 或公開發布。
 Windows 原生媒體卡片同步仍不在產品承諾內。
 
 已驗證的基礎能力包括：
@@ -118,6 +119,7 @@ Windows Sandbox gate，該 Stable Release 仍只提供既有 portable ZIP。第�
 - [產品規格](docs/product-spec.md)
 - [架構](docs/architecture.md)
 - [路線圖](docs/roadmap.md)
+- [Phase 14 `0.3.0` 正式版計畫](docs/phase-14/stable-release-plan.md)
 - [測試策略](docs/testing.md)
 - [領域詞彙](CONTEXT.md)
 - [架構決策](docs/adr/)
