@@ -5,22 +5,22 @@ after the candidate source commit is reviewed and clean.
 
 ## Candidate identity
 
-Status: replacement artifacts pending after the host smoke found and fixed an automatic-routing Keep Playing Recovery
-defect. The following `25690bf` artifacts are retained only as pre-fix provenance and are not publishable candidates.
+Status: second replacement artifacts built and independently inspected. Earlier `25690bf` and `229c9eb` artifacts are
+retained only as superseded provenance and are not publishable candidates.
 
 - Version: `0.3.0-rc.1`.
-- Source commit: `25690bf138342cdf79ee7b19a4d2e4080e15e38a`.
+- Source commit: `d0fe5583e91204fe98a79b14ae0327e5120af54e`.
 - Source dirty: `false`.
 - Runtime identifier: `win-x64`.
-- Self-contained: must be `true`.
-- Single-file: must be `true`.
-- Single-file compressed: must be `true`.
-- ZIP: `MediaLock-0.3.0-rc.1-win-x64.zip`; 76,499,947 bytes;
-  SHA-256 `4c0d8694fcdd76a7e90452a2ac0d13941281c5b5e44fab8ab337497adf15d042`.
-- Setup: `MediaLock-Setup-0.3.0-rc.1-win-x64.exe`; 76,912,972 bytes;
-  SHA-256 `7b8db4499340729df558a6fe99da865069aef9a093b6b2acbc903aa8d69c66bf`.
-- Payload: `MediaLock.exe`; 82,314,711 bytes;
-  SHA-256 `3868050e0a23079954047c016de25c55500dd14d75f9aba853150ccd2e3d164a`.
+- Self-contained: `true`.
+- Single-file: `true`.
+- Single-file compressed: `true`.
+- ZIP: `MediaLock-0.3.0-rc.1-win-x64.zip`; 76,500,560 bytes;
+  SHA-256 `bfcbc61998173c036ce1beb7574013920a906f6a01d2f1df1599791d24e29066`.
+- Setup: `MediaLock-Setup-0.3.0-rc.1-win-x64.exe`; 76,911,036 bytes;
+  SHA-256 `0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3`.
+- Payload: `MediaLock.exe`; 82,315,358 bytes;
+  SHA-256 `c2bbde78f195701356d9ffa2f23d68070fcc814cd448672168ee02a5119c0339`.
 - ProductVersion: `0.3.0-rc.1` for payload and Setup.
 - FileVersion: `0.3.0.0` for payload and Setup.
 - Executable and Setup signatures: independently verified `NotSigned`.
@@ -31,11 +31,11 @@ self-contained, single-file, compression, trimming and signing fields matched th
 
 ## Automated gate
 
-Status: replacement full gate pending. The pre-fix gate passed on 2026-08-25 against exact source commit
-`25690bf138342cdf79ee7b19a4d2e4080e15e38a`, but its result does not transfer to the corrected source.
+Status: passed on 2026-08-25 against exact source commit
+`d0fe5583e91204fe98a79b14ae0327e5120af54e`.
 
 - Restore and formatting verification passed.
-- All 344 Release tests passed; Release build completed with 0 warnings and 0 errors.
+- All 351 Release tests passed; Release build completed with 0 warnings and 0 errors.
 - Publish and footprint contract tests passed, including PowerShell 7 and Windows PowerShell 5.1 prerelease artifact
   selection.
 - ZIP／Setup one-payload identity, manifest schema, hashes, unsigned state and clean-source guards passed.
@@ -46,12 +46,10 @@ Status: replacement full gate pending. The pre-fix gate passed on 2026-08-25 aga
 
 ## Local host smoke
 
-Status: in progress; the pre-fix artifact failed the automatic-routing Keep Playing Recovery row on 2026-08-25.
-Windows Auto cleared the policy when the armed Session disappeared, while Priority Rules could retain a stale Ready
-state before later losing the policy. A deterministic Application regression test reproduced both paths. Replacement
-source preserves a missing armed target as Suspended, resumes only for one fingerprint-acceptable successor that is
-also Active Target, and sends no correction to an ambiguous or competing Session. All remaining host rows and the
-corrected-artifact rerun remain pending.
+Status: in progress. Exact second replacement payload from source `d0fe558` launched as one process on the local host.
+The 2026-08-25 real sleep row passed: entering sleep turned Keep Playing Off; after wake YouTube Music remained paused,
+Priority Rules recovered, ordinary YouTube did not change, and the application neither remained Unavailable nor
+reported an error or crash. The remaining exact-artifact host rows are pending.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
