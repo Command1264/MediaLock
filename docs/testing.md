@@ -431,6 +431,19 @@ pass from earlier Phase 11／12 commits, and it does not publish until separatel
 are ZIP and Setup only; record their hashes in the GitHub Prerelease body while retaining manifest and standalone
 checksum files as local provenance evidence.
 
+Phase 14 uses the frozen [0.3.0 stable-release plan](phase-14/stable-release-plan.md). Stable identity must first fail at
+the version, About classification, artifact-name and packaging seams, then pass with ProductVersion `0.3.0` and
+FileVersion `0.3.0.0`. PowerShell 7 and Windows PowerShell 5.1 tests must order public `0.3.0-rc.1` below `0.3.0`
+without `[version]`, then cover RC1-to-stable in-place upgrade, stable repair, stable-to-RC1 downgrade rejection and
+Ready-page cancellation with payload, registration, startup and user-data invariants.
+
+The complete local automated gate, two-axis review, formal ZIP／Setup inspection, i7-8700 exact-artifact host matrix and
+fresh Windows Sandbox matrix all run again for stable. Candidate source, ProductVersion and hashes are different
+evidence and do not transfer. The real public portable `0.2.0` data path and public RC1 Setup path are distinct
+predecessors and must both be represented. Real sign-out/sign-in startup may close only the Sandbox-impossible row on
+the persistent host. Preserve results in `phase-14/stable-release-smoke.md`, create `release/0.3` only after the exact
+stable source/artifacts pass, and keep `release/0.2` during Phase 14.
+
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.

@@ -560,3 +560,48 @@ The separately approved publication created GPG-signed annotated tag `v0.3.0-rc.
 [public GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1) on 2026-08-26. Its only
 assets are the verified ZIP and Setup; `v0.2.0` remains Stable／Latest and `release/0.2` remains the stable hotfix
 baseline.
+
+## Phase 14 — `0.3.0` stable promotion
+
+Phase 14 promotes the frozen `0.3.0-rc.1` feature set to stable `0.3.0`. It adds no product feature, does not reopen the
+Phase 11B Limit decision and does not mutate any published `v0.2.0` or `v0.3.0-rc.1` asset. See the
+[Phase 14 stable-release plan](phase-14/stable-release-plan.md).
+
+### Phase 14A — stable scope and gate definition
+
+Freeze stable identity, RC1-to-stable transition coverage, exact-artifact host／Sandbox evidence, release-branch
+retention and publication boundaries before changing version metadata.
+
+Status: planned on `codex/docs/phase-14-0.3-stable-plan`; complete only after the plan is reviewed and integrated into
+`develop`.
+
+Exit criteria:
+
+- Stable scope exactly matches `0.3.0-rc.1`; a blocker fix requires separate approval and regression coverage, while a
+  material behavior change requires another RC.
+- Stable ProductVersion is `0.3.0`, FileVersion remains `0.3.0.0`, and historical candidate evidence stays immutable.
+- Windows PowerShell 5.1 and PowerShell 7 transition coverage includes public RC1 Setup to stable, stable repair,
+  stable-to-RC1 downgrade protection and Ready-page cancellation.
+- Formal stable ZIP and Setup share one reviewed payload and receive independent clean-commit provenance, host and
+  Windows Sandbox evidence; no RC result transfers automatically.
+- `release/0.3` is created and retained only after the exact stable source/artifacts pass, while `release/0.2` and its
+  Worktree remain untouched during Phase 14.
+- Push, PR, merge, `main` synchronization, branch creation, tag, GitHub stable Release, Latest designation and public
+  uploads retain their documented authorization boundaries.
+
+### Phase 14B — stable implementation and validation
+
+After separate approval, change only stable identity, transition automation and release documentation, run the complete
+local gate and two-axis review, then create and validate one provenance-clean `0.3.0` ZIP／Setup pair on the host and a
+fresh Windows Sandbox. Record results in `docs/phase-14/stable-release-smoke.md` without rebuilding the artifact.
+
+Status: not started.
+
+### Phase 14C — integration and stable publication
+
+After Phase 14B passes and receives explicit remote-operation approval, establish the retained `release/0.3` baseline,
+integrate the stable change through `develop` and `main`, then separately create the signed annotated `v0.3.0` tag and
+GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve all older public Release assets and keep
+`release/0.2` unless a later explicit maintenance decision authorizes otherwise.
+
+Status: not started.
