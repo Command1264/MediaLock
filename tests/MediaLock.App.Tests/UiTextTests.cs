@@ -33,6 +33,22 @@ public sealed class UiTextTests
     }
 
     [Theory]
+    [InlineData(UiLanguagePreference.EnglishUnitedStates, "apply immediately after you save", "restarts")]
+    [InlineData(UiLanguagePreference.TraditionalChinese, "儲存後立即套用", "重新啟動後套用")]
+    public void RoutingHelpDescribesImmediateSettingsSynchronization(
+        string language,
+        string expected,
+        string obsolete)
+    {
+        UiText.Apply(language);
+
+        var routingHelp = UiText.Get("Settings_RoutingHelp");
+
+        Assert.Contains(expected, routingHelp, StringComparison.Ordinal);
+        Assert.DoesNotContain(obsolete, routingHelp, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData(UiLanguagePreference.EnglishUnitedStates, "zh-TW", "en-US")]
     [InlineData(UiLanguagePreference.TraditionalChinese, "en-US", "zh-TW")]
     [InlineData(UiLanguagePreference.System, "zh-HK", "zh-TW")]

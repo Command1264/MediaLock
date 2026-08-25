@@ -104,7 +104,7 @@
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>Recovery timeout in seconds</value></data>
   <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>Enter a finite number from 0 to 300.</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>Fallback policy</value></data>
-  <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply after Media Lock restarts. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
+  <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply immediately after you save. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>Application Priority Rules</value></data>
   <data name="Settings_PriorityRulesHelp" xml:space="preserve"><value>Add source applications from the current media-session list. Rules are evaluated from top to bottom; disabled rules are skipped.</value></data>
   <data name="Settings_Add" xml:space="preserve"><value>Add</value></data>
