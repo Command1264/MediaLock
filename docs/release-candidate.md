@@ -2,14 +2,14 @@
 
 ## Scope and release status
 
-The release under validation is `0.3.0-rc.1`, targeting `win-x64` as a compressed self-contained single-file WPF
+The published Prerelease is `0.3.0-rc.1`, targeting `win-x64` as a compressed self-contained single-file WPF
 application. It consolidates the completed one-way Playback State Lock, per-user Inno Setup package and Phase 12B
 publish profile without adding another product feature. Volume, customizable shortcuts, Windows Media Surface Mirror
 production integration and browser integration remain outside this release.
 
-The published `v0.2.0` assets remain frozen and portable-only. The candidate adds an unpublished per-user installer
-beside its portable ZIP. Re-running the command with version `0.2.0` is development evidence only and must not mutate
-or be attached to the existing GitHub Release.
+The published `v0.2.0` assets remain frozen and portable-only. The candidate publishes a per-user installer beside its
+portable ZIP while leaving `v0.2.0` Stable／Latest. Re-running the command with version `0.2.0` is development evidence
+only and must not mutate or be attached to the existing GitHub Release.
 
 The release is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
 SmartScreen warnings. Only continue with an artifact whose SHA-256 matches a trusted build. Phase 11／12 development
@@ -168,10 +168,10 @@ routine rollback. If login startup was enabled, disable it from the running rele
 or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
 Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
-approval after all release gates pass. Under the current candidate policy, a later GitHub Prerelease uploads only ZIP
-and Setup and lists both SHA-256 values in its body. Manifest and standalone checksum files remain trusted local
-provenance evidence. A candidate must not be designated Latest. The published stable `v0.2.0` Release and its retained
-`release/0.2` hotfix baseline remain unchanged.
+approval after all release gates pass. That approval published `v0.3.0-rc.1` on 2026-08-26 as a GitHub Prerelease with
+only ZIP and Setup, and listed both SHA-256 values in its body. Manifest and standalone checksum files remain trusted
+local provenance evidence. The candidate is not Latest; published stable `v0.2.0` and its retained `release/0.2`
+hotfix baseline remain unchanged.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md), and `0.2.0-rc.2` evidence is preserved in

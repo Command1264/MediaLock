@@ -550,9 +550,13 @@ No `release/0.3` branch is created for the prerelease. Create and retain that lo
 verified `0.3.0` stable release is ready. Push, PR, merge, tag, GitHub Prerelease and public upload follow their normal
 separate authorization boundaries.
 
-Status: validation in progress. Product metadata targets `0.3.0-rc.1`／`0.3.0.0`; the PowerShell 5.1-compatible
-installer gate selects explicitly named stable／prerelease artifacts without `[version]`. The complete automated gate
-and review passed, and clean source commit `25690bf138342cdf79ee7b19a4d2e4080e15e38a` produced independently matching
-ZIP／Setup／payload identities. Candidate release notes, installation guidance, runbook and exact identity are recorded
-in the [Phase 13B packaged validation](phase-13/release-candidate-smoke.md). Host and Windows Sandbox evidence remain
-pending; no remote publication has started.
+Status: complete. Product metadata targets `0.3.0-rc.1`／`0.3.0.0`; the PowerShell 5.1-compatible installer gate selects
+explicitly named stable／prerelease artifacts without `[version]`. The complete 351-test gate, review, exact-artifact
+host smoke and Windows Sandbox matrix passed. Clean source commit
+`d0fe5583e91204fe98a79b14ae0327e5120af54e` produced the independently matching ZIP／Setup／payload identities recorded
+in the [Phase 13B packaged validation](phase-13/release-candidate-smoke.md).
+
+The separately approved publication created GPG-signed annotated tag `v0.3.0-rc.1` at that source commit and a
+[public GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1) on 2026-08-26. Its only
+assets are the verified ZIP and Setup; `v0.2.0` remains Stable／Latest and `release/0.2` remains the stable hotfix
+baseline.

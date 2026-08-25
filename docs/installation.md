@@ -1,9 +1,8 @@
 # 下載、安裝、更新與移除
 
-Media Lock 目前以 unsigned、portable `win-x64` ZIP 發布，沒有公開安裝程式，也不需要另外安裝 .NET Runtime。
-Phase 12A 的 per-user installer 已完成實作與驗證，但尚未加入公開 `0.2.0` Release；在 GitHub Release 明確
-列出 Setup 與其 SHA-256 以前，不要把測試用 Setup 當作正式下載。第一個公開候選 Setup 是正在驗證的
-`0.3.0-rc.1`；在正式發布以前仍不是使用者下載管道。
+Media Lock 以 unsigned `win-x64` 套件發布，不需要另外安裝 .NET Runtime。Stable／Latest `0.2.0` 提供
+portable ZIP；`0.3.0-rc.1` Prerelease 同時提供 portable ZIP 與 per-user Setup。只有 GitHub Release 明確
+列出且 SHA-256 相符的檔案才是正式下載，不要使用開發或測試用 Setup。
 
 ## 系統需求與限制
 
@@ -15,8 +14,11 @@ Phase 12A 的 per-user installer 已完成實作與驗證，但尚未加入公�
 ## 下載與驗證
 
 1. 從 [Media Lock 0.2.0 Stable Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 下載
-   `MediaLock-0.2.0-win-x64.zip`。後續版本請從 [Media Lock Releases](https://github.com/Command1264/MediaLock/releases)
-   選擇最新 Stable／Latest 版本；不要從不明鏡像下載。
+   `MediaLock-0.2.0-win-x64.zip`，或從
+   [Media Lock 0.3.0-rc.1 Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1)
+   下載該候選的 ZIP／Setup。後續版本請從
+   [Media Lock Releases](https://github.com/Command1264/MediaLock/releases) 選擇所需 Stable 或 Prerelease；
+   不要從不明鏡像下載。
 2. 在 PowerShell 將 `<version>` 換成實際版本，以實際檔名計算 SHA-256：
 
    ```powershell
@@ -29,6 +31,9 @@ Phase 12A 的 per-user installer 已完成實作與驗證，但尚未加入公�
 
 `0.2.0` 的 SHA-256 是
 `f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`。
+`0.3.0-rc.1` ZIP 的 SHA-256 是
+`bfcbc61998173c036ce1beb7574013920a906f6a01d2f1df1599791d24e29066`；Setup 的 SHA-256 是
+`0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3`。
 
 ## Portable ZIP 第一次執行
 
