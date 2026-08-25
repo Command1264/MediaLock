@@ -46,7 +46,9 @@ Status: passed on 2026-08-25 against exact source commit
 
 ## Local host smoke
 
-Status: in progress. Exact second replacement payload from source `d0fe558` launched as one process on the local host.
+Status: passed on Windows 11 Pro 25H2 build `26200.9168` x64, Intel Core i7-8700 and an ASUS ROG STRIX FLARE
+keyboard. The exact second replacement payload from source `d0fe558` launched as one process with Brave YouTube Music
+and ordinary Brave YouTube as named competing sources.
 The 2026-08-25 real sleep row passed: entering sleep turned Keep Playing Off; after wake YouTube Music remained paused,
 Priority Rules recovered, ordinary YouTube did not change, and the application neither remained Unavailable nor
 reported an error or crash. A subsequent Priority Rules YouTube Music reload entered Recovering, reacquired the target,
@@ -68,6 +70,11 @@ applied immediately, Windows language／theme were restored, About reported `0.3
 expired automatically. Close-to-Tray, Tray restore and Tray Exit passed. After Exit the process count was zero;
 settings and state parsed as JSON, one JSONL log contained zero invalid lines and zero Error／Critical entries, and the
 persisted language and theme were both `system`.
+Enabling startup persisted `true` and created an ordinally exact Registry command pointing to the candidate executable
+with `--startup`. Disabling it persisted `false`, removed the Registry value and remained unchecked after reopening
+Settings. Final Tray Exit left zero processes; settings, state and the single JSONL log remained valid with zero invalid
+or Error／Critical lines. No qualitative responsiveness regression was observed during the smoke; the quantitative
+Phase 12B benchmark was not repeated and no new performance claim is made.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
