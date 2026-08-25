@@ -399,6 +399,14 @@ Preserve the sanitized exact-commit result using the structure in
 [Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md); do not commit executables, extraction caches
 or machine-specific absolute paths.
 
+The accepted Phase 12B profile passed its i7-8700 host smoke and fresh Windows Sandbox gates on 2026-08-25. The
+Sandbox artifact was built from clean commit `e277736d2abb4586a37af2ef1f961c307d8a4243`; its manifest declared schema 3
+and `singleFileCompressed: true`. The transaction smoke verified hashes, installed payload identity, Start Menu and
+Installed apps registration, default startup behavior, owned／portable startup cleanup boundaries, user-data retention
+and uninstall cleanup. A separate fresh Sandbox launch reached a visible main window and retained one process after a
+second launch. See the exact sizes, digests, host results and explicitly skipped direct reboot A/B pair in the
+[Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md).
+
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.

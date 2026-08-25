@@ -96,14 +96,38 @@ Single-file compressed, milliseconds:
 - Component measurement separated .NET runtime, WPF managed/native, WinForms, WinRT projection and Media Lock payload;
   see [official-source research](../research/dotnet-wpf-publish-footprint.md).
 
-## Pending manual release gates
+## Host acceptance result
 
-The profile must not be described as ready to ship until these checks pass against the compressed executable:
+The compressed executable passed the 2026-08-25 host smoke on the same i7-8700 system:
 
-1. reboot-based first launch and immediate main-window interaction on this i7-8700 host;
-2. Light／Dark and English／Traditional Chinese／Windows language;
-3. Settings, Tray restore, second instance and Exit;
-4. GSMTC metadata, artwork, timeline and physical media keys;
-5. Lock session／app, Priority Rules, Windows Auto, Recovery and competing-source isolation;
-6. lock／unlock, sleep／wake and login startup; and
-7. clean Windows Sandbox install, launch, upgrade／uninstall and retained data.
+- Main window, Settings, Light／Dark, English／Traditional Chinese／Windows language and the minimum layout remained
+  usable. Startup did not feel materially slower to the tester.
+- Play／Pause, Next, Previous and Stop routed to the locked YouTube Music source while the competing ordinary YouTube
+  source remained unchanged.
+- Recovery, Tray restore, second-instance activation and Exit passed. One JSONL log contained 5,756 valid entries and
+  no Error／Critical entry.
+- Lock／unlock and sleep／wake each retained routing isolation. Sleep／wake entered Recovering and returned to the
+  selected source without remaining Unavailable.
+- A single reboot observation was completed. A second reboot solely to create a direct baseline/candidate A/B pair was
+  deliberately skipped; the repeatable 15 + 15 sample benchmark above remains the quantitative comparison.
+
+## Clean Windows Sandbox result
+
+A fresh Windows 11 Sandbox validated a clean artifact built from evidence-recording base commit
+`e277736d2abb4586a37af2ef1f961c307d8a4243`. This documentation-only descendant has the same product payload as the
+measured implementation commit. The ignored evidence files were not committed as release assets.
+
+- ZIP SHA-256: `9c42790b59370f0a01c0cd8bd7806c56788261387670094b9c69d3d92437dc66`
+- Setup SHA-256: `675d14d811caa9648d2e3fda510fe2e5cf0bf5d6ecdb069dda039853e1d9f22d`
+- Manifest schema 3, `singleFileCompressed: true`, clean source and unsigned status all matched.
+- Silent current-user install created the exact payload, Start Menu shortcut and one Installed apps entry without
+  enabling login startup by default.
+- A separate fresh launch smoke reached a visible main window; launching the installed executable again retained one
+  process at the expected installed path. The initial `state.json` parsed successfully.
+- Uninstall removed the application, shortcut, owned startup value and process while retaining user data. A startup
+  value owned by a portable copy was preserved.
+
+The Phase 12A upgrade／blocked-downgrade and cancellation matrix was not repeated because Phase 12B changes only the
+published bundle compression and does not change the Inno transaction or migration logic. Its clean install, launch
+and uninstall paths were repeated against the exact compressed payload. Host and Sandbox evidence therefore close the
+Phase 12B acceptance scope without claiming a new signed or public artifact.
