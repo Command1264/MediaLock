@@ -54,7 +54,7 @@ $isolatedSourceRoot = Join-Path $temporaryRoot 'source'
 $artifactOutputRoot = Join-Path $temporaryRoot 'output'
 $expandedRoot = Join-Path $temporaryRoot 'expanded'
 $dirtyMarkerPath = Join-Path $isolatedSourceRoot '.MediaLock-Packaging-Test.tmp'
-$version = '0.2.0'
+$version = '0.3.0-rc.1'
 $artifactStem = "MediaLock-$version-win-x64"
 $installerStem = "MediaLock-Setup-$version-win-x64"
 $isolatedWorktreeCreated = $false
@@ -83,7 +83,7 @@ try {
     Assert-VersionReachesDirtySourceGuard `
         $publishScript $version $artifactOutputRoot $InnoCompilerPath
     Assert-VersionReachesDirtySourceGuard `
-        $publishScript '0.2.0-rc.99' $artifactOutputRoot $InnoCompilerPath
+        $publishScript '0.3.0-rc.99' $artifactOutputRoot $InnoCompilerPath
 
     $missingCompilerRejected = $false
     try {
@@ -177,7 +177,7 @@ try {
     Assert-Condition ($archiveFiles.Count -eq 1) 'Release archive must contain exactly one file.'
     Assert-Condition ($archiveFiles[0].Name -eq 'MediaLock.exe') 'Release archive must contain MediaLock.exe.'
     Assert-Condition ($archiveFiles[0].VersionInfo.ProductVersion -eq $version) "Executable ProductVersion must be $version."
-    Assert-Condition ($archiveFiles[0].VersionInfo.FileVersion -eq '0.2.0.0') 'Executable FileVersion must be 0.2.0.0.'
+    Assert-Condition ($archiveFiles[0].VersionInfo.FileVersion -eq '0.3.0.0') 'Executable FileVersion must be 0.3.0.0.'
     Assert-Condition ($manifest.executable.fileName -eq 'MediaLock.exe') `
         'Manifest payload name is incorrect.'
     Assert-Condition ($manifest.executable.signed -eq $false) `
@@ -186,14 +186,14 @@ try {
         (Get-FileHash -LiteralPath $archiveFiles[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()) `
         'Manifest payload SHA-256 does not match the portable executable.'
 
-    $rcVersion = '0.2.0-rc.99'
+    $rcVersion = '0.3.0-rc.99'
     $rcInstallerStem = "MediaLock-Setup-$rcVersion-win-x64-test"
     $rcInstallerPath = Join-Path $artifactOutputRoot "$rcInstallerStem.exe"
     $installerScriptPath = Join-Path $isolatedSourceRoot 'installer\MediaLock.iss'
     & $InnoCompilerPath `
         '/Qp' `
         "/DAppVersion=$rcVersion" `
-        '/DBinaryVersion=0.2.0.0' `
+        '/DBinaryVersion=0.3.0.0' `
         "/DPayloadPath=$($archiveFiles[0].FullName)" `
         "/DOutputDirectory=$artifactOutputRoot" `
         "/DOutputBaseName=$rcInstallerStem" `
