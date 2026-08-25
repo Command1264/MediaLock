@@ -145,7 +145,8 @@ function ConvertTo-FootprintMarkdown {
     foreach ($variantResult in $Report.Variants) {
         $markdown += @('', "### $($variantResult.Name)", '')
         $markdown += @(ConvertTo-FootprintSampleSection -Label 'Fresh-cache' -Statistics $variantResult.ColdStart)
-        $markdown += @('', @(ConvertTo-FootprintSampleSection -Label 'Warm-cache' -Statistics $variantResult.WarmStart))
+        $markdown += ''
+        $markdown += @(ConvertTo-FootprintSampleSection -Label 'Warm-cache' -Statistics $variantResult.WarmStart)
     }
 
     $markdown += @(

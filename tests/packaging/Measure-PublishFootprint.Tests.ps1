@@ -44,6 +44,20 @@ $measuredStatistics = [pscustomobject]@{
         }
     )
 }
+$warmStatistics = [pscustomobject]@{
+    SampleCount = 1
+    MedianMilliseconds = 20.5
+    P95Milliseconds = 22.25
+    MinimumMilliseconds = 19.75
+    MaximumMilliseconds = 22.25
+    Samples = @(
+        [pscustomobject]@{
+            Iteration = 1
+            ElapsedMilliseconds = 20.5
+            ExtractionCacheBytes = 333
+        }
+    )
+}
 $reportFixture = [pscustomobject]@{
     DotnetSdkVersion = '10.0.test'
     InnoSetupVersion = '6.7.3'
@@ -73,7 +87,7 @@ $reportFixture = [pscustomobject]@{
             ArchiveBytes = 800
             InstallerBytes = 700
             ColdStart = $measuredStatistics
-            WarmStart = $measuredStatistics
+            WarmStart = $warmStatistics
         },
         [pscustomobject]@{
             Name = 'skipped'
@@ -99,17 +113,21 @@ foreach ($expectedMarkdownContent in @(
     '- Logical processors: 8',
     '- Total physical memory bytes: 123456',
     '- Architecture: X64',
-    '| measured | 1000 | 800 | 700 | 222 | 10.5 ms | 12.25／9.75／12.25 ms | 10.5 ms | 12.25／9.75／12.25 ms |',
+    '| measured | 1000 | 800 | 700 | 333 | 10.5 ms | 12.25／9.75／12.25 ms | 20.5 ms | 22.25／19.75／22.25 ms |',
     '| skipped | 900 | 750 | Skipped | Skipped | Skipped | Skipped | Skipped | Skipped |',
     '- Setup reduction: Skipped',
     '- Fresh-cache median delta: 1.5 ms (2.5%)',
     '- Warm-cache median delta: Skipped',
     '## Raw startup samples',
-    'iteration=1, elapsed=10.5 ms, extraction-cache=222 bytes'
+    '- Warm-cache samples:',
+    'iteration=1, elapsed=10.5 ms, extraction-cache=222 bytes',
+    'iteration=1, elapsed=20.5 ms, extraction-cache=333 bytes'
 )) {
     Assert-Condition ($markdownFixture.Contains($expectedMarkdownContent)) `
         "Rendered Markdown did not include: $expectedMarkdownContent"
 }
+Assert-Condition (-not $markdownFixture.Contains('System.Object[]')) `
+    'Rendered Markdown must flatten warm sample lines instead of stringifying a nested array.'
 
 $publishProfile = [xml](Get-Content -LiteralPath $publishProfilePath -Raw)
 $compressionSetting =
