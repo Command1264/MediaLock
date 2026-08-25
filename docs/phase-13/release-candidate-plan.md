@@ -7,6 +7,9 @@ package and accepted publish-footprint optimization. Phase 13A defines the scope
 the version change, script and documentation updates, formal artifact build and exact-artifact validation after
 separate approval.
 
+Phase 13B implementation was approved on 2026-08-25. Push, PR, merge, tag, GitHub Prerelease and public artifact
+upload remain separate remote operations.
+
 The public stable `0.2.0` Release and retained `release/0.2` branch remain frozen. Candidate work starts from `develop`;
 it does not create `release/0.3`, because a prerelease is not yet the stable hotfix baseline.
 
@@ -68,6 +71,7 @@ dotnet format MediaLock.sln --verify-no-changes --no-restore
 dotnet test MediaLock.sln --configuration Release --no-restore
 dotnet build MediaLock.sln --configuration Release --no-restore
 & .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
+& .\tests\packaging\InstallerArtifactSelection.Tests.ps1
 & .\tests\packaging\Measure-PublishFootprint.Tests.ps1
 ```
 

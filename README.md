@@ -10,7 +10,8 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
 `0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
-Stable／Latest 版本。
+Stable／Latest 版本。原始碼目前準備未公開的 `0.3.0-rc.1`，加入單向 Keep Playing、per-user Setup 與
+壓縮後的 self-contained single-file payload；Windows 原生媒體卡片同步仍不在產品承諾內。
 
 已驗證的基礎能力包括：
 
@@ -43,6 +44,9 @@ dotnet run --project src\MediaLock.App\MediaLock.App.csproj --configuration Rele
 close-to-tray、全域媒體鍵攔截與目前使用者的 Windows 登入啟動，也可設定 Recovery timeout、Fallback Policy 與
 Priority Rules，並可選擇跟隨 Windows、英文或繁體中文介面，以及跟隨 Windows、淺色或深色主題。
 成功儲存後會立即切換語言與外觀。
+主畫面的 Playback State Lock 可在目標已播放時啟用 Keep Playing；外部 Pause 會由明確 Play 修正。
+Media Lock 自己的 Pause／Play-Pause／Stop、Windows 鎖定畫面 Pause／Stop，或設定次數內的重複外部暫停
+都能解除保護，避免無法有意停止播放。此政策只存在於目前程序，不會在登入或重新啟動時自動恢復。
 主畫面的目前媒體目標會顯示該實際路由 Session 的可用封面、播放時間與進度；封面缺失或無法解碼時
 使用中性 placeholder，不影響媒體鍵路由。支援 Seek 的 Session 可直接點擊或拖曳進度條，放開時只
 提交一次跳轉。
@@ -82,7 +86,7 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 官方 Inno Setup `6.7.3`；這只是 build-only 工具，使用者不需要安裝它。
 
 ```powershell
-& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.2.0
+& .\eng\Publish-ReleaseCandidate.ps1 -Version 0.3.0-rc.1
 ```
 
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
@@ -90,10 +94,12 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 `%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。目前公開的
 `0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
 Windows Sandbox gate，仍然只發布既有 portable ZIP；Phase 12A installer 已完成實作與驗證，但尚未公開。
-第一個公開候選 Setup 規劃於 `0.3.0-rc.1`，在正式發布以前仍不是使用者下載管道。完整驗證、證據與回復流程見
+第一個公開候選 Setup 規劃於 `0.3.0-rc.1`，目前仍在本機驗證，在正式發布以前不是使用者下載管道。
+完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
-[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)。正式版透過
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)，目前候選草稿見
+[0.3.0-rc.1 release notes](docs/releases/0.3.0-rc.1.md)。正式版透過
 [GitHub Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 公開 ZIP；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 

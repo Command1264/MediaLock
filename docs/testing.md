@@ -214,15 +214,18 @@ upgrade, downgrade or full runtime matrix.
 gate. It consumes only a read-only five-file artifact set and writes a JSON result to a separately mapped directory;
 it never treats an installed executable as evidence of a matching payload without independently hashing it.
 
-`tests/packaging/WindowsSandbox-InstallerUpgradeSmoke.ps1` consumes two test-only stable artifact sets. It installs the
-older version, preserves an exact installed-path startup command and user-data marker, upgrades in place, then requires
-the older installer to be rejected with Inno exit code 7. It verifies one uninstall entry and shortcut, the newer
-payload/version, retained data and the unchanged startup command after both operations.
+`tests/packaging/WindowsSandbox-InstallerUpgradeSmoke.ps1` requires explicit `OlderVersion` and `NewerVersion`
+parameters and selects exactly those manifests even when the artifact root contains other versions. Its shared
+PowerShell 5.1-compatible release parser orders stable and `-rc.N` versions without a `[version]` cast. The script
+installs the older version, preserves an exact installed-path startup command and user-data marker, upgrades in place,
+then requires the older installer to be rejected with Inno exit code 7. It verifies one uninstall entry and shortcut,
+the newer payload/version, retained data and the unchanged startup command after both operations.
 
-`tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` has explicit `Prepare` and `Verify` phases around a
-visible installer action. The recorded gate cancels on the Ready page before installation begins, requires exit code
-2 and proves the existing version, registration, startup command and user data remain unchanged. It does not claim
-that cancellation during file extraction was observed or that Inno provides MSI-level transaction rollback.
+`tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` uses the same explicit version-selection seam and has
+`Prepare` and `Verify` phases around a visible installer action. The recorded gate cancels on the Ready page before
+installation begins, requires exit code 2 and proves the existing version, registration, startup command and user data
+remain unchanged. It does not claim that cancellation during file extraction was observed or that Inno provides
+MSI-level transaction rollback.
 
 The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
 `6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched
@@ -408,11 +411,11 @@ second launch. See the exact sizes, digests, host results and explicitly skipped
 [Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md).
 
 Phase 13 uses the frozen [0.3.0-rc.1 release-candidate plan](phase-13/release-candidate-plan.md). Before the candidate
-can consume the installer transition gate, extend `WindowsSandbox-InstallerUpgradeSmoke.ps1` to accept an explicitly
-named stable predecessor and prerelease successor; its current two-stable-manifest discovery and `[version]` ordering
-are not valid evidence for `0.3.0-rc.1`. Candidate evidence must cover both the exact public `0.2.0` compatibility path
-and test-only automated version transitions. The formal ZIP and Setup, host checks and clean Windows Sandbox checks
-must all identify one reviewed source commit and independently matching hashes.
+can consume the installer transition gate, the PowerShell 7 and Windows PowerShell 5.1 contract test must prove that
+both Sandbox scripts accept an explicitly named stable predecessor and prerelease successor and reject invalid or
+ambiguous pairs. Candidate evidence covers both the exact public portable `0.2.0` compatibility path and generated
+installer-to-installer version transitions. The formal ZIP and Setup, host checks and clean Windows Sandbox checks must
+all identify one reviewed source commit and independently matching hashes.
 
 Because GitHub Actions capacity is unavailable, Phase 13B requires the full local automated gate. It does not infer a
 pass from earlier Phase 11／12 commits, and it does not publish until separately authorized. Public candidate assets
