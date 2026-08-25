@@ -15,15 +15,14 @@ Desktop Runtime、WPF、WinForms、WinRT projection、native runtime libraries �
 
 目前最重要的量測結果是：
 
-- `EnableCompressionInSingleFile=true` 把 EXE 從 `200,339,490` bytes 降至 `82,314,539` bytes，減少
+- `EnableCompressionInSingleFile=true` 把 EXE 從 `200,339,490` bytes 降至 `82,314,522` bytes，減少
   `58.91%`。
-- 相同設定只把 ZIP 從 `78,687,783` bytes 降至 `76,499,753` bytes，減少 `2.78%`。
-- Inno Setup 反而從 `56,031,735` bytes 增至 `76,910,921` bytes，增加 `37.26%`。原因是內層壓縮後，
+- 相同設定只把 ZIP 從 `78,687,769` bytes 降至 `76,499,762` bytes，減少 `2.78%`。
+- Inno Setup 反而從 `56,041,226` bytes 增至 `76,911,021` bytes，增加 `37.24%`。原因是內層壓縮後，
   外層 LZMA2 不再能對原始 assemblies 取得相同壓縮率。
-- 在 Intel Core i7-8700 的最終 15+15 次取樣中，壓縮版 fresh-extraction-cache median 慢 `73.46 ms`
-  （`4.32%`），warm-cache median 慢 `38.59 ms`（`2.29%`）。啟動成本不大，但下載用 Setup 明顯變大，
-  因此不能只憑裸 EXE
-  尺寸決定正式設定。
+- 在 Intel Core i7-8700 的 exact clean-commit 15+15 次取樣中，壓縮版 fresh-extraction-cache median 慢
+  `47.45 ms`（`2.86%`），warm-cache median 慢 `32.84 ms`（`2.04%`）。啟動成本不大，但下載用 Setup 明顯變大，
+  因此不能只憑裸 EXE 尺寸決定正式設定。
 - 僅保留 `zh-Hant;zh-TW` satellite resources、但不啟用 single-file 壓縮時，EXE、ZIP、Setup 分別減少
   `9.11%`、`6.98%`、`3.46%`。這是較均衡但收益較小的候選，仍須通過語言 fallback 實測。
 
@@ -84,8 +83,8 @@ WinForms 類別涵蓋 `System.Windows.Forms*`、`System.Drawing*` 與 `Accessibi
 
 | 變體 | EXE | ZIP | Setup | Fresh median／p95 | Warm median／p95 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| baseline | 200,339,490 | 78,687,783 | 56,031,735 | 1,701.73／1,841.25 ms | 1,685.69／1,848.00 ms |
-| single-file compressed | 82,314,539 | 76,499,753 | 76,910,921 | 1,775.19／1,920.84 ms | 1,724.28／1,818.49 ms |
+| baseline | 200,339,490 | 78,687,769 | 56,041,226 | 1,658.47／1,710.25 ms | 1,611.87／1,685.45 ms |
+| single-file compressed | 82,314,522 | 76,499,762 | 76,911,021 | 1,705.92／1,919.01 ms | 1,644.71／1,735.57 ms |
 
 這不是清除 Windows 檔案快取或重新開機後的真正 cold boot benchmark。正式採用前仍須在同一台
 i7-8700 上重新開機，各執行 baseline 與 candidate，記錄從啟動到主視窗可操作的人工 smoke；自動結果只用於

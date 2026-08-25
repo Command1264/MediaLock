@@ -491,7 +491,7 @@ Status: implementation and final validation in progress. The repeatable host ben
 single-file compression and optional supported-locale candidates while preserving self-contained, single-file,
 native-self-extract, trimming-off and ReadyToRun-off constraints. On the i7-8700 reference host, the first compression
 run reduced the installed／portable EXE by 58.91% with final 15-sample fresh- and warm-cache median startup regressions
-of 4.32% and 2.29%, but increased the Inno Setup download by 37.26%. The accepted candidate enables single-file
+of 2.86% and 2.04%, but increased the Inno Setup download by 37.24%. The accepted candidate enables single-file
 compression while retaining all language resources; the manifest records this explicitly. Supported-locale filtering
 reduced EXE, ZIP and Setup by 9.11%, 6.98% and 3.46%, but remains test-only rather than shipping in this phase. See the
 [Phase 12B plan](phase-12/footprint-optimization-plan.md) and

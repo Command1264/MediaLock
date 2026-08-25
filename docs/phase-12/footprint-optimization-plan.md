@@ -52,8 +52,8 @@ A candidate is eligible only when all conditions hold on the i7-8700 reference h
 - the main window remains responsive immediately after measurement readiness; and
 - a reboot-based manual comparison reports no material interaction delay.
 
-The final 15-sample single-file-compression run passed these startup thresholds: fresh median `+73.46 ms`
-（`+4.32%`）and warm median `+38.59 ms`（`+2.29%`）.
+The exact clean-commit 15-sample single-file-compression run passed these startup thresholds: fresh median `+47.45 ms`
+（`+2.86%`）and warm median `+32.84 ms`（`+2.04%`）.
 
 ### Footprint
 
@@ -106,7 +106,7 @@ The first measurement found:
 
 | Candidate | EXE | ZIP | Setup | Startup |
 | --- | ---: | ---: | ---: | --- |
-| single-file compression | -58.91% | -2.78% | **+37.26%** | fresh +4.32%; warm +2.29% |
+| single-file compression | -58.91% | -2.78% | **+37.24%** | fresh +2.86%; warm +2.04% |
 | supported locales | -9.11% | -6.98% | -3.46% | not expected to decompress; still requires final measurement |
 | locales + compression | -61.95% | -10.49% | **+26.64%** | requires final measurement |
 
