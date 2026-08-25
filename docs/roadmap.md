@@ -462,11 +462,12 @@ produce ZIP and Setup from one payload and protect startup cleanup from deleting
 silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
 default user-data retention. A clean Windows Sandbox transaction gate also passed for commit
 `6233da8bab35e6fcde0858d1fa0a58fe5babfba6`, including payload/digest matching, default-disabled startup, owned versus
-portable startup cleanup and retained user data. Indexed Search, full runtime/media behavior, actual login restart,
-upgrade, downgrade and controlled cancellation gates remain. The same artifact's visible Sandbox smoke passed the
+portable startup cleanup and retained user data. The same artifact's visible Sandbox smoke passed the
 ordinary-user wizard without UAC, fixed destination, cold launch without a separate .NET prompt, Settings, search-panel
 shortcut launch, single-instance restore and Tray restore. Indexed keyword search remains unverified because Sandbox
-disabled its search index. MSIX is deferred while
+disabled its search index. The subsequent host/manual gate passed Windows Search, single-instance and Tray restore,
+actual login startup, Play/Pause, Next/Previous, Recovery, competing-source isolation, uninstall and retained user
+data without a reported error or crash. Upgrade, downgrade and controlled cancellation remain. MSIX is deferred while
 direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
 enterprise deployment or repair becomes a concrete requirement. See the
 [Phase 12A plan](phase-12/installable-package-plan.md),

@@ -227,6 +227,12 @@ in the Windows search panel and restored the existing process, and exposed a not
 window on double-click. Windows Sandbox reported that search indexing was disabled, so indexed keyword search remains
 a host/manual gate rather than an inferred pass from the visible shortcut.
 
+The user completed that host/manual gate on 2026-08-25 with the same installer payload. Windows Search discovery,
+single-process launch, Tray restore, startup registration, actual sign-out/sign-in startup, Play/Pause, Next,
+Previous and Recovery all passed. The competing ordinary YouTube source remained unchanged. Uninstall completed,
+user data remained available, and no error or crash was reported. Upgrade, downgrade and controlled cancellation are
+the remaining Phase 12A package-behavior gates.
+
 ### Integration tests
 
 Cover:
