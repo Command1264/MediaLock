@@ -5,11 +5,11 @@ produced after its source commit is reviewed and clean.
 
 ## Release identity
 
-Status: replacement provenance-clean local formal artifact created after the approved settings-synchronization stable
-blocker fix; the full host and Sandbox matrices remain pending.
+Status: final provenance-clean local formal artifact created after the approved settings-synchronization stable
+blocker and stale Settings copy fixes; the fresh Windows Sandbox matrix remains pending.
 
 - Version: `0.3.0`.
-- Source commit: `cb1817e225f888d6397ce61c4a398b6db1c6018c`.
+- Source commit: `7273165234a418d1334fc2075adc7e876db89db2`.
 - Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
@@ -18,12 +18,12 @@ blocker fix; the full host and Sandbox matrices remain pending.
 - Signed: `false`; payload and Setup both report Authenticode `NotSigned`.
 - Archive: `MediaLock-0.3.0-win-x64.zip`.
 - Installer: `MediaLock-Setup-0.3.0-win-x64.exe`.
-- Archive SHA-256: `bd55f3c05983432a448f399ca1c013f421b592b6f27583150daa198cff070367`.
-- Installer SHA-256: `8b0fd26697d5a6a25bc2f7f2ed1c19dc33f0ab4485a6ef3c7be31d309b263384`.
-- Shared payload SHA-256: `9c65c9c080201f3770d82dd52316facc07105906ac11a3ece89993cb72b69a56`.
-- Archive size: 76,501,780 bytes.
-- Installer size: 76,911,884 bytes.
-- Payload size: 82,316,705 bytes.
+- Archive SHA-256: `c85869fe7232275a4c651447e8db51614bc536a9cc7cdf5d0011fb50481d557e`.
+- Installer SHA-256: `dc610ed0d6c7b0f09f94e98443652f3a75bf8ac16348ed37a872a71bf731668b`.
+- Shared payload SHA-256: `cff2031f712731123622416e637fac2695192bbcf78d112e2e43c9527ce4bd5b`.
+- Archive size: 76,501,806 bytes.
+- Installer size: 76,912,550 bytes.
+- Payload size: 82,316,731 bytes.
 
 Independent inspection matched both container manifests and checksum files, matched the shared payload hash and found
 exactly one extracted `MediaLock.exe`. Payload and Setup report ProductVersion `0.3.0`, FileVersion `0.3.0.0` and
@@ -78,9 +78,21 @@ The complete automated gate was repeated successfully on replacement artifact-so
 - the artifact-selection contract passed in PowerShell 7 and Windows PowerShell 5.1; and
 - Markdown relative-link validation plus `git diff --check` passed.
 
+Exact-host verification then found stale bilingual Settings copy which still claimed Recovery and Priority Rule
+changes required restart even though the runtime contract now applies them on Save. Commit
+`7273165234a418d1334fc2075adc7e876db89db2` updates both resources and adds a bilingual contract test which rejects
+the obsolete restart wording. A pre-existing Seek test was also constrained to its actual one-tick precision instead
+of requiring impossible sub-tick equality. The complete Release gate was repeated before rebuilding the formal
+artifacts:
+
+- 362/362 Release tests passed;
+- Release build completed with zero warnings and zero errors;
+- format verification, the publish packaging contract and `git diff --check` passed; and
+- the formal ZIP and Setup were built from a clean worktree at the exact source commit recorded above.
+
 ## Exact-artifact host gate
 
-Status: replacement-artifact blocker regression passed; the remaining full host matrix is pending.
+Status: blocker regression, full functional host matrix and final exact-artifact smoke passed.
 
 The exact ZIP payload from `cb1817e225f888d6397ce61c4a398b6db1c6018c` launched as one process. With Priority
 Rules already active and Brave PWA initially first, Settings moved Chrome to the first rule and saved. Without restart
@@ -88,9 +100,20 @@ or reselecting Priority Rules, the background accessibility projection immediate
 `Chrome — 回不去的夏天`. This closes the reported runtime settings-synchronization blocker without relying on the
 persisted JSON alone.
 
-Use the formal ZIP/Setup and record the full Phase 14 plan matrix: identity, launch/single instance, localization/theme,
-Settings/diagnostics, four Routing Modes and controls, Playback State Lock safety/override paths, competing-source
-isolation, Recovery, lock/unlock, sleep/resume, actual login startup, Tray and explicit Exit with valid user/log JSON.
+The same replacement candidate completed the four Routing Modes, Play/Pause/Next/Previous/Stop, Seek, competing
+source isolation, Playback State Lock external-pause recovery and three-pause escape, Recovery, lock/unlock and
+sleep/resume checks. Sleep/resume intentionally disables Keep Playing and does not restart audio without user input.
+Close-to-Tray, second-instance activation and Tray Exit also passed. No Error/Critical log entry or crash was found.
+
+The final exact ZIP payload from `7273165234a418d1334fc2075adc7e876db89db2` then cold-started as one process,
+displayed stable version `0.3.0`, and exposed the corrected Traditional Chinese Settings text stating that Recovery
+and Priority Rule changes apply immediately after Save. The English wording is covered by the same bilingual resource
+contract. Cancelling the inspection preserved `language=system`, `theme=dark` and disabled login startup. A second
+launch retained one process, closing the main window retained the Tray process, and relaunching restored the same
+window. The final process was then stopped after inspection; no product behavior changed after the functional host
+matrix other than the verified localized copy.
+
+The remaining release blocker is the fresh Windows Sandbox matrix below, using only the final formal ZIP and Setup.
 
 ## Windows Sandbox gate
 
