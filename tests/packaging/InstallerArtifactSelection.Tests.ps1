@@ -102,6 +102,17 @@ try {
     Assert-Condition ($pair[1].Manifest.version -eq '0.3.0-rc.1') `
         'The explicitly selected prerelease artifact was not second.'
 
+    $stablePair = @(Get-MediaLockArtifactPair `
+        -ArtifactRoot $temporaryRoot `
+        -OlderVersion '0.3.0-rc.1' `
+        -NewerVersion '0.3.0')
+    Assert-Condition ($stablePair.Count -eq 2) `
+        'The prerelease-to-stable pair must contain exactly two artifacts.'
+    Assert-Condition ($stablePair[0].Manifest.version -eq '0.3.0-rc.1') `
+        'The explicitly selected release candidate was not first.'
+    Assert-Condition ($stablePair[1].Manifest.version -eq '0.3.0') `
+        'The explicitly selected stable release was not second.'
+
     Assert-Condition `
         ((Compare-MediaLockReleaseVersion -Left '0.3.0-rc.1' -Right '0.3.0') -lt 0) `
         'A release candidate must sort before the stable release with the same base version.'
