@@ -165,6 +165,9 @@ public sealed record SessionFingerprint(
             proximity);
     }
 
+    public bool IsAcceptableSuccessor(MediaSessionSnapshot candidate) =>
+        Score(candidate) is { IsAcceptable: true };
+
     internal bool CanRepresent(MediaSessionSnapshot candidate) =>
         string.Equals(
             Descriptor.SourceAppUserModelId,

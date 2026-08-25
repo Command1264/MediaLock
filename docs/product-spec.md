@@ -261,6 +261,10 @@ Armed Playback Target while the workstation is locked, or in the first fresh obs
 clears Keep Playing without sending Play. Locking and unlocking without changing playback preserves the policy; the
 post-unlock GSMTC refresh closes this attribution window before later desktop observations are evaluated normally.
 
+Windows Power Suspend is a separate safety boundary. Entering sleep turns Keep Playing Off immediately. Resume may
+reacquire the catalog and routing target, but it never restarts audio or automatically re-arms the policy. The user may
+start playback and explicitly enable Keep Playing again after wake.
+
 An enabled-by-default repeated-pause override gives a person another deliberate escape path. The defaults are three
 distinct Playing-to-Paused transitions within five seconds and one system notification sound. The threshold event is
 not corrected: it turns Keep Playing Off and leaves the target paused. Settings allow a 1–60 second window, a 2–10
@@ -271,8 +275,12 @@ Playing-to-Paused transition cannot be distinguished perfectly; Media Lock uses 
 transition history rather than claiming source attribution it does not receive.
 
 The lock is armed against the active target identity at the moment the user selects it. Recovery may resume enforcement
-only for the accepted successor of that same target. Catalog loss, suspend and ambiguous Recovery suspend correction;
-fallback routing and unrelated target changes clear it and must never redirect a correction. Corrections wait for fresh
+only for the accepted successor of that same target. Catalog loss and ambiguous Recovery suspend correction; Windows
+Power Suspend clears the policy as described above.
+In Windows Auto and Priority Rules, temporary disappearance of the Armed Playback Target also suspends correction even
+when the Router temporarily exposes a competing or stale Active Target. Enforcement resumes only when exactly one
+fingerprint-acceptable successor becomes the Active Target. If the original Session still exists while the Active Target
+changes, Keep Playing clears; a competing or fallback Session never receives a correction. Corrections wait for fresh
 catalog observations, allow at most two unconfirmed Play attempts for one paused episode, and expose an actionable
 Failed state instead of fighting the player indefinitely. A fresh Playing observation confirms recovery and resets the
 bounded attempt state.

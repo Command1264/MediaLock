@@ -3,6 +3,14 @@ param(
     [ValidateSet('Prepare', 'Verify')]
     [string] $Mode,
 
+    [Parameter(Mandatory)]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
+    [string] $OlderVersion,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-rc\.\d+)?$')]
+    [string] $NewerVersion,
+
     [string] $ArtifactRoot = 'C:\MediaLockArtifacts',
 
     [int] $CancellationExitCode = -1,
@@ -12,6 +20,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+. (Join-Path $PSScriptRoot 'MediaLockReleaseArtifacts.ps1')
 
 function Assert-Condition {
     param(
@@ -40,19 +50,10 @@ function Get-MediaLockUninstallEntries {
     )
 }
 
-$manifests = @(
-    Get-ChildItem -LiteralPath $ArtifactRoot -Filter 'MediaLock-*-win-x64.manifest.json' -Recurse |
-        Where-Object { -not $_.PSIsContainer } |
-        ForEach-Object {
-            [pscustomobject]@{
-                Manifest = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
-                Directory = $_.DirectoryName
-            }
-        } |
-        Sort-Object { [version]$_.Manifest.version }
-)
-Assert-Condition ($manifests.Count -eq 2) `
-    'Exactly two stable-version manifests are required for the cancellation smoke.'
+$manifests = @(Get-MediaLockArtifactPair `
+    -ArtifactRoot $ArtifactRoot `
+    -OlderVersion $OlderVersion `
+    -NewerVersion $NewerVersion)
 
 $older = $manifests[0]
 $newer = $manifests[1]
