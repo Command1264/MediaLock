@@ -49,7 +49,9 @@ Status: passed on 2026-08-25 against exact source commit
 Status: in progress. Exact second replacement payload from source `d0fe558` launched as one process on the local host.
 The 2026-08-25 real sleep row passed: entering sleep turned Keep Playing Off; after wake YouTube Music remained paused,
 Priority Rules recovered, ordinary YouTube did not change, and the application neither remained Unavailable nor
-reported an error or crash. The remaining exact-artifact host rows are pending.
+reported an error or crash. A subsequent Priority Rules YouTube Music reload entered Recovering, reacquired the target,
+retained Keep Playing, resumed playback without changing ordinary YouTube and produced no Unavailable, error or crash.
+The remaining exact-artifact host rows are pending.
 
 The first replacement artifact from source `229c9eb` passed the controlled Priority Rules reload and three consecutive
 same-target Session Lock reloads, plus ordinary Lock／Unlock. The subsequent real sleep row exposed an intentional
