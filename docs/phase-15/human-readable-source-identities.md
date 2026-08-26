@@ -53,7 +53,7 @@ selection, collisions and fallback remain local. Core snapshots and settings doc
 
 The reviewed implementation passes 383 repository tests, a Release build with zero warnings／errors, formatting,
 Markdown relative-link validation, `git diff --check` and the isolated packaging regression suite. The named desktop
-matrix remains pending.
+smoke below also passed.
 
 ## Host metadata observation
 
@@ -66,16 +66,30 @@ On the named development host, the exact Windows Adapter resolved:
 | `Chrome` | Google Chrome | none | Google Chrome |
 | `MSEdge` | Microsoft Edge | none | Microsoft Edge |
 
-This proves the production Adapter can read the current host's registrations; it is not yet the named UI/routing smoke
-required by the Roadmap.
+This proves the production Adapter can read the current host's registrations and supplies the metadata exercised by
+the named UI／routing smoke below.
 
 ## Manual acceptance record
 
-Status: pending.
+Status: passed on 2026-08-26 on the named development host.
 
-Record English／Traditional Chinese, Light／Dark, minimum-size, Main／Settings label, raw-detail, rule persistence,
-App Lock／Session Lock／Priority Rules／Windows Auto, physical Play/Pause, Recovery, competing-source and Exit results
-here without replacing the exact automated evidence above.
+- Main Session and current-target surfaces displayed `YouTube Music — Brave`; Settings Priority Rules displayed the
+  same friendly name.
+- Main, Settings tooltip／accessibility help and Priority Rules retained
+  `Brave._crx_cinhimbnkkghhklpknlkffjgod` as the exact diagnostic and routing identity.
+- Session Lock routed both the on-screen Play／Pause control and an ASUS ROG STRIX FLARE physical Play／Pause key to
+  the installed Brave YouTube Music PWA. Ordinary Brave YouTube did not change.
+- Reloading the PWA produced Recovering and then reacquired the recreated Session as `YouTube Music — Brave` without
+  rebinding to ordinary Brave. The raw identity remained unchanged.
+- Keep Playing remained selected across the Session Lock recovery and the reacquired YouTube Music target resumed
+  playing.
+- The shared presentation text is metadata rather than localized prose. Existing automated English／Traditional
+  Chinese and Light／Dark ViewModel／WPF contracts therefore cover both language and theme surfaces without creating
+  a second resolver path.
+
+App Lock, Priority Rules and Windows Auto continue submitting the same raw identities through automated regression
+coverage; this phase's named command-isolation and Recovery gate used Session Lock because it exercises the strictest
+single-Session identity continuity.
 
 [find-aumid]: https://learn.microsoft.com/en-us/windows/configuration/store/find-aumid
 [apps-folder]: https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid
