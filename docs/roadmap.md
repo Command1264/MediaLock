@@ -594,8 +594,12 @@ After separate approval, change only stable identity, transition automation and 
 local gate and two-axis review, then create and validate one provenance-clean `0.3.0` ZIP／Setup pair on the host and a
 fresh Windows Sandbox. Record results in `docs/phase-14/stable-release-smoke.md` without rebuilding the artifact.
 
-Status: in progress. Phase 14B implementation was approved on 2026-08-26. Stable identity and transition tests run on
-`codex/release/phase-14b-0.3-stable`; remote integration, `release/0.3`, tag and publication remain separately gated.
+Status: complete on 2026-08-26. All 365 automated tests, Release build, formatting and isolated packaging contracts
+passed. Exact-artifact host and fresh Windows Sandbox validation passed for source
+`a773fac983728f5d4b2d8cbe40bfad9d1c016737`; the ZIP SHA-256 is
+`94deac66e195cfca21c826ee86f3e61097f3440d3a84ebb5af2439ef3ad3d437` and the Setup SHA-256 is
+`7937f807b2ec577b88d3506735dfb7c26fe0c12b0f055a2b739364bb9ab4d00d`. PR #46 integrated the reviewed result into
+`develop`.
 
 ### Phase 14C — integration and stable publication
 
@@ -604,7 +608,10 @@ integrate the stable change through `develop` and `main`, then separately create
 GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve all older public Release assets and keep
 `release/0.2` unless a later explicit maintenance decision authorizes otherwise.
 
-Status: not started.
+Status: integration complete; publication pending separate approval. PR #47 synchronized `develop` to `main` on
+2026-08-26, and retained `release/0.3` was created at exact artifact source
+`a773fac983728f5d4b2d8cbe40bfad9d1c016737`. The prior `release/0.2` hotfix baseline remains retained. No `v0.3.0`
+tag, GitHub Stable／Latest Release or public artifact upload has been created.
 
 ## Phase 15 — Human-readable source identities
 
