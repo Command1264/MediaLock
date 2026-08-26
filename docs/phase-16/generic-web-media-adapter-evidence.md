@@ -2,6 +2,8 @@
 
 Date: 2026-08-27
 
+Implementation commit: `bf55b18`
+
 ## Slice under test
 
 The first disposable slice covers one user-invoked temporary `activeTab` grant on an HTTPS top-level page. It injects
@@ -28,7 +30,7 @@ claimed by this slice.
 
 ## Manual Gate B1
 
-Pending against an exact committed revision:
+Pending against implementation commit `bf55b18`:
 
 1. Load the unpacked Phase 16B Extension in Chrome and confirm the fixed Extension ID.
 2. Open an HTTPS page containing exactly one ordinary `<video>` or `<audio>` and start playback.
