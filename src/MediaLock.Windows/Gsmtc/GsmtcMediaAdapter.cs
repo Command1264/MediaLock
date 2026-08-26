@@ -11,7 +11,9 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private readonly IGsmtcSessionManagerFactory managerFactory;
     private readonly TimeProvider timeProvider;
     private readonly ISystemLifecycle? systemLifecycle;
+    private readonly IWorkstationLockState? workstationLockState;
     private readonly IReadOnlyList<TimeSpan> reacquisitionDelays;
+    private readonly HashSet<string> excludedSourceApplicationIds;
     private readonly Channel<MediaSessionCatalogSnapshot> snapshots =
         Channel.CreateUnbounded<MediaSessionCatalogSnapshot>(new UnboundedChannelOptions
         {
@@ -60,15 +62,37 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     {
     }
 
+    public GsmtcMediaAdapter(
+        ISystemLifecycle systemLifecycle,
+        IEnumerable<string> excludedSourceApplicationIds)
+        : this(
+            new GsmtcSessionManagerFactory(),
+            TimeProvider.System,
+            systemLifecycle ?? throw new ArgumentNullException(nameof(systemLifecycle)),
+            excludedSourceApplicationIds: excludedSourceApplicationIds)
+    {
+    }
+
     internal GsmtcMediaAdapter(
         IGsmtcSessionManagerFactory managerFactory,
         TimeProvider timeProvider,
         ISystemLifecycle? systemLifecycle = null,
-        IReadOnlyList<TimeSpan>? reacquisitionDelays = null)
+        IReadOnlyList<TimeSpan>? reacquisitionDelays = null,
+        IEnumerable<string>? excludedSourceApplicationIds = null)
     {
         this.managerFactory = managerFactory;
         this.timeProvider = timeProvider;
         this.systemLifecycle = systemLifecycle;
+        workstationLockState = systemLifecycle as IWorkstationLockState;
+        this.excludedSourceApplicationIds = new HashSet<string>(
+            excludedSourceApplicationIds ?? [],
+            StringComparer.OrdinalIgnoreCase);
+        if (this.excludedSourceApplicationIds.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException(
+                "Excluded source application IDs must not be blank.",
+                nameof(excludedSourceApplicationIds));
+        }
         this.reacquisitionDelays = reacquisitionDelays ??
             [TimeSpan.Zero, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2)];
         if (this.reacquisitionDelays.Count != 3 ||
@@ -97,6 +121,10 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         {
             systemLifecycle.Suspending += OnSuspending;
             systemLifecycle.Resumed += OnResumed;
+        }
+        if (workstationLockState is not null)
+        {
+            workstationLockState.Unlocked += OnWorkstationUnlocked;
         }
 
         await AcquireManagerAndPublishAsync(startupCancellation.Token);
@@ -136,6 +164,10 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         {
             systemLifecycle.Suspending -= OnSuspending;
             systemLifecycle.Resumed -= OnResumed;
+        }
+        if (workstationLockState is not null)
+        {
+            workstationLockState.Unlocked -= OnWorkstationUnlocked;
         }
 
         await lifetime.CancelAsync();
@@ -251,6 +283,8 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private void OnResumed() =>
         lifecycleTransitions.Writer.TryWrite(new AdapterTransition(
             AdapterTransitionKind.Resume));
+
+    private void OnWorkstationUnlocked() => QueueRefresh();
 
     private void QueueRefresh()
     {
@@ -450,10 +484,14 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var currentManager = manager ?? throw new InvalidOperationException("GSMTC manager is not initialized.");
-        var sessions = currentManager.GetSessions();
+        var sessions = currentManager
+            .GetSessions()
+            .Where(session => !excludedSourceApplicationIds.Contains(
+                session.SourceAppUserModelId))
+            .ToArray();
         ReconcileSessions(sessions);
         var observedAt = timeProvider.GetUtcNow();
-        var builder = ImmutableArray.CreateBuilder<MediaSessionSnapshot>(sessions.Count);
+        var builder = ImmutableArray.CreateBuilder<MediaSessionSnapshot>(sessions.Length);
         foreach (var session in sessions)
         {
             builder.Add(await session.ReadAsync(GetKey(session), observedAt, cancellationToken));

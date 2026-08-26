@@ -17,6 +17,13 @@
   <data name="Main_PlaybackProgress" xml:space="preserve"><value>Current media playback progress</value></data>
   <data name="Main_PlaybackSeek" xml:space="preserve"><value>Seek current media playback position</value></data>
   <data name="Main_PlaybackSeekHelp" xml:space="preserve"><value>Drag or use the keyboard to change the routed media position.</value></data>
+  <data name="Main_PlaybackStateLock" xml:space="preserve"><value>Playback state lock</value></data>
+  <data name="Main_PlaybackStateLockOff" xml:space="preserve"><value>Off</value></data>
+  <data name="Main_PlaybackStateLockOffAutomation" xml:space="preserve"><value>Turn off playback state lock</value></data>
+  <data name="Main_KeepPlaying" xml:space="preserve"><value>Keep Playing</value></data>
+  <data name="Main_KeepPlayingAutomation" xml:space="preserve"><value>Keep the current media target playing</value></data>
+  <data name="Main_KeepPlayingSuspended" xml:space="preserve"><value>Waiting for the locked media target to return.</value></data>
+  <data name="Main_KeepPlayingFailed" xml:space="preserve"><value>Playback could not be confirmed after two corrections. Turn this off or play the target before enabling it again.</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>Open Media Lock settings</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
@@ -97,7 +104,7 @@
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>Recovery timeout in seconds</value></data>
   <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>Enter a finite number from 0 to 300.</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>Fallback policy</value></data>
-  <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply after Media Lock restarts. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
+  <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply immediately after you save. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>Application Priority Rules</value></data>
   <data name="Settings_PriorityRulesHelp" xml:space="preserve"><value>Add source applications from the current media-session list. Rules are evaluated from top to bottom; disabled rules are skipped.</value></data>
   <data name="Settings_Add" xml:space="preserve"><value>Add</value></data>
@@ -148,4 +155,16 @@
   <data name="Settings_OpenSupportAutomation" xml:space="preserve"><value>Open Media Lock support</value></data>
   <data name="Settings_ReportBug" xml:space="preserve"><value>Report a bug</value></data>
   <data name="Settings_ReportBugAutomation" xml:space="preserve"><value>Open the Media Lock bug report form</value></data>
+  <data name="Main_KeepPlayingReleased" xml:space="preserve"><value>Keep Playing was turned off after repeated pause requests.</value></data>
+  <data name="Main_NotificationSoundFailed" xml:space="preserve"><value>The notification sound could not be played: {0}</value></data>
+  <data name="Settings_PlaybackStateLock" xml:space="preserve"><value>Playback State Lock</value></data>
+  <data name="Settings_RepeatedPauseOverride" xml:space="preserve"><value>Allow repeated pause requests to turn off Keep Playing</value></data>
+  <data name="Settings_RepeatedPauseWindow" xml:space="preserve"><value>Time window (seconds)</value></data>
+  <data name="Settings_RepeatedPauseWindowAutomation" xml:space="preserve"><value>Repeated pause time window in seconds</value></data>
+  <data name="Settings_RepeatedPauseWindowValidation" xml:space="preserve"><value>Enter a whole number from 1 to 60.</value></data>
+  <data name="Settings_RepeatedPauseCount" xml:space="preserve"><value>Pause requests</value></data>
+  <data name="Settings_RepeatedPauseCountAutomation" xml:space="preserve"><value>Number of repeated pause requests</value></data>
+  <data name="Settings_RepeatedPauseCountValidation" xml:space="preserve"><value>Enter a whole number from 2 to 10.</value></data>
+  <data name="Settings_RepeatedPauseSound" xml:space="preserve"><value>Play a notification sound when Keep Playing turns off</value></data>
+  <data name="Settings_RepeatedPauseHelp" xml:space="preserve"><value>Only distinct Playing-to-Paused transitions count. Buffering, recovery, target changes, Media Lock commands, and lock-screen pause requests do not count.</value></data>
 </root>

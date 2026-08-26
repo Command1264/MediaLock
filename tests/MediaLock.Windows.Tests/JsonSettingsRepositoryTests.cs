@@ -51,6 +51,7 @@ public sealed class JsonSettingsRepositoryTests
         Assert.Equal(expected.DefaultRoutingMode, result.Value.DefaultRoutingMode);
         Assert.Equal(expected.Recovery, result.Value.Recovery);
         Assert.Equal(expected.Desktop, result.Value.Desktop);
+        Assert.Equal(expected.PlaybackStateLock, result.Value.PlaybackStateLock);
         Assert.Equal(expected.PriorityRules.ToArray(), result.Value.PriorityRules.ToArray());
         Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);
@@ -78,10 +79,11 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.Equal(7, result.Value.SchemaVersion);
         Assert.Equal(TimeSpan.FromSeconds(30), result.Value.Recovery!.Timeout);
         Assert.Equal(FallbackPolicy.Wait, result.Value.Recovery.FallbackPolicy);
         Assert.Equal(MediaLockSettings.Default.Desktop, result.Value.Desktop);
+        Assert.Equal(MediaLockSettings.Default.PlaybackStateLock, result.Value.PlaybackStateLock);
         Assert.Empty(result.Value.PriorityRules);
         Assert.Empty(result.Issues);
     }
@@ -112,7 +114,7 @@ public sealed class JsonSettingsRepositoryTests
 
         var result = await repository.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.Equal(7, result.Value.SchemaVersion);
         Assert.Equal(RoutingMode.AppLock, result.Value.DefaultRoutingMode);
         Assert.Equal(
             new DesktopSettings(
@@ -156,7 +158,7 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.Equal(7, result.Value.SchemaVersion);
         Assert.Equal(
             new DesktopSettings(
                 false,
@@ -198,7 +200,7 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.Equal(7, result.Value.SchemaVersion);
         Assert.Equal(
             new DesktopSettings(
                 true,
@@ -239,10 +241,46 @@ public sealed class JsonSettingsRepositoryTests
             directory.Path,
             TimeProvider.System).LoadAsync(CancellationToken.None);
 
-        Assert.Equal(6, result.Value.SchemaVersion);
+        Assert.Equal(7, result.Value.SchemaVersion);
         Assert.True(result.Value.Desktop!.InterceptMediaKeys);
         Assert.Equal(UiLanguagePreference.TraditionalChinese, result.Value.Desktop.Language);
         Assert.Equal(UiThemePreference.Dark, result.Value.Desktop.Theme);
+        Assert.False(result.UsedDefaults);
+        Assert.Empty(result.Issues);
+    }
+
+    [Fact]
+    public async Task VersionSixSettingsPreserveMediaKeyPreferenceAndMigratePlaybackStateLockDefaults()
+    {
+        using var directory = new TemporaryDirectory();
+        await File.WriteAllTextAsync(
+            System.IO.Path.Combine(directory.Path, "settings.json"),
+            """
+            {
+              "schemaVersion": 6,
+              "defaultRoutingMode": "windowsAuto",
+              "recovery": {
+                "timeout": "00:00:15",
+                "fallbackPolicy": "sameApplicationThenWindowsCurrentSession"
+              },
+              "desktop": {
+                "closeToTray": true,
+                "startWithWindows": false,
+                "language": "system",
+                "theme": "system",
+                "interceptMediaKeys": false
+              },
+              "priorityRules": []
+            }
+            """);
+
+        var result = await new JsonSettingsRepository(
+            directory.Path,
+            TimeProvider.System).LoadAsync(CancellationToken.None);
+
+        Assert.Equal(7, result.Value.SchemaVersion);
+        Assert.False(result.Value.Desktop!.InterceptMediaKeys);
+        Assert.Equal(MediaLockSettings.Default.PlaybackStateLock, result.Value.PlaybackStateLock);
         Assert.False(result.UsedDefaults);
         Assert.Empty(result.Issues);
     }

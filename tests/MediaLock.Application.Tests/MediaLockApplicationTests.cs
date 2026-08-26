@@ -3,7 +3,9 @@ using System.Threading.Channels;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
+using MediaLock.Core.Lifecycle;
 using MediaLock.Core.Media;
+using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
 using Xunit;
 
@@ -11,6 +13,1193 @@ namespace MediaLock.Application.Tests;
 
 public sealed class MediaLockApplicationTests
 {
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        while (!condition())
+        {
+            await Task.Delay(10, timeout.Token);
+        }
+    }
+
+    [Fact]
+    public async Task KeepPlayingArmsTheCurrentPlayingTarget()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            result.State.PlaybackStateLock.Mode);
+        Assert.Equal(PlaybackStateLockStatus.Ready, result.State.PlaybackStateLock.Status);
+        Assert.Equal(session.Key, result.State.PlaybackStateLock.ArmedTarget);
+    }
+
+    [Fact]
+    public async Task KeepPlayingCannotArmAPausedTarget()
+    {
+        var session = Session("music", "music") with
+        {
+            PlaybackStatus = PlaybackStatus.Paused,
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            application.DispatchAsync(
+                new ApplicationIntent.SetPlaybackStateLock(
+                    PlaybackStateLockMode.KeepPlaying),
+                CancellationToken.None).AsTask());
+
+        Assert.Contains("only be enabled while", exception.Message);
+        Assert.Equal(PlaybackStateLockState.Off, application.State.PlaybackStateLock);
+    }
+
+    [Fact]
+    public async Task KeepPlayingCorrectsAnExternalPauseOnTheArmedTarget()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [session with { PlaybackStatus = PlaybackStatus.Paused }],
+            session.Key));
+        await controller.WaitForCommandCountAsync(1);
+
+        Assert.Equal([(session.Key, MediaCommand.Play)], controller.Commands);
+    }
+
+    [Theory]
+    [MemberData(nameof(CommandsThatDisarmKeepPlaying))]
+    public async Task MediaLockPauseToggleAndStopDisarmKeepPlayingBeforeRouting(
+        MediaCommand command)
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.Route(command),
+            CancellationToken.None);
+
+        Assert.Equal(PlaybackStateLockState.Off, result.State.PlaybackStateLock);
+        Assert.Equal([(session.Key, command)], controller.Commands);
+    }
+
+    public static TheoryData<MediaCommand> CommandsThatDisarmKeepPlaying => new()
+    {
+        MediaCommand.Pause,
+        MediaCommand.TogglePlayPause,
+        MediaCommand.Stop,
+    };
+
+    [Theory]
+    [MemberData(nameof(CommandsThatPreserveKeepPlaying))]
+    public async Task NonPausingMediaLockCommandsPreserveKeepPlaying(MediaCommand command)
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.Route(command),
+            CancellationToken.None);
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            result.State.PlaybackStateLock.Mode);
+    }
+
+    public static TheoryData<MediaCommand> CommandsThatPreserveKeepPlaying => new()
+    {
+        MediaCommand.Play,
+        MediaCommand.Next,
+        MediaCommand.Previous,
+    };
+
+    [Fact]
+    public async Task UnrelatedActiveTargetClearsKeepPlayingWithoutDispatching()
+    {
+        var music = Session("music", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var cleared = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Mode == PlaybackStateLockMode.Off)
+            {
+                cleared.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([music, video], video.Key));
+        var state = await cleared.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(PlaybackStateLockState.Off, state.PlaybackStateLock);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
+    public async Task LockedTargetRecoverySuspendsKeepPlayingWithoutUsingACompetitor()
+    {
+        var music = Session("music", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(music.Key),
+            CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var suspended = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        var state = await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            state.PlaybackStateLock.Mode);
+        Assert.Equal(music.Key, state.PlaybackStateLock.ArmedTarget);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SystemSuspendDisarmsKeepPlayingAndDoesNotResumeAudio(
+        bool usePriorityRules)
+    {
+        var music = Session("music", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        if (usePriorityRules)
+        {
+            await application.DispatchAsync(
+                new ApplicationIntent.UsePriorityRules(),
+                CancellationToken.None);
+        }
+
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var disarmed = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.CatalogStatus == MediaSessionCatalogStatus.Suspended &&
+                args.State.PlaybackStateLock.Mode == PlaybackStateLockMode.Off)
+            {
+                disarmed.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [],
+            null,
+            MediaSessionCatalogStatus.Suspended,
+            "Media sessions are suspended while Windows sleeps."));
+        var suspendedState = await disarmed.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(PlaybackStateLockState.Off, suspendedState.PlaybackStateLock);
+        Assert.Empty(controller.Commands);
+
+        var resumed = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.CatalogStatus == MediaSessionCatalogStatus.Available &&
+                args.State.Router.Sessions.Any(session => session.Key == music.Key))
+            {
+                resumed.TrySetResult(args.State);
+            }
+        };
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [],
+            null,
+            MediaSessionCatalogStatus.Reacquiring,
+            "Reacquiring GSMTC after Windows resumed."));
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [music with { PlaybackStatus = PlaybackStatus.Paused }, video],
+            music.Key));
+        var resumedState = await resumed.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(PlaybackStateLockState.Off, resumedState.PlaybackStateLock);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LockScreenPauseDisarmsKeepPlayingWithoutCorrection(
+        bool pauseArrivesBeforeUnlock)
+    {
+        var music = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music], music.Key));
+        var controller = new RecordingController();
+        var workstation = new FakeWorkstationLockState();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            settingsRepository: null,
+            loginStartupManager: null,
+            workstationLockState: workstation);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        workstation.Lock();
+        if (!pauseArrivesBeforeUnlock)
+        {
+            workstation.Unlock();
+        }
+
+        var cleared = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Mode == PlaybackStateLockMode.Off)
+            {
+                cleared.TrySetResult(args.State);
+            }
+        };
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [music with { PlaybackStatus = PlaybackStatus.Paused }],
+            music.Key));
+        var state = await cleared.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(PlaybackStateLockState.Off, state.PlaybackStateLock);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
+    public async Task UnlockRefreshPreservesKeepPlayingAndEndsLockScreenIntentWindow()
+    {
+        var music = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music], music.Key));
+        var controller = new RecordingController();
+        var workstation = new FakeWorkstationLockState();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            settingsRepository: null,
+            loginStartupManager: null,
+            workstationLockState: workstation);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        workstation.Lock();
+        workstation.Unlock();
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot([music], music.Key));
+
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [music with { PlaybackStatus = PlaybackStatus.Paused }],
+            music.Key));
+        await controller.WaitForCommandCountAsync(1);
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            application.State.PlaybackStateLock.Mode);
+        Assert.Equal([(music.Key, MediaCommand.Play)], controller.Commands);
+    }
+
+    [Fact]
+    public async Task LiveLockedTargetObservationsRefreshKeepPlayingRecoveryIdentity()
+    {
+        var music = Session("music", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(music.Key),
+            CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var refreshed = music with
+        {
+            ObservedAt = music.ObservedAt.AddMinutes(1),
+            Metadata = new MediaMetadata("new track", "artist", null, null),
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([refreshed, video], refreshed.Key));
+        var suspended = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        var state = await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            state.PlaybackStateLock.Mode);
+    }
+
+    [Fact]
+    public async Task AcceptedRecoverySuccessorResumesKeepPlayingOnTheNewSession()
+    {
+        var music = Session("music-old", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(music.Key),
+            CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var suspended = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult();
+            }
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var successor = music with
+        {
+            Key = new SessionKey("music-new"),
+            PlaybackStatus = PlaybackStatus.Paused,
+            ObservedAt = music.ObservedAt.AddSeconds(1),
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video, successor], successor.Key));
+        await controller.WaitForCommandCountAsync(1);
+
+        Assert.Equal([(successor.Key, MediaCommand.Play)], controller.Commands);
+        Assert.Equal(successor.Key, application.State.PlaybackStateLock.ArmedTarget);
+        Assert.Equal(
+            PlaybackStateLockStatus.Ready,
+            application.State.PlaybackStateLock.Status);
+    }
+
+    [Theory]
+    [InlineData(RoutingMode.WindowsAuto)]
+    [InlineData(RoutingMode.PriorityRules)]
+    public async Task AutomaticRoutingPreservesKeepPlayingAcrossTransientTargetRecreation(
+        RoutingMode mode)
+    {
+        var music = Session("music-old", "music");
+        var video = Session("video", "browser");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = mode,
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var suspended = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        var suspendedState = await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            suspendedState.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Suspended,
+            suspendedState.PlaybackStateLock.Status);
+        Assert.Empty(controller.Commands);
+
+        var successor = music with
+        {
+            Key = new SessionKey("music-new"),
+            PlaybackStatus = PlaybackStatus.Paused,
+            ObservedAt = music.ObservedAt.AddSeconds(1),
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video, successor], successor.Key));
+        await controller.WaitForCommandCountAsync(1);
+
+        Assert.Equal([(successor.Key, MediaCommand.Play)], controller.Commands);
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            application.State.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Ready,
+            application.State.PlaybackStateLock.Status);
+        Assert.Equal(successor.Key, application.State.PlaybackStateLock.ArmedTarget);
+    }
+
+    [Theory]
+    [InlineData(RoutingMode.WindowsAuto)]
+    [InlineData(RoutingMode.PriorityRules)]
+    public async Task AutomaticRoutingDoesNotGuessBetweenAmbiguousPlaybackSuccessors(
+        RoutingMode mode)
+    {
+        var music = Session("music-old", "music");
+        var video = Session("video", "browser");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = mode,
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var suspended = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult();
+            }
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var first = music with
+        {
+            Key = new SessionKey("music-new-1"),
+            PlaybackStatus = PlaybackStatus.Paused,
+            ObservedAt = music.ObservedAt.AddSeconds(1),
+        };
+        var second = first with { Key = new SessionKey("music-new-2") };
+        var ambiguousObserved = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var ambiguousStateChanges = 0;
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.Router.Sessions.Length == 3 &&
+                Interlocked.Increment(ref ambiguousStateChanges) >= 2)
+            {
+                ambiguousObserved.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video, first, second], first.Key));
+        var state = await ambiguousObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            state.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Suspended,
+            state.PlaybackStateLock.Status);
+        Assert.Equal(music.Key, state.PlaybackStateLock.ArmedTarget);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
+    public async Task WindowsAutoDoesNotRearmAnInactivePlaybackSuccessor()
+    {
+        var music = Session("music-old", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var suspended = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult();
+            }
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var successor = music with
+        {
+            Key = new SessionKey("music-new"),
+            PlaybackStatus = PlaybackStatus.Paused,
+            ObservedAt = music.ObservedAt.AddSeconds(1),
+        };
+        var inactiveSuccessorObserved = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var inactiveSuccessorStateChanges = 0;
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.Router.Sessions.Length == 2 &&
+                args.State.Router.Sessions.Any(session => session.Key == successor.Key) &&
+                Interlocked.Increment(ref inactiveSuccessorStateChanges) >= 2)
+            {
+                inactiveSuccessorObserved.TrySetResult(args.State);
+            }
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video, successor], video.Key));
+        var state = await inactiveSuccessorObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            state.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Suspended,
+            state.PlaybackStateLock.Status);
+        Assert.Equal(music.Key, state.PlaybackStateLock.ArmedTarget);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Theory]
+    [InlineData(RoutingMode.WindowsAuto)]
+    [InlineData(RoutingMode.PriorityRules)]
+    public async Task LiveAutomaticTargetObservationsRefreshKeepPlayingRecoveryIdentity(
+        RoutingMode mode)
+    {
+        var music = Session("music-old", "music");
+        var video = Session("video", "browser");
+        var settings = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = mode,
+            PriorityRules = [new PriorityRule("music")],
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            new RecordingLoginStartupManager(),
+            new RecordingRuntimeStateRepository());
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var refreshed = music with
+        {
+            ObservedAt = music.ObservedAt.AddMinutes(20),
+            Metadata = new MediaMetadata("new track", "artist", null, null),
+        };
+        var refreshObserved = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.Router.Sessions.Any(session =>
+                    session.Key == refreshed.Key &&
+                    session.Metadata?.Title == refreshed.Metadata.Title))
+            {
+                refreshObserved.TrySetResult();
+            }
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([refreshed, video], refreshed.Key));
+        await refreshObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var suspended = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Suspended)
+            {
+                suspended.TrySetResult();
+            }
+        };
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video], video.Key));
+        await suspended.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var successor = refreshed with
+        {
+            Key = new SessionKey("music-new"),
+            PlaybackStatus = PlaybackStatus.Paused,
+            ObservedAt = refreshed.ObservedAt.AddSeconds(1),
+        };
+
+        await catalog.PublishAsync(
+            new MediaSessionCatalogSnapshot([video, successor], successor.Key));
+        await controller.WaitForCommandCountAsync(1);
+
+        Assert.Equal([(successor.Key, MediaCommand.Play)], controller.Commands);
+        Assert.Equal(successor.Key, application.State.PlaybackStateLock.ArmedTarget);
+        Assert.Equal(
+            PlaybackStateLockStatus.Ready,
+            application.State.PlaybackStateLock.Status);
+    }
+
+    [Fact]
+    public async Task RepeatedPausedObservationsExhaustBoundedCorrections()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var failed = new TaskCompletionSource<MediaLockApplicationState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        application.StateChanged += (_, args) =>
+        {
+            if (args.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Failed)
+            {
+                failed.TrySetResult(args.State);
+            }
+        };
+
+        for (var observation = 1; observation <= 3; observation++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with
+                {
+                    PlaybackStatus = PlaybackStatus.Paused,
+                    ObservedAt = session.ObservedAt.AddSeconds(observation),
+                }],
+                session.Key));
+        }
+        var state = await failed.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(2, controller.Commands.Count);
+        Assert.All(controller.Commands, command =>
+            Assert.Equal((session.Key, MediaCommand.Play), command));
+        Assert.Contains("could not be confirmed", state.PlaybackStateLock.Message);
+    }
+
+    [Fact]
+    public async Task ThirdDistinctExternalPauseWithinTheWindowReleasesKeepPlaying()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }],
+                session.Key));
+            if (episode < 3)
+            {
+                await controller.WaitForCommandCountAsync(episode);
+                await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+                clock.Advance(TimeSpan.FromSeconds(1));
+            }
+        }
+
+        await WaitUntilAsync(() =>
+            application.State.PlaybackStateLock.Status == PlaybackStateLockStatus.Released);
+        Assert.Equal(PlaybackStateLockMode.Off, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(2, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task RepeatedPauseWindowExpiryStartsANewSequence()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }],
+                session.Key));
+            await controller.WaitForCommandCountAsync(episode);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+            clock.Advance(episode == 1 ? TimeSpan.FromSeconds(6) : TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(3, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task BufferingTransitionsDoNotCountAsDistinctPauseRequests()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Changing }],
+                session.Key));
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }],
+                session.Key));
+            await controller.WaitForCommandCountAsync(episode);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(3, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task ExplicitMediaLockCommandResetsTheRepeatedPauseSequence()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+            [session with { PlaybackStatus = PlaybackStatus.Paused }], session.Key));
+        await controller.WaitForCommandCountAsync(1);
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Next),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 2; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }], session.Key));
+            await controller.WaitForCommandCountAsync(episode + 2);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(4, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task DisabledRepeatedPauseOverrideNeverReleasesKeepPlaying()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        var settings = MediaLockSettings.Default with
+        {
+            PlaybackStateLock = MediaLockSettings.Default.PlaybackStateLock! with
+            {
+                RepeatedPauseOverrideEnabled = false,
+            },
+        };
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(settings),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }], session.Key));
+            await controller.WaitForCommandCountAsync(episode);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(3, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task UpdatedRepeatedPauseOverrideAppliesWithoutRestarting()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        var controller = new RecordingController();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(controller),
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var updated = application.State.Settings with
+        {
+            PlaybackStateLock = application.State.Settings.PlaybackStateLock! with
+            {
+                RepeatedPauseOverrideEnabled = false,
+            },
+        };
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        for (var episode = 1; episode <= 3; episode++)
+        {
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot(
+                [session with { PlaybackStatus = PlaybackStatus.Paused }], session.Key));
+            await controller.WaitForCommandCountAsync(episode);
+            await catalog.PublishAsync(new MediaSessionCatalogSnapshot([session], session.Key));
+        }
+
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, application.State.PlaybackStateLock.Mode);
+        Assert.Equal(3, controller.Commands.Count);
+    }
+
+    [Fact]
+    public async Task ExplicitTargetChangeClearsKeepPlayingImmediately()
+    {
+        var music = Session("music", "music");
+        var video = Session("video", "browser");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([music, video], music.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.LockSession(video.Key),
+            CancellationToken.None);
+
+        Assert.Equal(video.Key, result.State.Router.ActiveTarget);
+        Assert.Equal(PlaybackStateLockState.Off, result.State.PlaybackStateLock);
+    }
+
+    [Fact]
+    public async Task SavingUnrelatedSettingsPreservesKeepPlayingForTheSameTarget()
+    {
+        var session = Session("music", "music");
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([session], session.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()));
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var updated = application.State.Settings with
+        {
+            Desktop = application.State.Settings.Desktop! with
+            {
+                CloseToTray = !application.State.Settings.Desktop.CloseToTray,
+            },
+        };
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            result.State.PlaybackStateLock.Mode);
+        Assert.Equal(session.Key, result.State.PlaybackStateLock.ArmedTarget);
+    }
+
+    [Fact]
+    public async Task UpdatedPriorityRulesImmediatelyRecalculateTheApplicationTarget()
+    {
+        var brave = Session("brave", "Brave");
+        var chrome = Session("chrome", "Chrome");
+        var initial = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("Brave"), new PriorityRule("Chrome")],
+        };
+        var repository = new RecordingSettingsRepository(initial);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([brave, chrome], brave.Key)),
+            new MediaRouter(new SuccessfulController()),
+            repository,
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        var updated = initial with
+        {
+            PriorityRules = [new PriorityRule("Chrome"), new PriorityRule("Brave")],
+        };
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
+        Assert.Equal(chrome.Key, result.State.Router.ActiveTarget);
+        Assert.Equal(updated, result.State.Settings);
+    }
+
+    [Fact]
+    public async Task PriorityRuleTargetChangePublishesPlaybackLockReleaseAtomically()
+    {
+        var brave = Session("brave", "Brave");
+        var chrome = Session("chrome", "Chrome");
+        var initial = MediaLockSettings.Default with
+        {
+            DefaultRoutingMode = RoutingMode.PriorityRules,
+            PriorityRules = [new PriorityRule("Brave"), new PriorityRule("Chrome")],
+        };
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([brave, chrome], brave.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(initial),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
+        var observed = new List<MediaLockApplicationState>();
+        application.StateChanged += (_, args) => observed.Add(args.State);
+        var updated = initial with
+        {
+            PriorityRules = [new PriorityRule("Chrome"), new PriorityRule("Brave")],
+        };
+
+        var result = await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        Assert.Equal(chrome.Key, result.State.Router.ActiveTarget);
+        Assert.Equal(PlaybackStateLockState.Off, result.State.PlaybackStateLock);
+        Assert.DoesNotContain(observed, state =>
+            state.Router.ActiveTarget == chrome.Key &&
+            state.PlaybackStateLock.Mode == PlaybackStateLockMode.KeepPlaying);
+    }
+
+    [Fact]
+    public async Task UpdatedRecoveryAndPrioritySettingsAreSentToTheRouter()
+    {
+        var session = Session("music", "Brave");
+        var router = new RecordingIntentRouter();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(
+                new MediaSessionCatalogSnapshot([session], session.Key)),
+            router,
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        var updated = MediaLockSettings.Default with
+        {
+            Recovery = new RecoverySettings(
+                TimeSpan.FromSeconds(27),
+                FallbackPolicy.DisableRouting),
+            PriorityRules = [new PriorityRule("Chrome")],
+        };
+
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+
+        var options = Assert.IsType<RouterIntent.UpdateOptions>(router.Intents[^1]).Options;
+        Assert.Equal(TimeSpan.FromSeconds(27), options.RecoveryTimeout);
+        Assert.Equal(FallbackPolicy.DisableRouting, options.FallbackPolicy);
+        Assert.Equal(updated.PriorityRules, options.PriorityRules);
+    }
+
+    [Fact]
+    public async Task UpdatedRecoveryTimeoutReplacesTheActiveApplicationDeadline()
+    {
+        var locked = Session("music", "Brave");
+        var initial = MediaLockSettings.Default with
+        {
+            Recovery = new RecoverySettings(TimeSpan.FromSeconds(5), FallbackPolicy.Wait),
+        };
+        var catalog = new InMemoryCatalog(
+            new MediaSessionCatalogSnapshot([locked], locked.Key));
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(initial),
+            loginStartupManager: null);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.LockSession(locked.Key),
+            CancellationToken.None);
+        await catalog.PublishAsync(new MediaSessionCatalogSnapshot([], null));
+        await WaitUntilAsync(() => application.State.Router.Status == RouterStatus.Recovering);
+        var updated = initial with
+        {
+            Recovery = new RecoverySettings(TimeSpan.Zero, FallbackPolicy.DisableRouting),
+        };
+
+        await application.DispatchAsync(
+            new ApplicationIntent.UpdateSettings(updated),
+            CancellationToken.None);
+        await WaitUntilAsync(() => application.State.Router.Status == RouterStatus.Unavailable);
+
+        Assert.Equal(FallbackPolicy.DisableRouting, application.State.Router.ActiveFallback);
+        Assert.Equal(updated, application.State.Settings);
+    }
+
     [Fact]
     public async Task PriorityRulesDefaultActivatesWithoutPersistedLockedTarget()
     {
@@ -684,6 +1873,49 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task RunningApplicationRepairsLoginStartupChangedByAnExternalWriter()
+    {
+        var session = Session("music", "Brave");
+        var settings = MediaLockSettings.Default with
+        {
+            Desktop = MediaLockSettings.Default.Desktop! with
+            {
+                StartWithWindows = true,
+            },
+        };
+        var startup = new ObservableLoginStartupManager(enabled: true);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(settings),
+            startup);
+        await application.StartAsync(CancellationToken.None);
+
+        await startup.PublishExternalStateAsync(value: false);
+        await WaitUntilAsync(() => startup.Updates.Count == 1);
+
+        Assert.Equal([true], startup.Updates);
+    }
+
+    [Fact]
+    public async Task DisabledLoginStartupDoesNotDeleteAValueOwnedByAnotherExecutable()
+    {
+        var session = Session("music", "Brave");
+        var startup = new ObservableLoginStartupManager(enabled: false);
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([session], session.Key)),
+            new MediaRouter(new SuccessfulController()),
+            new RecordingSettingsRepository(MediaLockSettings.Default),
+            startup);
+        await application.StartAsync(CancellationToken.None);
+
+        await startup.PublishExternalStateAsync(value: false);
+        await WaitUntilAsync(() => startup.ObservedStates.Count == 1);
+
+        Assert.Empty(startup.Updates);
+    }
+
+    [Fact]
     public async Task FailedLoginStartupUpdateRollsSettingsBackToThePreviousValue()
     {
         var session = Session("music", "Brave");
@@ -896,6 +2128,10 @@ public sealed class MediaLockApplicationTests
         await application.DispatchAsync(
             new ApplicationIntent.LockSession(session.Key),
             CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.SetPlaybackStateLock(
+                PlaybackStateLockMode.KeepPlaying),
+            CancellationToken.None);
         var errorObserved = new TaskCompletionSource<MediaLockApplicationState>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         application.StateChanged += (_, args) =>
@@ -910,8 +2146,15 @@ public sealed class MediaLockApplicationTests
         var failed = await errorObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.Equal("Media Session catalog stopped unexpectedly.", failed.ErrorMessage);
+        Assert.Equal(MediaSessionCatalogStatus.Unavailable, failed.CatalogStatus);
         Assert.Empty(failed.Router.Sessions);
         Assert.Equal(RouterStatus.Recovering, failed.Router.Status);
+        Assert.Equal(
+            PlaybackStateLockMode.KeepPlaying,
+            failed.PlaybackStateLock.Mode);
+        Assert.Equal(
+            PlaybackStateLockStatus.Suspended,
+            failed.PlaybackStateLock.Status);
         var routed = await application.DispatchAsync(
             new ApplicationIntent.Route(MediaCommand.Next),
             CancellationToken.None);
@@ -1024,6 +2267,8 @@ public sealed class MediaLockApplicationTests
 
     private sealed class RecordingController : IMediaController
     {
+        private TaskCompletionSource changed = NewSignal();
+
         public List<(SessionKey Target, MediaCommand Command)> Commands { get; } = [];
 
         public ValueTask<MediaControlResult> TryExecuteAsync(
@@ -1032,8 +2277,21 @@ public sealed class MediaLockApplicationTests
             CancellationToken cancellationToken)
         {
             Commands.Add((target, command));
+            changed.TrySetResult();
+            changed = NewSignal();
             return ValueTask.FromResult(MediaControlResult.Succeeded);
         }
+
+        public async Task WaitForCommandCountAsync(int expected)
+        {
+            while (Commands.Count < expected)
+            {
+                await changed.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            }
+        }
+
+        private static TaskCompletionSource NewSignal() => new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed class ControllableRouter : IMediaRouter
@@ -1166,6 +2424,27 @@ public sealed class MediaLockApplicationTests
         }
     }
 
+    private sealed class FakeWorkstationLockState : IWorkstationLockState
+    {
+        public bool IsLocked { get; private set; }
+
+        public event Action? Locked;
+
+        public event Action? Unlocked;
+
+        public void Lock()
+        {
+            IsLocked = true;
+            Locked?.Invoke();
+        }
+
+        public void Unlock()
+        {
+            IsLocked = false;
+            Unlocked?.Invoke();
+        }
+    }
+
     private sealed class FailingSaveSettingsRepository(MediaLockSettings initial) : ISettingsRepository
     {
         public ValueTask<ConfigurationLoadResult<MediaLockSettings>> LoadAsync(
@@ -1192,6 +2471,44 @@ public sealed class MediaLockApplicationTests
         {
             Updates.Add(enabled);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ObservableLoginStartupManager(bool enabled) :
+        ILoginStartupManager,
+        ILoginStartupChangeSource
+    {
+        private readonly Channel<bool> changes = Channel.CreateUnbounded<bool>();
+
+        public List<bool> Updates { get; } = [];
+
+        public List<bool> ObservedStates { get; } = [];
+
+        public ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(enabled);
+
+        public ValueTask SetEnabledAsync(bool value, CancellationToken cancellationToken)
+        {
+            enabled = value;
+            Updates.Add(value);
+            return ValueTask.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<bool> WatchEnabledAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            await foreach (var value in changes.Reader.ReadAllAsync(cancellationToken))
+            {
+                ObservedStates.Add(value);
+                yield return value;
+            }
+        }
+
+        public ValueTask PublishExternalStateAsync(bool value)
+        {
+            enabled = value;
+            return changes.Writer.WriteAsync(value);
         }
     }
 
@@ -1372,5 +2689,14 @@ public sealed class MediaLockApplicationTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private DateTimeOffset now = DateTimeOffset.Parse("2026-08-24T00:00:00Z");
+
+        public override DateTimeOffset GetUtcNow() => now;
+
+        public void Advance(TimeSpan amount) => now += amount;
     }
 }

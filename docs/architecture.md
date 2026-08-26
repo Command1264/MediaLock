@@ -202,6 +202,19 @@ application identity through the same router interface as an interactive App Loc
 the saved default mode requests it and fingerprint matching produces one acceptable, unambiguous candidate;
 Windows Auto never restores a saved lock. JSONL diagnostics rotate to at most three one-megabyte files and omit title/artist
 unless a future explicitly disclosed diagnostic mode supplies them.
+
+`MediaLockApplication` owns the successful-settings-application transaction. It validates one immutable settings
+snapshot, persists it, synchronizes owned platform state such as login startup, sends Router-owned values through
+`RouterIntent.UpdateOptions`, and only then publishes application state with that same snapshot. Presentation and
+input consumers observe the published state or their explicit post-commit callback; they do not reread
+`settings.json`. If a platform or Router application step fails, the application attempts to restore the prior
+durable and platform values and does not publish the candidate snapshot as successful.
+
+Router options are a live seam. Priority Rule changes recalculate the Priority Rules target in the serialized Router
+queue. A Recovery-timeout change during an active Recovery advances its epoch, cancels the old deadline and schedules
+one replacement using the new duration; the eventual timeout evaluates the current Fallback Policy. New settings must
+be assigned to an owning runtime module here (or be explicitly documented as startup-only) before they are exposed by
+Settings.
 Phase 10B adds a read-only environment adapter at `IAppEnvironmentInfoProvider`. Its Windows implementation owns
 Registry, runtime-architecture, entry-assembly version and embedded Authenticode-certificate inspection, including
 normalizing the stale `Windows 10` Registry product name when build 22000 or later identifies Windows 11. The pure
@@ -214,7 +227,7 @@ Clipboard, Shell and `%LocalAppData%\MediaLock\logs` behavior plus the canonical
 ViewModel supplies diagnostic text only for the copy action, catches adapter failures as localized actionable UI
 errors and otherwise remains independent of Registry, Clipboard and process launch details.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
-fallback and Priority Rule edits take effect on the next process start. A successful explicit main-window Routing
+fallback and Priority Rule edits also update the running router immediately. A successful explicit main-window Routing
 Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
 corresponding startup setting last inside the same serialized application dispatch. A failed transition or target
 save leaves the prior startup setting intact; a settings save failure keeps the current-run transition observable,
@@ -300,20 +313,40 @@ sole authority for target identity; the UI bookmark never changes Router state.
 ### Playback State Lock
 
 Playback State Lock extends the existing deep Application routing module rather than adding a ViewModel loop or a
-second media-control service. Core owns a pure decision value for Off, Keep Playing and Keep Paused. The Application
-dispatcher owns the armed target, Desired Playback State, observation/confirmation status and bounded correction
-effects inside the same serialized critical section as catalog and Route intents.
+second media-control service. Core owns pure Off/Keep Playing eligibility and correction decisions. The Application
+dispatcher owns the Armed Playback Target, observation/confirmation status and bounded correction effects inside the
+same serialized critical section as catalog and Route intents.
 
-Each correction is an ordinary explicit Play or Pause Media Command carrying the captured `ExpectedTarget`. The Router
+Each correction is an ordinary explicit Play Media Command carrying the captured `ExpectedTarget`. The Router
 still resolves capability and rejects stale targets; the Windows GSMTC adapter remains a one-shot controller. Catalog
-observations trigger policy evaluation, so no polling loop is introduced. Recovery, fallback, catalog unavailability,
-suspend and shutdown cancel pending confirmation. Only the Router-accepted successor of the armed identity may resume
-enforcement; an unrelated Active Target clears the lock.
+observations trigger policy evaluation, so no polling loop is introduced. Recovery and catalog unavailability make
+enforcement Suspended; a real Power Suspend clears the process-lifetime policy so resume cannot restart audio.
+Fallback, an unrelated Active Target and shutdown cannot redirect a correction. Locked modes reuse the Router-accepted
+successor. Windows Auto and Priority Rules retain the armed fingerprint while its
+Session is absent, refresh that fingerprint from live observations while it remains active, require exactly one
+acceptable candidate and re-arm only when that candidate is also the Router Active Target. A changed Active Target
+while the original Session still exists remains an explicit target change and clears the policy.
 
 Application state exposes the selected policy, armed target continuity and Ready, Suspended or Failed result for WPF
 projection. The current-target ViewModel submits intents and renders state but neither compares playback observations
-nor retries commands. A supplied time boundary makes confirmation and retry tests deterministic. Retries are finite,
-and the module waits for a fresh playback observation before any subsequent correction.
+nor retries commands. The module waits for a fresh playback observation before any subsequent correction, allows at
+most two unconfirmed Play attempts per paused episode and exposes Failed when confirmation is exhausted. Media Lock
+Pause, TogglePlayPause and Stop clear the policy before their one-shot command is routed.
+
+The Core lifecycle port separately exposes workstation Lock/Unlock without depending on Windows APIs. The Windows
+adapter translates Session Switch notifications and requests a fresh GSMTC snapshot after unlock. Application keeps a
+small attribution window across that transition: Playing closes it and preserves Keep Playing, while Paused, Stopped
+or Closed clears the policy without correction. A missing or unknown target remains Suspended and cannot redirect a
+command to a competitor. Power Suspend arrives through catalog lifecycle state instead: Application clears Keep Playing
+on `Suspended`, and later `Reacquiring`／Available snapshots cannot re-arm it.
+
+Settings schema v7 adds `PlaybackStateLockSettings` for the repeated-pause escape hatch. Application keeps a bounded
+queue of distinct direct Playing-to-Paused observation times. Duplicate Paused events never add entries; Changing,
+Recovery, suspend, target changes, explicit routes, settings changes and workstation transitions reset or bypass the
+sequence. Reaching the configured threshold publishes a one-shot Released status and performs no Play correction.
+WPF owns the replaceable notification-sound adapter and the five-second localized live-region message; neither Core
+nor Application depends on presentation or audio APIs. Schema v1–v6 migration supplies the 5-second/3-transition,
+sound-enabled defaults.
 
 ### Windows Media Surface Mirror
 
@@ -350,8 +383,23 @@ input first, drains or cancels routing work, persists state, removes subscriptio
 The same root injects the Windows environment and desktop-support adapters into Settings; tests replace both through
 their public seams without launching Explorer, a browser or the Clipboard.
 
+The login-startup adapter monitors the current-user Run key with `RegNotifyChangeKeyValue`. Application owns that
+stream and reconciles notifications through its serialized settings boundary: an enabled preference repairs a stale
+or foreign command to the current executable, while a disabled preference does not delete a value owned by another
+portable copy. Shutdown cancels and joins this monitor before disposing Application coordination resources.
+
+An installer-only `--uninstall-cleanup` command is handled before single-instance, GSMTC, tray or input initialization.
+It delegates to the Windows startup adapter, which removes the current-user Run value only when its complete quoted
+command matches the executing installed path. Missing or portable-owned values are preserved. The command produces no
+desktop UI and reports cleanup failure through its process exit code for the uninstaller.
+
 ## 11. Publication
 
 The release candidate targets `win-x64`, self-contained, single-file publication. Single-file output can be larger
 and may interact with native libraries or extraction behavior, so build success, cold start, tray resources,
 settings paths and clean-machine execution are release gates rather than assumptions.
+
+Phase 12B enables compression for managed assemblies inside the single-file bundle while retaining self-contained
+runtime and native-library self extraction. This reduces the installed executable but can make the outer Inno Setup
+container larger because its LZMA2 compressor receives already-compressed input. Release metadata records the
+single-file-compression state; EXE, ZIP, Setup, extraction cache and startup remain separate gates.

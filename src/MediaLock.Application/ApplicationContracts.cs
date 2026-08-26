@@ -1,5 +1,6 @@
 using MediaLock.Core.Media;
 using MediaLock.Core.Configuration;
+using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
 
 namespace MediaLock.Application;
@@ -23,6 +24,9 @@ public abstract record ApplicationIntent
     public sealed record Route(
         MediaCommand Command,
         SessionKey? ExpectedTarget = null) : ApplicationIntent;
+
+    public sealed record SetPlaybackStateLock(
+        PlaybackStateLockMode Mode) : ApplicationIntent;
 
     public sealed record UpdateSettings(MediaLockSettings Settings) : ApplicationIntent;
 }

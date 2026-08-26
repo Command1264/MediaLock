@@ -33,6 +33,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private double recoveryTimeoutSeconds;
     private string recoveryTimeoutText = string.Empty;
     private string? recoveryTimeoutError;
+    private bool repeatedPauseOverrideEnabled;
+    private int repeatedPauseWindowSeconds;
+    private string repeatedPauseWindowText = string.Empty;
+    private string? repeatedPauseWindowError;
+    private int repeatedPauseCount;
+    private string repeatedPauseCountText = string.Empty;
+    private string? repeatedPauseCountError;
+    private bool playRepeatedPauseOverrideSound;
     private FallbackPolicy fallbackPolicy;
     private string? errorMessage;
     private string? supportStatusMessage;
@@ -209,7 +217,50 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         }
     }
 
-    public bool HasErrors => recoveryTimeoutError is not null;
+    public bool RepeatedPauseOverrideEnabled
+    {
+        get => repeatedPauseOverrideEnabled;
+        set => SetField(ref repeatedPauseOverrideEnabled, value);
+    }
+
+    public string RepeatedPauseWindowText
+    {
+        get => repeatedPauseWindowText;
+        set
+        {
+            value ??= string.Empty;
+            if (!string.Equals(repeatedPauseWindowText, value, StringComparison.Ordinal))
+            {
+                repeatedPauseWindowText = value;
+                OnPropertyChanged();
+                ValidateRepeatedPauseWindow();
+            }
+        }
+    }
+
+    public string RepeatedPauseCountText
+    {
+        get => repeatedPauseCountText;
+        set
+        {
+            value ??= string.Empty;
+            if (!string.Equals(repeatedPauseCountText, value, StringComparison.Ordinal))
+            {
+                repeatedPauseCountText = value;
+                OnPropertyChanged();
+                ValidateRepeatedPauseCount();
+            }
+        }
+    }
+
+    public bool PlayRepeatedPauseOverrideSound
+    {
+        get => playRepeatedPauseOverrideSound;
+        set => SetField(ref playRepeatedPauseOverrideSound, value);
+    }
+
+    public bool HasErrors => recoveryTimeoutError is not null ||
+        repeatedPauseWindowError is not null || repeatedPauseCountError is not null;
 
     public FallbackPolicy FallbackPolicy
     {
@@ -269,12 +320,29 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         private set => SetField(ref errorMessage, value);
     }
 
-    public IEnumerable GetErrors(string? propertyName) =>
-        recoveryTimeoutError is not null &&
-        (string.IsNullOrEmpty(propertyName) ||
-         propertyName == nameof(RecoveryTimeoutText))
-            ? new[] { recoveryTimeoutError }
-            : Array.Empty<string>();
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        var errors = new List<string>(3);
+        if (recoveryTimeoutError is not null &&
+            (string.IsNullOrEmpty(propertyName) || propertyName == nameof(RecoveryTimeoutText)))
+        {
+            errors.Add(recoveryTimeoutError);
+        }
+
+        if (repeatedPauseWindowError is not null &&
+            (string.IsNullOrEmpty(propertyName) || propertyName == nameof(RepeatedPauseWindowText)))
+        {
+            errors.Add(repeatedPauseWindowError);
+        }
+
+        if (repeatedPauseCountError is not null &&
+            (string.IsNullOrEmpty(propertyName) || propertyName == nameof(RepeatedPauseCountText)))
+        {
+            errors.Add(repeatedPauseCountError);
+        }
+
+        return errors;
+    }
 
     public void Dispose()
     {
@@ -291,6 +359,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
     private async Task SaveAsync()
     {
+        var previousSettings = application.State.Settings;
         try
         {
             var settings = new MediaLockSettings(
@@ -305,12 +374,59 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
                     SelectedLanguage,
                     SelectedTheme,
                     InterceptMediaKeys),
-                PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray());
+                PriorityRules.Select(rule => rule.ToPriorityRule()).ToImmutableArray())
+            {
+                PlaybackStateLock = new PlaybackStateLockSettings(
+                    RepeatedPauseOverrideEnabled,
+                    TimeSpan.FromSeconds(repeatedPauseWindowSeconds),
+                    repeatedPauseCount,
+                    PlayRepeatedPauseOverrideSound),
+            };
             await application.DispatchAsync(
                 new ApplicationIntent.UpdateSettings(settings),
                 CancellationToken.None);
-            applyLanguage?.Invoke(SelectedLanguage);
-            applyTheme?.Invoke(SelectedTheme);
+            try
+            {
+                applyLanguage?.Invoke(SelectedLanguage);
+                applyTheme?.Invoke(SelectedTheme);
+            }
+            catch (Exception exception)
+            {
+                var failures = new List<Exception> { exception };
+                try
+                {
+                    await application.DispatchAsync(
+                        new ApplicationIntent.UpdateSettings(previousSettings),
+                        CancellationToken.None);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                try
+                {
+                    applyLanguage?.Invoke(previousSettings.Desktop!.Language);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                try
+                {
+                    applyTheme?.Invoke(previousSettings.Desktop!.Theme);
+                }
+                catch (Exception rollbackException)
+                {
+                    failures.Add(rollbackException);
+                }
+
+                throw new AggregateException(
+                    "Settings presentation could not be applied; rollback was attempted.",
+                    failures);
+            }
+
             ErrorMessage = null;
             ClearSupportStatus();
             requestClose?.Invoke();
@@ -358,10 +474,23 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
         if (HasErrors)
         {
-            recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
-            ErrorsChanged?.Invoke(
-                this,
-                new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+            if (recoveryTimeoutError is not null)
+            {
+                recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+            }
+
+            if (repeatedPauseWindowError is not null)
+            {
+                repeatedPauseWindowError = UiText.Get("Settings_RepeatedPauseWindowValidation");
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepeatedPauseWindowText)));
+            }
+
+            if (repeatedPauseCountError is not null)
+            {
+                repeatedPauseCountError = UiText.Get("Settings_RepeatedPauseCountValidation");
+                ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepeatedPauseCountText)));
+            }
         }
     }
 
@@ -514,6 +643,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         ApplyStartupRoutingMode(settings.DefaultRoutingMode);
         RecoveryTimeoutSeconds = settings.Recovery!.Timeout.TotalSeconds;
         FallbackPolicy = settings.Recovery.FallbackPolicy;
+        var playbackSettings = settings.PlaybackStateLock!;
+        RepeatedPauseOverrideEnabled = playbackSettings.RepeatedPauseOverrideEnabled;
+        RepeatedPauseWindowText = ((int)playbackSettings.RepeatedPauseWindow.TotalSeconds)
+            .ToString(CultureInfo.InvariantCulture);
+        RepeatedPauseCountText = playbackSettings.RepeatedPauseCount
+            .ToString(CultureInfo.InvariantCulture);
+        PlayRepeatedPauseOverrideSound = playbackSettings.PlayOverrideSound;
         PriorityRules.Clear();
         foreach (var rule in settings.PriorityRules)
         {
@@ -561,6 +697,58 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         ErrorsChanged?.Invoke(
             this,
             new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
+        saveCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ValidateRepeatedPauseWindow()
+    {
+        var isValid = int.TryParse(
+                RepeatedPauseWindowText,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var seconds) &&
+            seconds is >= PlaybackStateLockSettings.MinimumWindowSeconds and
+                <= PlaybackStateLockSettings.MaximumWindowSeconds;
+        if (isValid)
+        {
+            repeatedPauseWindowSeconds = seconds;
+        }
+
+        SetValidationError(
+            nameof(RepeatedPauseWindowText),
+            ref repeatedPauseWindowError,
+            isValid ? null : UiText.Get("Settings_RepeatedPauseWindowValidation"));
+    }
+
+    private void ValidateRepeatedPauseCount()
+    {
+        var isValid = int.TryParse(
+                RepeatedPauseCountText,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var count) &&
+            count is >= PlaybackStateLockSettings.MinimumPauseCount and
+                <= PlaybackStateLockSettings.MaximumPauseCount;
+        if (isValid)
+        {
+            repeatedPauseCount = count;
+        }
+
+        SetValidationError(
+            nameof(RepeatedPauseCountText),
+            ref repeatedPauseCountError,
+            isValid ? null : UiText.Get("Settings_RepeatedPauseCountValidation"));
+    }
+
+    private void SetValidationError(string propertyName, ref string? field, string? next)
+    {
+        if (!string.Equals(field, next, StringComparison.Ordinal))
+        {
+            field = next;
+            OnPropertyChanged(nameof(HasErrors));
+        }
+
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));
         saveCommand.RaiseCanExecuteChanged();
     }
 

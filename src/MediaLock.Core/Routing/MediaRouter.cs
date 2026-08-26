@@ -164,7 +164,21 @@ public sealed class MediaRouter : IMediaRouter
     private RouterResult UpdateOptions(RouterOptions updated)
     {
         ValidateOptions(updated);
+        var previousOptions = options;
         options = updated;
+        if (state.Status == RouterStatus.Recovering &&
+            previousOptions.RecoveryTimeout != updated.RecoveryTimeout)
+        {
+            var previous = state;
+            var nextRevision = state.Revision + 1;
+            state = state with
+            {
+                RecoveryEpoch = nextRevision,
+                Revision = nextRevision,
+            };
+            return StateUpdated(previous);
+        }
+
         if (state.Mode == RoutingMode.PriorityRules)
         {
             var nextTarget = SelectPriorityCandidate(state.Sessions, updated.PriorityRules)?.Key;

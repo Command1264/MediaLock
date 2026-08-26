@@ -58,7 +58,7 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                 stream,
                 SerializerOptions,
                 cancellationToken);
-            if (settings?.SchemaVersion is >= 1 and <= 5)
+            if (settings?.SchemaVersion is >= 1 and <= 6)
             {
                 var sourceVersion = settings.SchemaVersion;
                 settings = settings with
@@ -76,9 +76,12 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                                 Theme = sourceVersion <= 4
                                     ? UiThemePreference.System
                                     : settings.Desktop.Theme,
-                                InterceptMediaKeys = true,
+                                InterceptMediaKeys = sourceVersion <= 5
+                                    ? true
+                                    : settings.Desktop.InterceptMediaKeys,
                             },
                     PriorityRules = sourceVersion <= 2 ? [] : settings.PriorityRules,
+                    PlaybackStateLock = MediaLockSettings.Default.PlaybackStateLock,
                 };
             }
 

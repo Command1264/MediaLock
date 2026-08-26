@@ -46,6 +46,28 @@ public sealed class MediaInputCoordinatorTests
     }
 
     [Fact]
+    public async Task UpdatedInterceptionSettingAppliesToTheNextInput()
+    {
+        var target = Session("music", MediaCommandCapabilities.All);
+        var application = new RecordingApplication(State(target));
+        await using var source = new FakeInputSource();
+        await using var coordinator = new MediaInputCoordinator(application, source);
+        await coordinator.StartAsync(CancellationToken.None);
+        var disabled = application.State.Settings with
+        {
+            Desktop = application.State.Settings.Desktop! with
+            {
+                InterceptMediaKeys = false,
+            },
+        };
+
+        application.Publish(application.State with { Settings = disabled });
+
+        Assert.False(source.Emit(MediaCommand.TogglePlayPause));
+        Assert.False(application.NextIntent.Task.IsCompleted);
+    }
+
+    [Fact]
     public async Task CaptureDecisionReadsOneImmutableApplicationStateSnapshot()
     {
         var target = Session("music", MediaCommandCapabilities.All);
@@ -232,7 +254,7 @@ public sealed class MediaInputCoordinatorTests
             remove { }
         }
 
-        public MediaLockApplicationState State { get; } = state;
+        public MediaLockApplicationState State { get; private set; } = state;
 
         public TaskCompletionSource<ApplicationIntent> NextIntent { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -248,6 +270,8 @@ public sealed class MediaInputCoordinatorTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public void Publish(MediaLockApplicationState updated) => State = updated;
     }
 
     private sealed class StateReadCountingApplication(

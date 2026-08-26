@@ -100,6 +100,53 @@
                                            FontSize="11" Text="{Binding NowPlayingDuration}" />
                             </Grid>
                         </Grid>
+                        <Grid x:Name="PlaybackStateLockPanel" Margin="0,12,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="PlaybackStateLockLabel"
+                                       VerticalAlignment="Center"
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Text="{loc:Translate Main_PlaybackStateLock}" />
+                            <WrapPanel Grid.Column="1" Margin="6,0,0,0"
+                                       HorizontalAlignment="Left">
+                                <ToggleButton x:Name="PlaybackStateLockOffButton"
+                                              Margin="8,0,0,0"
+                                              Style="{StaticResource StateLockToggleStyle}"
+                                              AutomationProperties.Name="{loc:Translate Main_PlaybackStateLockOffAutomation}"
+                                              Command="{Binding PlaybackStateLockOffCommand}"
+                                              Content="{loc:Translate Main_PlaybackStateLockOff}"
+                                              IsChecked="{Binding IsPlaybackStateLockOff, Mode=OneWay}" />
+                                <ToggleButton x:Name="PlaybackStateLockKeepPlayingButton"
+                                              Margin="8,0,0,0"
+                                              Style="{StaticResource StateLockToggleStyle}"
+                                              AutomationProperties.Name="{loc:Translate Main_KeepPlayingAutomation}"
+                                              Command="{Binding KeepPlayingCommand}"
+                                              Content="{loc:Translate Main_KeepPlaying}"
+                                              IsChecked="{Binding IsKeepPlaying, Mode=OneWay}" />
+                            </WrapPanel>
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                                       Margin="0,6,0,0" Text="{Binding PlaybackStateLockNotice}"
+                                       TextWrapping="Wrap"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       Visibility="{Binding HasPlaybackStateLockNotice, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsPlaybackStateLockFailed}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </Border>

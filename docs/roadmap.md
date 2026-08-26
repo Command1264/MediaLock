@@ -386,21 +386,28 @@ Phase 11 targets `0.3.0`. It does not mutate the published stable `0.2.0` releas
 
 ### Phase 11A — Playback State Lock
 
-Let the user explicitly choose Off, Keep Playing or Keep Paused for the current routed target without turning ordinary
-Play/Pause controls into an unbounded automation loop.
+Let the user explicitly choose Off or one-way Keep Playing for the current routed target without turning ordinary
+Play/Pause controls into an unbounded automation loop or adding a Keep Paused mode.
 
-Status: planned.
+Status: complete. PR #35 integrated the one-way Keep Playing policy, repeated-pause escape hatch and named host
+validation into `develop` on 2026-08-25.
 
 Exit criteria:
 
-- Core defines the three policy values and deterministic correction decisions without WPF or Windows dependencies.
+- Core defines Off/Keep Playing eligibility and deterministic correction decisions without WPF or Windows dependencies.
 - Application arms the policy to a captured target, serializes observations and corrections, and sends only explicit
-  Play or Pause with `ExpectedTarget`; TogglePlayPause is never used for enforcement.
-- Play/Pause updates the Desired Playback State, Next/Previous preserves it, and Stop clears the lock before stopping.
+  Play with `ExpectedTarget`; Pause and TogglePlayPause are never used for enforcement.
+- Media Lock Pause/TogglePlayPause/Stop clears the policy before routing; Play/Next/Previous preserves it.
+- Windows lock-screen Pause/Stop clears the policy; lock/unlock without a playback change preserves it, using a fresh
+  post-unlock GSMTC observation rather than guessing from stale state.
 - Recovery may resume only for the Router-accepted successor. Fallback, unrelated target changes, ambiguity, catalog
   loss, suspend and shutdown cannot redirect an enforcement command.
-- Correction confirmation and retry are bounded, observable and deterministically tested; Keep Playing does not restart
-  Stopped, Closed or naturally exhausted playback.
+- Correction confirmation is observation-driven and bounded to two unconfirmed attempts; exhaustion is visible and
+  deterministically tested. Keep Playing does not restart Stopped, Closed or naturally exhausted playback.
+- An enabled-by-default repeated-pause escape hatch turns Keep Playing Off on the third distinct direct
+  Playing-to-Paused transition within five seconds, leaves the third request paused and optionally plays one system
+  sound. Settings constrain the window to 1–60 seconds and the threshold to 2–10; schema v7 migrates v1–v6 defaults.
+  Changing/buffering, duplicate Paused, Recovery, target/lifecycle changes and Media Lock commands do not count.
 - The current-target UI exposes Off and the active locked state in English/Traditional Chinese and Light/Dark without
   resizing controls. The first version is not restored on process startup.
 - Real YouTube Music plus ordinary YouTube evidence covers external state changes, Next/Previous, Recovery, competing
@@ -411,7 +418,9 @@ Exit criteria:
 Measure whether a Media Lock-owned SMTC Session can make Windows' native media surface usefully reflect and control the
 routed target. This is a feasibility probe, not a production promise.
 
-Status: planned after Phase 11A.
+Status: complete on 2026-08-25 with a final **Limit** decision. The documented mirror synchronized target data and
+routed native-surface actions exactly once, but Windows did not reliably retain it as Current Session after control,
+unlock or sleep/resume. See [`phase-11/windows-media-surface-probe.md`](phase-11/windows-media-surface-probe.md).
 
 Exit criteria:
 
@@ -431,3 +440,195 @@ Proceed only if Phase 11B demonstrates reliable, supportable native-surface beha
 replaceable adapter, fake-driven Application coverage, self-session exclusion, accessibility/localization, stale-state
 cleanup and a documented compatibility boundary. If the probe fails, record the limitation and scope any Media Lock
 on-screen display as a separate feature rather than calling it native Windows synchronization.
+
+Status: not proceeding. Phase 11B could not establish the required Current Session persistence, so Media Lock does
+not ship or promise a native Windows media-surface replacement. A separately scoped best-effort mirror or Media Lock
+on-screen display would require a new product decision.
+
+## Phase 12 — Distribution and footprint
+
+Phase 12 is planned after Phase 11 and is not part of Playback State Lock.
+
+### Phase 12A — Installable Windows package
+
+Provide an ordinary-user installation path that registers Media Lock in the Start menu so Windows Search can find it,
+supports upgrade and uninstall, and keeps login-startup paths valid. Compare MSIX with an installer-based package before
+selecting a format; code-signing and SmartScreen behavior must be stated precisely rather than implied by packaging.
+The portable ZIP remains available until an installed migration and rollback path has passed a clean-Windows gate.
+
+Status: complete on 2026-08-25. PR #38 integrated a per-user Inno Setup EXE at a stable
+`%LocalAppData%\Programs\MediaLock\` path that the release command produces beside the existing portable ZIP. The
+first RED → GREEN slices
+produce ZIP and Setup from one payload and protect startup cleanup from deleting a portable-owned Run value. Local
+silent install/uninstall has verified current-user registration, Start Menu discovery, matching startup cleanup and
+default user-data retention. A clean Windows Sandbox transaction gate also passed for commit
+`6233da8bab35e6fcde0858d1fa0a58fe5babfba6`, including payload/digest matching, default-disabled startup, owned versus
+portable startup cleanup and retained user data. The same artifact's visible Sandbox smoke passed the
+ordinary-user wizard without UAC, fixed destination, cold launch without a separate .NET prompt, Settings, search-panel
+shortcut launch, single-instance restore and Tray restore. Indexed keyword search remains unverified because Sandbox
+disabled its search index. The subsequent host/manual gate passed Windows Search, single-instance and Tray restore,
+actual login startup, Play/Pause, Next/Previous, Recovery, competing-source isolation, uninstall and retained user
+data without a reported error or crash. Clean source commit
+`ed05c2742bdc6f3b0d5760406c6c3c410533ff9d` then produced test-only `0.2.0` and `0.2.1` artifacts whose hashes and
+Sandbox matrix passed in-place upgrade with one Installed apps entry, retained user data and an unchanged startup
+command. Older installers are now blocked with exit code 7 and an actionable message; a Ready-page cancellation
+returned exit code 2 and left the old installation unchanged. Cancellation during extraction is not claimed because
+the payload completed before the cancel action arrived. MSIX is deferred while
+direct public installation requires a trusted signature and packaged-startup migration; MSI/WiX is deferred until
+enterprise deployment or repair becomes a concrete requirement. See the
+[Phase 12A plan](phase-12/installable-package-plan.md),
+[packaging ADR](adr/0004-use-inno-setup-for-first-installer.md) and
+[official-source comparison](research/windows-installation-packaging-options.md).
+
+### Phase 12B — Footprint measurement and optimization
+
+Measure the compressed archive, single-file executable, managed framework, native WPF/WinRT payload and runtime
+extraction separately before choosing an optimization. Research an optional framework-dependent package and compare
+safe publish settings; a complete framework-dependent footprint remains deferred until it includes the separately
+required Desktop Runtime. Trimming, native-library exclusion or compression changes do
+not ship unless WPF resources, GSMTC, tray, localization, startup and clean-machine tests pass; reducing bytes must not
+silently remove the current no-runtime-install promise from the portable package.
+
+Status: complete on 2026-08-25. The repeatable host benchmark compares the current payload with
+single-file compression and optional supported-locale candidates while preserving self-contained, single-file,
+native-self-extract, trimming-off and ReadyToRun-off constraints. On the i7-8700 reference host, the first compression
+run reduced the installed／portable EXE by 58.91% with final 15-sample fresh- and warm-cache median startup regressions
+of 2.86% and 2.04%, but increased the Inno Setup download by 37.24%. The accepted candidate enables single-file
+compression while retaining all language resources; the manifest records this explicitly. Supported-locale filtering
+reduced EXE, ZIP and Setup by 9.11%, 6.98% and 3.46%, but remains test-only rather than shipping in this phase. See the
+[Phase 12B plan](phase-12/footprint-optimization-plan.md) and
+[official-source research](research/dotnet-wpf-publish-footprint.md). The exact clean-commit i7-8700 evidence and raw
+samples are preserved in the [host footprint benchmark](phase-12/host-footprint-benchmark.md). The compressed
+candidate subsequently passed host routing, Recovery, lock／unlock, sleep／wake, Tray and localization smoke. A fresh
+Windows Sandbox independently passed artifact identity, clean install, visible launch, single-instance, uninstall,
+owned-startup cleanup and user-data retention checks.
+The product owner explicitly waived a second reboot solely for a direct A/B pair after accepting the 15 + 15 sample
+result and ordinary candidate startup smoke. Full Phase 12A upgrade／downgrade／cancellation and login-startup
+transactions were inherited because their owning installer and startup code did not change; the exact compressed
+payload repeated clean install／launch／uninstall and critical runtime routing instead.
+
+## Phase 13 — `0.3.0` release preparation
+
+Phase 13 turns the completed Phase 11A, 12A and 12B work into a reviewable `0.3.0-rc.1` candidate. It does not reopen
+the Phase 11B Limit decision, add a best-effort Windows media-surface mirror or mutate the published `0.2.0` release.
+The retained `release/0.2` branch remains the current stable hotfix baseline until a later verified `release/0.3`
+stable baseline exists.
+
+### Phase 13A — `0.3.0-rc.1` scope and gate definition
+
+Freeze the candidate contents, compatibility boundary, artifact policy and repeatable host／Windows Sandbox evidence
+before changing product version metadata or producing a formal candidate.
+
+Status: complete. PR #40 integrated the scope and gate definition into `develop` on 2026-08-25. See the
+[Phase 13 release-candidate plan](phase-13/release-candidate-plan.md).
+
+Exit criteria:
+
+- Candidate scope contains the completed one-way Keep Playing feature, per-user Inno Setup installer and accepted
+  single-file compression profile, without adding another product feature.
+- The documented Phase 11B Limit remains explicit: `0.3.0-rc.1` does not promise to own or remain first on Windows'
+  native media surface.
+- Upgrade coverage is defined from public portable `0.2.0` and, separately, from a clean per-user installation to the
+  candidate installer. The existing two-stable-version Sandbox helper must be extended before it is used with an RC.
+- README, installation guidance, release runbook, release notes and testing evidence are all named deliverables of
+  candidate execution rather than being updated piecemeal after publication.
+- Public candidate assets are limited to portable ZIP and Setup EXE. Their SHA-256 values appear in the Release body;
+  manifest and standalone checksum files remain local provenance evidence unless a later publication decision changes
+  that policy.
+- ZIP, Setup and contained executable remain explicitly unsigned. No package format is presented as suppressing
+  SmartScreen, Smart App Control or reputation warnings.
+- Local gates are authoritative because GitHub Actions capacity is unavailable. Tagging, GitHub Prerelease creation
+  and public artifact upload remain separately approved remote operations.
+
+### Phase 13B — `0.3.0-rc.1` implementation and validation
+
+After approval, change version and candidate documentation on one task branch, extend prerelease upgrade automation,
+run the complete automated gate, then build one provenance-clean ZIP／Setup pair from the reviewed exact commit. Repeat
+the named host and clean Windows Sandbox matrices and preserve exact digests and outcomes before review or publication.
+
+No `release/0.3` branch is created for the prerelease. Create and retain that long-lived hotfix baseline only when a
+verified `0.3.0` stable release is ready. Push, PR, merge, tag, GitHub Prerelease and public upload follow their normal
+separate authorization boundaries.
+
+Status: complete. Product metadata targets `0.3.0-rc.1`／`0.3.0.0`; the PowerShell 5.1-compatible installer gate selects
+explicitly named stable／prerelease artifacts without `[version]`. The complete 351-test gate, review, exact-artifact
+host smoke and Windows Sandbox matrix passed. Clean source commit
+`d0fe5583e91204fe98a79b14ae0327e5120af54e` produced the independently matching ZIP／Setup／payload identities recorded
+in the [Phase 13B packaged validation](phase-13/release-candidate-smoke.md).
+
+The separately approved publication created GPG-signed annotated tag `v0.3.0-rc.1` at that source commit and a
+[public GitHub Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1) on 2026-08-26. Its only
+assets are the verified ZIP and Setup; `v0.2.0` remains Stable／Latest and `release/0.2` remains the stable hotfix
+baseline.
+
+## Phase 14 — `0.3.0` stable promotion
+
+Phase 14 promotes the frozen `0.3.0-rc.1` feature set to stable `0.3.0`. It adds no product feature, does not reopen the
+Phase 11B Limit decision and does not mutate any published `v0.2.0` or `v0.3.0-rc.1` asset. See the
+[Phase 14 stable-release plan](phase-14/stable-release-plan.md).
+
+### Phase 14A — stable scope and gate definition
+
+Freeze stable identity, RC1-to-stable transition coverage, exact-artifact host／Sandbox evidence, release-branch
+retention and publication boundaries before changing version metadata.
+
+Status: complete. PR #44 integrated the reviewed scope and gate definition into `develop` on 2026-08-26.
+
+Exit criteria:
+
+- Stable scope exactly matches `0.3.0-rc.1`; a blocker fix requires separate approval and regression coverage, while a
+  material behavior change requires another RC.
+- Stable ProductVersion is `0.3.0`, FileVersion remains `0.3.0.0`, and historical candidate evidence stays immutable.
+- Windows PowerShell 5.1 and PowerShell 7 transition coverage includes public RC1 Setup to stable, stable repair,
+  stable-to-RC1 downgrade protection and Ready-page cancellation.
+- Formal stable ZIP and Setup share one reviewed payload and receive independent clean-commit provenance, host and
+  Windows Sandbox evidence; no RC result transfers automatically.
+- `release/0.3` is created and retained only after the exact stable source/artifacts pass, while `release/0.2` and its
+  Worktree remain untouched during Phase 14.
+- Push, PR, merge, `main` synchronization, branch creation, tag, GitHub stable Release, Latest designation and public
+  uploads retain their documented authorization boundaries.
+
+### Phase 14B — stable implementation and validation
+
+After separate approval, change only stable identity, transition automation and release documentation, run the complete
+local gate and two-axis review, then create and validate one provenance-clean `0.3.0` ZIP／Setup pair on the host and a
+fresh Windows Sandbox. Record results in `docs/phase-14/stable-release-smoke.md` without rebuilding the artifact.
+
+Status: in progress. Phase 14B implementation was approved on 2026-08-26. Stable identity and transition tests run on
+`codex/release/phase-14b-0.3-stable`; remote integration, `release/0.3`, tag and publication remain separately gated.
+
+### Phase 14C — integration and stable publication
+
+After Phase 14B passes and receives explicit remote-operation approval, establish the retained `release/0.3` baseline,
+integrate the stable change through `develop` and `main`, then separately create the signed annotated `v0.3.0` tag and
+GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve all older public Release assets and keep
+`release/0.2` unless a later explicit maintenance decision authorizes otherwise.
+
+Status: not started.
+
+## Phase 15 — Human-readable source identities
+
+Replace raw source-application identifiers in user-facing Session and Priority Rules surfaces with a trustworthy,
+human-readable presentation while preserving the exact GSMTC identity used by routing. For example, an installed
+YouTube Music PWA currently exposed as `Brave._crx_cinhimbnkkghhklpknlkffjgod` may display as
+`YouTube Music — Brave Web App` when Windows application metadata can verify both parts.
+
+This is a presentation resolver, not browser URL detection and not an identity migration. App Lock, Priority Rules,
+Recovery and persisted state continue comparing the complete `SourceAppUserModelId`; the friendly name may change
+without changing the routed target. The resolver must prefer authoritative Windows application／package metadata,
+retain the raw identifier in an accessible details surface, and fall back to that identifier when no reliable name
+exists. It must not infer an application name from a song title, artist, browser tab title or hard-coded `_crx_` value.
+
+Exit criteria:
+
+- Ordinary browsers, installed Chromium PWAs, packaged apps and classic desktop sources have deterministic display
+  resolution and raw-ID fallback behavior.
+- Duplicate friendly names remain distinguishable without changing their routing identities.
+- Main Session rows, Priority Rules, App Lock details, accessibility text and English／Traditional Chinese surfaces
+  use one shared resolver rather than independent labels.
+- PWA reinstall／identity changes and unavailable Windows metadata fail safely without rebinding a saved rule to a
+  different source.
+- Unit tests cover resolver precedence, collisions, fallback and localization; a named Brave YouTube Music PWA plus
+  ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
+
+Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.

@@ -114,6 +114,18 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
+A successful Settings save is an application-wide commit, not only a file write. Before reporting success or closing
+Settings, Media Lock must persist the validated snapshot, apply it to every running consumer and publish application
+state containing the same snapshot. Priority Rules, Recovery timeout and Fallback Policy update the active Router
+immediately; changing the timeout during Recovery replaces the outstanding deadline. Desktop lifecycle, global-key
+interception, Playback State Lock override behavior, language and theme likewise observe the committed values without
+a process restart. A failed runtime or platform update leaves Settings open, reports an actionable failure and attempts
+to restore the previous durable and platform values.
+
+Every future setting must identify its runtime consumer and application time. Runtime-applicable settings require an
+observable immediate-application test; an intentionally startup-only setting must say so explicitly in the UI and
+specification rather than silently deferring its effect.
+
 The desktop settings persist a UI language preference independently from routing state. Supported choices are
 Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`). Windows-language selection uses Traditional
 Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English. Language changes take effect on
@@ -239,33 +251,58 @@ correlate browser tabs with GSMTC Sessions remain later `v0.3.x` work when techn
 Before browser integration, Phase 7 establishes localization and visual foundations as independently reviewed
 post-RC work. Localization does not alter Session matching or routing semantics.
 
-The published `0.2.0-rc.3` artifact remains frozen. Phase 11 does not amend that candidate or transfer its evidence;
-stable `0.2.0` keeps its existing release gate, while executable Phase 11 work targets `0.3.0`.
+The published stable `0.2.0` artifact and retained `release/0.2` hotfix baseline remain frozen. Executable Phase 11
+work targets `0.3.0` and does not transfer stable-release evidence.
 
 #### Playback State Lock
 
-Playback State Lock is an explicit three-state control on the current-target surface:
+Playback State Lock is an explicit two-state control on the current-target surface:
 
 - **Off** sends ordinary one-shot media commands and performs no later correction.
-- **Keep Playing** corrects an observed Paused state with an explicit Play request.
-- **Keep Paused** corrects an observed Playing state with an explicit Pause request.
+- **Keep Playing** can be armed only while the routed target is Playing and corrects an externally observed Paused
+  state with an explicit Play request.
 
 Enforcement never uses TogglePlayPause because a delayed or duplicate toggle could invert the intended state. A Media
-Lock Play, Pause or physical Play/Pause action updates the Desired Playback State when the lock is armed; Next and
-Previous preserve it. Stop first clears Playback State Lock and then stops so enforcement cannot immediately restart
-the target. Keep Playing does not resurrect a Stopped, Closed or unavailable source, including a naturally exhausted
-queue.
+Lock Pause, TogglePlayPause or Stop action clears Keep Playing before routing, so an explicit Media Lock action can
+pause or stop normally. Play, Next and Previous preserve it. Off ignores both external Playing-to-Paused and
+Paused-to-Playing changes. Keep Playing does not resurrect a Stopped, Closed or unavailable source, including a
+naturally exhausted queue.
+
+Windows lock-screen media controls are an explicit user override. A Paused, Stopped or Closed observation from the
+Armed Playback Target while the workstation is locked, or in the first fresh observation immediately after unlock,
+clears Keep Playing without sending Play. Locking and unlocking without changing playback preserves the policy; the
+post-unlock GSMTC refresh closes this attribution window before later desktop observations are evaluated normally.
+
+Windows Power Suspend is a separate safety boundary. Entering sleep turns Keep Playing Off immediately. Resume may
+reacquire the catalog and routing target, but it never restarts audio or automatically re-arms the policy. The user may
+start playback and explicitly enable Keep Playing again after wake.
+
+An enabled-by-default repeated-pause override gives a person another deliberate escape path. The defaults are three
+distinct Playing-to-Paused transitions within five seconds and one system notification sound. The threshold event is
+not corrected: it turns Keep Playing Off and leaves the target paused. Settings allow a 1–60 second window, a 2–10
+transition threshold and sound on/off. Changing/buffering observations, duplicate Paused events, Recovery, catalog
+loss, target changes, Media Lock commands and lock-screen overrides do not increment the sequence. Because GSMTC does
+not expose the origin of a Paused value, a player that reports sustained buffering as a genuine direct
+Playing-to-Paused transition cannot be distinguished perfectly; Media Lock uses the explicit Changing state and
+transition history rather than claiming source attribution it does not receive.
 
 The lock is armed against the active target identity at the moment the user selects it. Recovery may resume enforcement
-only for the accepted successor of that same target. Catalog loss, suspend, fallback routing and ambiguous recovery
-suspend correction and must never send it to another Session. An explicit target change clears the lock and requires
-the user to arm it again. Corrections use bounded confirmation and retry; exhaustion leaves an actionable visible status
-instead of fighting the player indefinitely.
+only for the accepted successor of that same target. Catalog loss and ambiguous Recovery suspend correction; Windows
+Power Suspend clears the policy as described above.
+In Windows Auto and Priority Rules, temporary disappearance of the Armed Playback Target also suspends correction even
+when the Router temporarily exposes a competing or stale Active Target. Enforcement resumes only when exactly one
+fingerprint-acceptable successor becomes the Active Target. If the original Session still exists while the Active Target
+changes, Keep Playing clears; a competing or fallback Session never receives a correction. Corrections wait for fresh
+catalog observations, allow at most two unconfirmed Play attempts for one paused episode, and expose an actionable
+Failed state instead of fighting the player indefinitely. A fresh Playing observation confirms recovery and resets the
+bounded attempt state.
 
 The first version is process-lifetime state and is not restored at login or application restart. This prevents a
 background startup from unexpectedly starting audio. Persisted automatic re-arming, if ever added, requires a separate
-opt-in product decision and migration. The current-target surface shows which Play or Pause state is locked so the
-policy is not hidden in Settings.
+opt-in product decision and migration. The current-target surface shows Off or Keep Playing so the policy is not
+hidden in Settings.
+Settings schema v7 persists only repeated-pause override preferences; the active policy and its counter remain
+process-lifetime state. Schema v1–v6 documents migrate to the enabled 5-second/3-transition/sound defaults.
 
 #### Windows Media Surface Mirror
 
@@ -282,6 +319,23 @@ The feature ships only if named Windows builds reliably surface the mirror and l
 changes, Recovery, suspend/resume and shutdown cannot leave stale metadata or a route loop. Otherwise the result is
 documented as limited or rejected; a separate Media Lock-owned on-screen display may later provide guaranteed visual
 feedback, but it must not be described as the Windows native media surface.
+
+#### Installable Windows package
+
+Media Lock `0.3.x` may add an unsigned per-user installer beside, not in place of, the supported portable ZIP. The
+installer must require no elevation, use a stable `%LocalAppData%\Programs\MediaLock\` path, create one current-user
+Start Menu entry for Windows Search, register one Installed apps uninstall entry and preserve user data by default.
+Installer and ZIP must contain the same reviewed payload and carry independent hashes tied to the same source commit.
+
+Login startup remains an explicit Settings choice. In-place upgrades must preserve its exact executable command, while
+the running primary instance must repair a later external overwrite when the persisted choice remains enabled.
+Disabling startup and uninstall may remove only a matching installed-path value and must not disturb a portable copy.
+Until a trusted signing path is separately approved, documentation must identify both installer and executable as
+unsigned and must not imply
+that installer format suppresses SmartScreen or Smart App Control. Portable distribution remains available until
+clean-Windows upgrade, rollback and uninstall evidence passes. The installer permits same-version repair and upgrades,
+but blocks a complete release version older than the registered installation with an actionable message so it cannot
+silently expose persisted settings to an older schema.
 
 ### v1.0
 

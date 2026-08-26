@@ -60,6 +60,19 @@ enable/disable, move, remove and schema-v3 round trips, including v1/v2 migratio
 mode explicitly; tray Windows Auto remains a current-run action.
 Application regression coverage also keeps runtime autosave suppressed after that tray override across later media
 commands, and restores the prior runtime document if the startup-settings commit fails.
+Saving reordered, enabled, disabled or removed Priority Rules while Priority Rules is active must immediately
+recalculate the routed target through `IMediaLockApplication`; restarting or reselecting the Routing Mode is not part
+of acceptance.
+
+Settings tests maintain a runtime-consumer matrix. Recovery and Priority Rules must reach the Router immediately,
+including cancellation and replacement of an active Recovery deadline when its timeout changes. Login startup must
+match the owned Run value and repair an external overwrite after initial synchronization without deleting a
+portable-owned value when startup is disabled. Global-key interception and close-to-tray must observe the published
+application state,
+repeated-pause settings must reset prior observations, and language/theme must apply only after a successful commit.
+Every newly introduced setting adds either an immediate-application test at its owning public seam or an explicit,
+documented startup-only contract. A repository write by itself is never sufficient evidence of a successful runtime
+settings change.
 
 Phase 6 tests packaging at the release-command seam. `tests/packaging/Publish-ReleaseCandidate.Tests.ps1` invokes
 the public publish script against an isolated temporary output, verifies the versioned ZIP/manifest/checksum set,
@@ -158,15 +171,33 @@ Run the complete local gate and two-axis review before creating the clean formal
 Sandbox evidence must match that artifact's exact source commit and digest and repeat the RC3 critical paths; no RC
 runtime result transfers. Preserve `release/0.2` as the current stable hotfix baseline after merge and publication.
 
-Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off, both
-desired states and observed Playing, Paused, Stopped, Closed and unavailable states. It requires no correction for a
-matching observation, uses explicit Play/Pause for an opposite observation, and never restarts Stopped or Closed
-playback. Application tests use fake time and controller observations to prove captured-target protection, one
-in-flight correction, confirmation, bounded retry, exhaustion, Stop clearing, Next/Previous preservation and
-Play/Pause desired-state updates. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown
-must cancel or suspend pending work without dispatching to a competing Session. Process restart begins at Off.
+Phase 11A uses RED → GREEN coverage at the public Core and Application seams. A decision matrix covers Off and Keep
+Playing against observed Playing, Paused, Stopped, Closed and unavailable states. Only Keep Playing plus Paused yields
+an explicit Play correction; no policy yields Pause, and Stopped or Closed playback is never restarted. Application
+tests use controller observations and fresh catalog snapshots to prove captured-target protection, one in-flight
+correction, confirmation, two-attempt exhaustion, Media Lock Pause/Toggle/Stop clearing and Play/Next/Previous
+preservation. Catalog loss, fallback, ambiguity, Recovery, target replacement, suspend and shutdown must cancel,
+suspend or clear work without dispatching to a competing Session. Power Suspend explicitly turns Keep Playing Off;
+resume must not issue Play or re-arm it. Process restart begins at Off.
+Workstation lifecycle tests distinguish power suspend from Session Lock/Unlock, require an unlock-triggered GSMTC
+refresh, and cover lock-screen Pause arriving on either side of the Unlock event. That explicit override clears Keep
+Playing with zero correction commands; an unchanged Playing refresh preserves the policy and closes the attribution
+window so a later desktop Pause is corrected normally. Power Suspend tests cover Windows Auto and Priority Rules,
+require Off at the Suspended observation and prove that a paused post-resume target receives zero Play commands.
+Repeated-pause tests use a controllable clock to prove that three distinct Playing-to-Paused transitions in the
+default five-second window release Keep Playing, leave the third pause uncorrected and emit a Released state. They
+also prove window expiry, duplicate Paused suppression, Changing-to-Paused buffering exclusion, sequence resets and
+settings bounds. ViewModel tests verify one optional system-sound request and a localized notice that clears after
+five seconds or disposal.
 
-Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one visible policy state,
+Automatic-routing Recovery tests cover Windows Auto and Priority Rules separately. When the Armed Playback Target
+temporarily disappears, both must publish Suspended without dispatching to the competing Session. A unique acceptable
+successor that becomes Active Target re-arms Keep Playing and receives at most one correction; ambiguous same-source
+successors and an inactive successor remain Suspended with zero correction commands. A long-running-target case proves
+that live observations refresh the fingerprint before a later recreation. The existing unrelated-target test continues
+to prove that an Active Target change while the original Session is still present clears the policy.
+
+Phase 11A ViewModel and WPF contract coverage verifies the current-target placement, exactly one of Off/Keep Playing,
 stable geometry, accessibility names, keyboard operation and English/Traditional Chinese plus Light/Dark rendering.
 Hardware-assisted coverage uses YouTube Music and ordinary YouTube simultaneously. It changes playback both through
 Media Lock and outside it, then repeats Next, Previous, reload/Recovery, focus changes, lock/unlock, sleep/resume and
@@ -180,6 +211,70 @@ surface renders, and which Session actually changes after each button or seek ac
 competing ordinary YouTube Session through reload/Recovery, target changes, lock/unlock, sleep/resume and shutdown on
 named Windows builds. A passing adapter lifecycle does not imply current-session selection. Phase 11C is blocked unless
 the evidence supports a precise compatibility claim; unreliable selection produces a limit or reject record instead.
+
+Phase 12A tests the installer and portable archive as two containers around one reviewed payload. Packaging coverage
+first makes the fixed Inno `AppId`, per-user privilege mode, stable install directory, Start Menu shortcut and uninstall
+metadata requirements fail, then verifies both artifacts record the same payload hash and source commit. The release
+command must retain dirty/changing-source rejection, refuse partial final output, independently verify every digest and
+fail clearly when the pinned Inno compiler is absent or unexpected. Startup tests cover exact quoted-command matching
+and prove uninstall cannot remove a Run value owned by a portable executable.
+
+The clean-Windows Phase 12A gate starts from an ordinary user and separately records cold install, Search launch,
+Installed apps metadata, runtime smoke, opt-in login startup, previous-version in-place upgrade, controlled
+cancellation/failure, supported downgrade or an actionable block, uninstall with retained user data, and portable
+coexistence. Installer, ZIP, source commit and Windows build evidence are inseparable. An unsigned Setup remains an
+explicit test fact, and observed Inno behavior must not be generalized into MSI-level transactional rollback.
+
+The initial implementation pins official Inno Setup `6.7.3`. Local RED → GREEN evidence covers owned and nonowned
+startup values, early non-UI cleanup command parsing, isolated ZIP/Setup publication, schema-2 manifest hashes and
+unsigned installer metadata. A reversible current-user transaction smoke installed without elevation, created the
+fixed executable/Start Menu/Installed apps entries, removed an owned Run value, preserved a portable-owned value and
+left existing user data intact after uninstall. This host evidence does not replace the remaining clean-Windows,
+upgrade, downgrade or full runtime matrix.
+
+`tests/packaging/WindowsSandbox-InstallerSmoke.ps1` is the PowerShell 5.1-compatible clean-environment transaction
+gate. It consumes only a read-only five-file artifact set and writes a JSON result to a separately mapped directory;
+it never treats an installed executable as evidence of a matching payload without independently hashing it.
+
+`tests/packaging/WindowsSandbox-InstallerUpgradeSmoke.ps1` requires explicit `OlderVersion`, `NewerVersion` and pinned
+older-installer SHA-256 parameters and selects exactly those manifests even when the artifact root contains other
+versions. Its shared PowerShell 5.1-compatible release parser orders stable and `-rc.N` versions without a `[version]`
+cast. Both installer files must match their manifests, and the older file must also match the caller's trusted digest.
+The script installs the older version, preserves exact settings/state bytes, an installed-path startup command and a
+user-data marker, upgrades in place, performs same-version repair, then requires the older installer to be rejected
+with Inno exit code 7. Before that blocked transaction it captures the installed EXE and shortcut SHA-256 values, the
+complete Media Lock uninstall-registration properties, startup command, settings/state and retained-marker hashes;
+the post-attempt snapshot must match every field exactly.
+
+`tests/packaging/WindowsSandbox-InstallerCancellationSmoke.ps1` uses the same explicit version and pinned-digest seam
+and has `Prepare` and `Verify` phases around a visible installer action. The recorded gate cancels on the Ready page
+before installation begins, requires exit code 2 and persists a trusted preparation snapshot beside the result. The
+Verify phase binds that snapshot to both selected installer hashes, then proves the installed EXE, Start Menu shortcut,
+complete uninstall registration, startup command and user data remain byte-for-byte unchanged. It does not claim that
+cancellation during file extraction was observed or that Inno provides MSI-level transaction rollback.
+
+The transaction gate passed on Windows Sandbox on 2026-08-25 for source commit
+`6233da8bab35e6fcde0858d1fa0a58fe5babfba6`. It independently matched the ZIP and unsigned Setup digests, matched
+the installed payload hash, created the Start Menu and Installed apps entries without enabling startup by default,
+removed an installer-owned startup value, preserved a portable-owned startup value, retained user data and finished
+with no Media Lock process. This result covers the scripted install/uninstall transaction only; indexed Search, full
+runtime/media behavior, actual login restart, upgrade, downgrade and controlled cancellation remain separate gates.
+
+The same artifact also passed a visible ordinary-user Sandbox smoke: the English Setup wizard opened without UAC,
+used the fixed per-user destination, launched without a separate .NET installation prompt, opened Settings, appeared
+in the Windows search panel and restored the existing process, and exposed a notification-area icon that restored the
+window on double-click. Windows Sandbox reported that search indexing was disabled, so indexed keyword search remains
+a host/manual gate rather than an inferred pass from the visible shortcut.
+
+The user completed that host/manual gate on 2026-08-25 with the same installer payload. Windows Search discovery,
+single-process launch, Tray restore, startup registration, actual sign-out/sign-in startup, Play/Pause, Next,
+Previous and Recovery all passed. The competing ordinary YouTube source remained unchanged. Uninstall completed,
+user data remained available, and no error or crash was reported. Test-only `0.2.0` and `0.2.1` artifacts from clean
+source commit `ed05c2742bdc6f3b0d5760406c6c3c410533ff9d` then passed the Sandbox matrix: both installer hashes matched
+their manifests, in-place upgrade retained data/startup state, and the older installer was intentionally blocked with
+exit code 7. Cancelling on the Ready page returned exit code 2 and left the old installation unchanged. Cancellation
+during file extraction was attempted, but the single-file payload completed before cancellation was delivered, so
+that stronger rollback claim remains unverified.
 
 ### Integration tests
 
@@ -309,6 +404,63 @@ dotnet build MediaLock.sln --configuration Release --no-restore
 & .\tests\packaging\Publish-ReleaseCandidate.Tests.ps1
 ```
 
+For Phase 12B publish-footprint work, first run the fast measurement-contract test:
+
+```powershell
+& .\tests\packaging\Measure-PublishFootprint.Tests.ps1
+```
+
+Then close every running Media Lock instance and produce an ignored, machine-specific comparison report:
+
+```powershell
+& .\eng\Measure-PublishFootprint.ps1 `
+    -OutputRoot '.\artifacts\phase-12b-footprint' `
+    -ColdStartIterations 15 `
+    -WarmStartIterations 15
+```
+
+Add `-IncludeLocaleCandidates` only when running the complete English／Traditional Chinese／Windows-language fallback
+matrix. The benchmark alternates variant order and uses isolated bundle extraction caches, but does not flush the
+Windows file cache; preserve a separate reboot-based first-launch smoke for the selected candidate. Generated binaries,
+cache directories and raw host reports remain under ignored `artifacts/` and are not release evidence until tied to an
+exact reviewed source commit. See [Phase 12B footprint plan](phase-12/footprint-optimization-plan.md).
+Preserve the sanitized exact-commit result using the structure in
+[Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md); do not commit executables, extraction caches
+or machine-specific absolute paths.
+
+The accepted Phase 12B profile passed its i7-8700 host smoke and fresh Windows Sandbox gates on 2026-08-25. The
+Sandbox artifact was built from clean commit `e277736d2abb4586a37af2ef1f961c307d8a4243`; its manifest declared schema 3
+and `singleFileCompressed: true`. The transaction smoke verified hashes, installed payload identity, Start Menu and
+Installed apps registration, default startup behavior, owned／portable startup cleanup boundaries, user-data retention
+and uninstall cleanup. A separate fresh Sandbox launch reached a visible main window and retained one process after a
+second launch. See the exact sizes, digests, host results and explicitly skipped direct reboot A/B pair in the
+[Phase 12B host footprint benchmark](phase-12/host-footprint-benchmark.md).
+
+Phase 13 uses the frozen [0.3.0-rc.1 release-candidate plan](phase-13/release-candidate-plan.md). Before the candidate
+can consume the installer transition gate, the PowerShell 7 and Windows PowerShell 5.1 contract test must prove that
+both Sandbox scripts accept an explicitly named stable predecessor and prerelease successor and reject invalid or
+ambiguous pairs. Candidate evidence covers both the exact public portable `0.2.0` compatibility path and generated
+installer-to-installer version transitions. The formal ZIP and Setup, host checks and clean Windows Sandbox checks must
+all identify one reviewed source commit and independently matching hashes.
+
+Because GitHub Actions capacity is unavailable, Phase 13B requires the full local automated gate. It does not infer a
+pass from earlier Phase 11／12 commits, and it does not publish until separately authorized. Public candidate assets
+are ZIP and Setup only; record their hashes in the GitHub Prerelease body while retaining manifest and standalone
+checksum files as local provenance evidence.
+
+Phase 14 uses the frozen [0.3.0 stable-release plan](phase-14/stable-release-plan.md). Stable identity must first fail at
+the version, About classification, artifact-name and packaging seams, then pass with ProductVersion `0.3.0` and
+FileVersion `0.3.0.0`. PowerShell 7 and Windows PowerShell 5.1 tests must order public `0.3.0-rc.1` below `0.3.0`
+without `[version]`, then cover RC1-to-stable in-place upgrade, stable repair, stable-to-RC1 downgrade rejection and
+Ready-page cancellation with payload, registration, startup and user-data invariants.
+
+The complete local automated gate, two-axis review, formal ZIP／Setup inspection, i7-8700 exact-artifact host matrix and
+fresh Windows Sandbox matrix all run again for stable. Candidate source, ProductVersion and hashes are different
+evidence and do not transfer. The real public portable `0.2.0` data path and public RC1 Setup path are distinct
+predecessors and must both be represented. Real sign-out/sign-in startup may close only the Sandbox-impossible row on
+the persistent host. Preserve results in `phase-14/stable-release-smoke.md`, create `release/0.3` only after the exact
+stable source/artifacts pass, and keep `release/0.2` during Phase 14.
+
 After committing the reviewed source, produce the provenance-clean release artifact with
 `eng/Publish-ReleaseCandidate.ps1`; see [Release artifact runbook](release-candidate.md). GitHub Actions capacity is
 not assumed by this gate.
@@ -340,6 +492,8 @@ commits or digests. Record `0.2.0-rc.3` evidence independently in
 [Phase 10C packaged validation](phase-10/release-candidate-smoke.md).
 Record stable `0.2.0` evidence independently in
 [Phase 10D packaged validation](phase-10/stable-release-smoke.md).
+Record stable `0.3.0` evidence independently in
+[Phase 14 packaged validation](phase-14/stable-release-smoke.md).
 
 ## 7. Manual evidence
 

@@ -43,6 +43,23 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (IsUninstallCleanupCommand(e.Args))
+        {
+            try
+            {
+                await new RegistryLoginStartupManager().RemoveIfOwnedAsync(
+                    CancellationToken.None);
+                Shutdown();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Trace.TraceError(exception.ToString());
+                Shutdown(1);
+            }
+
+            return;
+        }
+
         UiText.Apply(UiLanguagePreference.System);
         ApplyTheme(UiThemePreference.System);
 
@@ -69,7 +86,8 @@ public partial class App : System.Windows.Application
                 new JsonSettingsRepository(),
                 new RegistryLoginStartupManager(),
                 new JsonRuntimeStateRepository(),
-                diagnosticLog);
+                diagnosticLog,
+                systemLifecycle);
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
@@ -108,7 +126,8 @@ public partial class App : System.Windows.Application
                 ApplyTheme,
                 environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
                 desktopSupportActions: new DesktopSupportActions(),
-                isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true);
+                isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
+                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback());
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -156,6 +175,9 @@ public partial class App : System.Windows.Application
             Shutdown(1);
         }
     }
+
+    internal static bool IsUninstallCleanupCommand(IReadOnlyList<string> arguments) =>
+        arguments.Contains("--uninstall-cleanup", StringComparer.OrdinalIgnoreCase);
 
     private void OnMainWindowClosing(object? sender, CancelEventArgs e)
     {

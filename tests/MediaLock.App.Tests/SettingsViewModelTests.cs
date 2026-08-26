@@ -214,6 +214,49 @@ public sealed class SettingsViewModelTests
             intent.Settings.Recovery!.Timeout);
     }
 
+    [Theory]
+    [InlineData("0", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("61", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("1e2", "3", nameof(SettingsViewModel.RepeatedPauseWindowText))]
+    [InlineData("5", "1", nameof(SettingsViewModel.RepeatedPauseCountText))]
+    [InlineData("5", "11", nameof(SettingsViewModel.RepeatedPauseCountText))]
+    public void InvalidRepeatedPauseSettingsAreReportedImmediately(
+        string window,
+        string count,
+        string invalidProperty)
+    {
+        using var viewModel = new SettingsViewModel(
+            new FakeApplication(MediaLockApplicationState.Initial));
+
+        viewModel.RepeatedPauseWindowText = window;
+        viewModel.RepeatedPauseCountText = count;
+
+        Assert.True(viewModel.HasErrors);
+        Assert.NotEmpty(viewModel.GetErrors(invalidProperty).Cast<string>());
+        Assert.False(viewModel.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RepeatedPauseOverrideSettingsSaveThroughTheApplicationSeam()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        using var viewModel = new SettingsViewModel(application)
+        {
+            RepeatedPauseOverrideEnabled = false,
+            RepeatedPauseWindowText = "12",
+            RepeatedPauseCountText = "4",
+            PlayRepeatedPauseOverrideSound = false,
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(
+            Assert.Single(application.Intents));
+        Assert.Equal(
+            new PlaybackStateLockSettings(false, TimeSpan.FromSeconds(12), 4, false),
+            intent.Settings.PlaybackStateLock);
+    }
+
     [Fact]
     public async Task StartupRoutingModeIsReadOnlyAndPreservedWhenSettingsAreSaved()
     {
@@ -398,6 +441,44 @@ public sealed class SettingsViewModelTests
         Assert.Equal(0, languageApplyRequests);
         Assert.Equal(0, themeApplyRequests);
         Assert.Equal("Settings could not be saved.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task PresentationFailureRollsBackTheCommittedSettingsAndKeepsSettingsOpen()
+    {
+        var initial = MediaLockApplicationState.Initial;
+        var application = new FakeApplication(initial);
+        var closeRequests = 0;
+        var appliedLanguages = new List<string>();
+        var appliedThemes = new List<string>();
+        using var viewModel = new SettingsViewModel(
+            application,
+            requestClose: () => closeRequests++,
+            applyLanguage: appliedLanguages.Add,
+            applyTheme: theme =>
+            {
+                appliedThemes.Add(theme);
+                if (theme == UiThemePreference.Dark)
+                {
+                    throw new InvalidOperationException("Theme could not be applied.");
+                }
+            });
+        viewModel.SelectedLanguage = UiLanguagePreference.TraditionalChinese;
+        viewModel.SelectedTheme = UiThemePreference.Dark;
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, closeRequests);
+        Assert.Equal(initial.Settings, application.State.Settings);
+        Assert.Equal(2, application.Intents.Count);
+        Assert.Equal(
+            [UiLanguagePreference.TraditionalChinese, UiLanguagePreference.System],
+            appliedLanguages);
+        Assert.Equal([UiThemePreference.Dark, UiThemePreference.System], appliedThemes);
+        Assert.Contains(
+            "Settings presentation could not be applied",
+            viewModel.ErrorMessage,
+            StringComparison.Ordinal);
     }
 
     [Fact]
