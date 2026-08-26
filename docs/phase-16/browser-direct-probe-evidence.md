@@ -56,6 +56,8 @@ Revision ownership is intentionally split rather than assigning every observatio
 | Chrome YouTube Music Pause while ordinary Brave YouTube also plays, after opaque document-ID fix | Accepted once | Chrome YouTube Music paused once; ordinary Brave YouTube continued playing | Pass, cross-browser exact-page isolation |
 | Pause from the loopback iframe harness while its cross-origin YouTube iframe plays | `target-unavailable` | Embedded video continued playing; no other media source changed | Pass, nested frame rejected without fallback |
 | Pause with a 3000 ms Host command delay, then close the target YouTube Music tab | Popup closed with its tab before a visible result | After more than 5 seconds, ordinary Chrome YouTube continued playing, Brave media was unchanged and no duplicate occurred | Pass, closed document did not fall through to another target |
+| Pause with a 6000 ms Host command delay against the five-second command deadline | `outcome-unknown` at approximately 5 seconds | After more than 8 seconds, YouTube Music continued playing; ordinary Chrome YouTube and Brave were unchanged; no late retry or duplicate occurred | Pass, full-lifecycle timeout failed closed |
+| Final zero-delay Pause smoke after restoring the shared Chrome／Brave registration | Accepted once in each browser | Each selected target paused immediately; every competing source remained unchanged; no delayed or duplicate switch occurred | Pass, production-default Probe timing restored |
 
 After reloading the `5c2e69a` Popup in Chrome, its Copy button copied the complete accepted status exactly, displayed
 `Copied.` transiently and cleared that feedback automatically. No permission confirmation, error or crash appeared.
@@ -145,19 +147,16 @@ observations:
   `helloAck`, and includes the exact delay in its content-addressed registration identity. Cache reuse rejects a
   mismatched configuration instead of overwriting an active Host.
 
-These seams pass in the dependency-free Extension suite. Live iframe, closed-tab and deliberately suspended Host
-observations remain explicit Gate A rows to execute rather than inferred evidence.
+These seams pass in the dependency-free Extension suite. Live iframe, closed-tab and delayed-Host timeout observations
+also passed against the final hardening revision without controlling a competing source.
 
 ## Current conclusion
 
 Chrome and Brave fixed-site Play, Pause, Seek, same-browser and cross-browser exact-page isolation, document reload,
 Host-loss safety and explicit reconnect pass the manual slices. Both browsers passed full process restart with a
 first command, Brave passed active non-target-page isolation, Chrome passed a separate disallowed-origin check, and
-the no-Extension stable GSMTC fallback observation passed. This is **not** complete Phase 16A Gate A evidence. It
-does not yet prove:
-
-- command-timeout behavior at the live browser seam on the final hardening revision;
-- generic web media or page-level persisted identity planned for Phase 16B.
+the no-Extension stable GSMTC fallback observation passed. Phase 16A Gate A is complete. Generic web media and
+page-level persisted identity remain explicitly outside this fixed-site Probe and belong to Phase 16B.
 
 The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
 binding rejection; a Host／Extension fixed-vector connection ID derived from two nonces, browser family and negotiated
@@ -165,7 +164,7 @@ capabilities plus per-command capability enforcement; a 64-command pending ceili
 completion timeout; finite duration／`seekable`-range Seek checks; and fail-closed closed-tab／full-lifecycle command
 deadline seams. The Probe status Copy control additionally has exact-write, fail-closed and two-second transient
 feedback coverage, while its manifest contract permits `clipboardWrite` but explicitly rejects `clipboardRead`.
-The complete Extension suite contains 30 passing tests and the complete .NET solution contains 420 passing tests.
+The complete Extension suite contains 30 passing tests and the complete .NET solution contains 427 passing tests.
 Manual Chrome／Brave stale-document evidence
 passed three rounds per browser: every old command was rejected as `target-unavailable`, no replacement document
 received the old command, every round made at most one media change and each competing ordinary YouTube source was
