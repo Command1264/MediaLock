@@ -539,6 +539,18 @@ Removing or disabling an Extension before startup must behave like provider abse
 target was bound must instead exercise explicit target-preserving Recovery and prove that no competing Session is
 controlled.
 
+Phase 16B adds a generic Adapter matrix for a directly hosted MP4, cloud-drive MP4, ordinary streaming page, multiple
+media elements, same-origin and cross-origin iframe, unsupported／DRM player and revoked site permission. For every
+supported row, record the browser profile, Page Binding, document generation, frame and selected Endpoint separately;
+page title, media title, origin and browser executable are presentation／scope inputs rather than sufficient identity.
+
+Routing-mode tests use two playable pages in the same browser. Session Lock and page-scoped Priority Rules must route
+only to the bound page. App Lock must use its explicit Browser Application Scope and refuse an ambiguous candidate.
+Windows Auto may change targets by policy, but its visible selection must still identify the exact page. Reload,
+same-origin navigation, cross-origin navigation, tab duplication, tab replacement and browser restart must never
+silently rebind a saved lock or rule to the other page.
+See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected

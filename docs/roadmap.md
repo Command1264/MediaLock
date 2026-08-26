@@ -651,18 +651,19 @@ artifact. See
 
 ## Phase 16 — Direct browser integration
 
-Add an optional, support-bounded browser-control path for YouTube and YouTube Music that can address an exact browser
-tab or installed PWA without using that source's GSMTC Session as the command transport. The existing GSMTC adapter
-remains the universal fallback for unsupported sites, browsers and desktop media applications. This phase does not
-promise to replace Windows GSMTC, suppress Sessions owned by other processes or force Media Lock to remain Windows
-Current Session.
+Add an optional, support-bounded browser-control path for standards-based web media that can address an exact page or
+installed PWA without using that source's GSMTC Session as the command transport. A generic Adapter covers compatible
+`HTMLMediaElement` pages such as directly hosted／cloud MP4 and ordinary streaming media; site Adapters add richer
+capabilities where a documented platform contract exists. The existing GSMTC adapter remains the universal fallback
+for unsupported sites, browsers and desktop media applications. This phase does not promise to replace Windows GSMTC,
+suppress Sessions owned by other processes or force Media Lock to remain Windows Current Session.
 
 The intended shape is a peer browser adapter behind a neutral media-target seam, not browser-specific behavior inside
 the existing GSMTC adapter:
 
 ```text
-YouTube／YouTube Music ──▶ browser extension ──▶ native messaging ──▶ browser adapter
-GSMTC applications ────────────────────────────────────────────────▶ GSMTC adapter
+Authorized web media ──▶ browser extension ──▶ native messaging ──▶ browser adapter
+GSMTC applications ──────────────────────────────────────────────▶ GSMTC adapter
                                                                        │
                                                                        ▼
                                                          existing routing semantics
@@ -693,6 +694,9 @@ Exit criteria:
   native-host access is limited to approved extension identities.
 - Direct targets have explicit identity, capability and Recovery semantics that do not silently rebind existing
   GSMTC App Lock, Session Lock or Priority Rules.
+- Session Lock and page-scoped Priority Rules retain an exact Page Binding. Browser App Lock uses an exact Browser
+  Application Scope plus deterministic page selection; no mode treats a browser executable as the complete target or
+  silently merges two pages into one rule.
 - Extension absence, permission denial, unsupported pages, disconnects and adapter failures fall back safely to the
   established GSMTC-only operation without claiming that a command succeeded.
 - A clean profile with no Media Lock Extension installed passes the complete `0.3.0` regression matrix without an
@@ -709,5 +713,6 @@ Status: Phase 16A security-first disposable Probe in progress after Phase 15. Th
 Router and release payload unchanged while validating a fixed-ID Extension, bounded Native Messaging protocol and
 explicitly authorized YouTube targets. See the
 [`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
+[`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
 [`Native Messaging security boundary`](research/phase-16-native-messaging-security-boundary.md) and
 [`direct-browser integration limits`](research/direct-browser-integration-and-gsmtc-limits.md).
