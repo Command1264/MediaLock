@@ -5,8 +5,7 @@ namespace MediaLock.App.Presentation;
 internal sealed record SourceApplicationPresentation(
     string SourceAppUserModelId,
     string DisplayName,
-    string Details,
-    bool IsFallback);
+    string Details);
 
 internal static class SourceApplicationPresentationCatalog
 {
@@ -60,7 +59,6 @@ internal static class SourceApplicationPresentationCatalog
         return new SourceApplicationPresentation(
             sourceAppUserModelId,
             displayName,
-            sourceAppUserModelId,
-            isFallback);
+            sourceAppUserModelId);
     }
 }

@@ -2,23 +2,30 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using MediaLock.Application;
+using MediaLock.Core.Diagnostics;
 
 namespace MediaLock.Windows;
 
 public sealed class WindowsSourceApplicationMetadataResolver
     : ISourceApplicationMetadataResolver
 {
+    private readonly IDiagnosticLog? diagnosticLog;
     private readonly Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>> metadata;
 
-    public WindowsSourceApplicationMetadataResolver()
-        : this(LoadShellApplicationMetadata)
+    public WindowsSourceApplicationMetadataResolver(IDiagnosticLog? diagnosticLog = null)
     {
+        this.diagnosticLog = diagnosticLog;
+        metadata = new Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>>(
+            () => LoadSafely(LoadShellApplicationMetadata),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     internal WindowsSourceApplicationMetadataResolver(
-        Func<IReadOnlyDictionary<string, SourceApplicationMetadata>> loadMetadata)
+        Func<IReadOnlyDictionary<string, SourceApplicationMetadata>> loadMetadata,
+        IDiagnosticLog? diagnosticLog = null)
     {
         ArgumentNullException.ThrowIfNull(loadMetadata);
+        this.diagnosticLog = diagnosticLog;
         metadata = new Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>>(
             () => LoadSafely(loadMetadata),
             LazyThreadSafetyMode.ExecutionAndPublication);
@@ -61,7 +68,7 @@ public sealed class WindowsSourceApplicationMetadataResolver
             normalizedTargetProductName);
     }
 
-    private static IReadOnlyDictionary<string, SourceApplicationMetadata> LoadSafely(
+    private IReadOnlyDictionary<string, SourceApplicationMetadata> LoadSafely(
         Func<IReadOnlyDictionary<string, SourceApplicationMetadata>> loadMetadata)
     {
         try
@@ -71,11 +78,12 @@ public sealed class WindowsSourceApplicationMetadataResolver
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
+            ReportFailure("catalog", exception);
             return new Dictionary<string, SourceApplicationMetadata>(StringComparer.Ordinal);
         }
     }
 
-    private static IReadOnlyDictionary<string, SourceApplicationMetadata>
+    private IReadOnlyDictionary<string, SourceApplicationMetadata>
         LoadShellApplicationMetadata()
     {
         var result = new Dictionary<string, SourceApplicationMetadata>(StringComparer.Ordinal);
@@ -148,7 +156,7 @@ public sealed class WindowsSourceApplicationMetadataResolver
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException)
                 {
-                    // One malformed Shell item cannot remove otherwise trustworthy names.
+                    ReportFailure("shell-item", exception);
                 }
                 finally
                 {
@@ -166,7 +174,7 @@ public sealed class WindowsSourceApplicationMetadataResolver
         }
     }
 
-    private static string? ReadTargetProductName(string? targetPath)
+    private string? ReadTargetProductName(string? targetPath)
     {
         if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath))
         {
@@ -179,7 +187,36 @@ public sealed class WindowsSourceApplicationMetadataResolver
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
+            ReportFailure("target-product", exception);
             return null;
+        }
+    }
+
+    private void ReportFailure(string stage, Exception exception)
+    {
+        System.Diagnostics.Trace.TraceError(exception.ToString());
+        if (diagnosticLog is null)
+        {
+            return;
+        }
+
+        try
+        {
+            diagnosticLog.WriteAsync(
+                new DiagnosticEvent(
+                    "source.metadata.failed",
+                    new Dictionary<string, string>
+                    {
+                        ["stage"] = stage,
+                        ["exceptionType"] = exception.GetType().FullName ??
+                            exception.GetType().Name,
+                    }),
+                CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        }
+        catch (Exception diagnosticException) when (
+            diagnosticException is not OutOfMemoryException)
+        {
+            System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
         }
     }
 

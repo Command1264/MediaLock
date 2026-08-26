@@ -273,6 +273,8 @@ The presentation never enters Core, settings or runtime state. App Lock, Session
 selection bookmarks and routed commands continue comparing and persisting the original `SourceAppUserModelId`.
 Tooltips and accessibility help retain that raw identity even when the visible label is friendly. Missing Shell
 metadata is a normal fallback result and cannot remove a Session or interrupt routing.
+Unexpected AppsFolder／shortcut metadata failures emit the privacy-safe `source.metadata.failed` diagnostic with only
+the lookup stage and exception type before the same raw-ID fallback is used.
 
 Phase 7B advances settings to schema v5 with a neutral App-owned theme preference; schema v1-v4 documents migrate
 to Windows theme while preserving every previously supported setting. `UiTheme` resolves Windows, Light and Dark

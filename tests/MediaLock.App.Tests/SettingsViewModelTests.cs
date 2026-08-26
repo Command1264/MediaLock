@@ -662,11 +662,4 @@ public sealed class SettingsViewModelTests
         }
     }
 
-    private sealed class FakeSourceApplicationMetadataResolver(
-        IReadOnlyDictionary<string, SourceApplicationMetadata> metadata)
-        : ISourceApplicationMetadataResolver
-    {
-        public SourceApplicationMetadata? TryResolve(string sourceAppUserModelId) =>
-            metadata.GetValueOrDefault(sourceAppUserModelId);
-    }
 }

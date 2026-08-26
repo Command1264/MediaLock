@@ -50,7 +50,7 @@ selection, collisions and fallback remain local. Core snapshots and settings doc
 - Settings: friendly available-app／Priority Rule label while Save persists raw identities.
 - WPF contract: raw identity remains in tooltip and accessibility help; ComboBox uses raw ID as selected value.
 
-The reviewed implementation passes 380 repository tests, a Release build with zero warnings／errors, formatting,
+The reviewed implementation passes 381 repository tests, a Release build with zero warnings／errors, formatting,
 Markdown relative-link validation, `git diff --check` and the isolated packaging regression suite. The named desktop
 matrix remains pending.
 

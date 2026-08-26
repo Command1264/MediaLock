@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly IPlaybackStateLockFeedback? playbackStateLockFeedback;
     private readonly ISourceApplicationMetadataResolver? sourceApplicationMetadataResolver;
     private readonly TimeSpan playbackStateLockNoticeDuration;
+    private IReadOnlyList<string> priorityRuleSourceIds = [];
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
     private PlaybackStateLockState playbackStateLock = PlaybackStateLockState.Off;
@@ -267,7 +268,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public string CurrentTargetSourceDetails =>
-        ResolveTarget()?.SourceApplicationDetails ?? string.Empty;
+        ResolveTarget()?.SourceApplicationDetails ??
+        routerState.LockedTarget?.Fingerprint.Descriptor.SourceAppUserModelId ??
+        string.Empty;
 
     public string NowPlayingTitle => ResolveTarget()?.Title ?? string.Empty;
 
@@ -540,6 +543,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         routerState = state.Router;
+        priorityRuleSourceIds = state.Settings.PriorityRules
+            .Select(rule => rule.SourceAppUserModelId)
+            .ToArray();
         var previousPlaybackStateLockStatus = playbackStateLock.Status;
         playbackStateLock = state.PlaybackStateLock;
         if (playbackStateLock.Status == PlaybackStateLockStatus.Released &&
@@ -634,7 +640,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private void RefreshLocalizedProjection()
     {
         var presentations = SourceApplicationPresentationCatalog.Resolve(
-            routerState.Sessions.Select(session => session.SourceAppUserModelId),
+            routerState.Sessions
+                .Select(session => session.SourceAppUserModelId)
+                .Concat(priorityRuleSourceIds),
             sourceApplicationMetadataResolver);
         projectingSelection = true;
         try

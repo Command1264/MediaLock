@@ -27,7 +27,6 @@ public sealed class SettingsWindowContractTests
             xaml.Descendants(presentation + "ComboBox"),
             element => (string?)element.Attribute("ItemsSource") ==
                 "{Binding AvailableApplications}");
-        Assert.Equal("DisplayName", (string?)available.Attribute("DisplayMemberPath"));
         Assert.Equal(
             "SourceAppUserModelId",
             (string?)available.Attribute("SelectedValuePath"));
@@ -35,9 +34,18 @@ public sealed class SettingsWindowContractTests
             "{Binding SelectedAvailableApplication}",
             (string?)available.Attribute("SelectedValue"));
 
+        var availableSource = Assert.Single(
+            available.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding DisplayName}");
+        Assert.Equal("{Binding Details}", (string?)availableSource.Attribute("ToolTip"));
+        Assert.Equal(
+            "{Binding Details}",
+            (string?)availableSource.Attribute("AutomationProperties.HelpText"));
+
         var ruleSource = Assert.Single(
             xaml.Descendants(presentation + "TextBlock"),
-            element => (string?)element.Attribute("Text") == "{Binding DisplayName}");
+            element => element != availableSource &&
+                (string?)element.Attribute("Text") == "{Binding DisplayName}");
         Assert.Equal("{Binding Details}", (string?)ruleSource.Attribute("ToolTip"));
         Assert.Equal(
             "{Binding Details}",

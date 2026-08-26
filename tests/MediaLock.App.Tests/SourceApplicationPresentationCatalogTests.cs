@@ -9,7 +9,7 @@ public sealed class SourceApplicationPresentationCatalogTests
     [Fact]
     public void ResolveUsesTrustedDisplayAndHostNamesWithoutChangingIdentity()
     {
-        var resolver = new FakeMetadataResolver(new Dictionary<string, SourceApplicationMetadata>
+        var resolver = new FakeSourceApplicationMetadataResolver(new Dictionary<string, SourceApplicationMetadata>
         {
             ["Brave._crx_music"] = new("YouTube Music", "Brave Browser"),
             ["Brave"] = new("Brave"),
@@ -34,19 +34,18 @@ public sealed class SourceApplicationPresentationCatalogTests
     {
         var presentations = SourceApplicationPresentationCatalog.Resolve(
             ["Unknown.Source"],
-            new FakeMetadataResolver(
+            new FakeSourceApplicationMetadataResolver(
                 new Dictionary<string, SourceApplicationMetadata>()));
 
         var presentation = presentations["Unknown.Source"];
         Assert.Equal("Unknown.Source", presentation.DisplayName);
         Assert.Equal("Unknown.Source", presentation.Details);
-        Assert.True(presentation.IsFallback);
     }
 
     [Fact]
     public void ResolveDisambiguatesDuplicateFriendlyNamesDeterministically()
     {
-        var resolver = new FakeMetadataResolver(new Dictionary<string, SourceApplicationMetadata>
+        var resolver = new FakeSourceApplicationMetadataResolver(new Dictionary<string, SourceApplicationMetadata>
         {
             ["Player.Alpha"] = new("Player"),
             ["Player.Beta"] = new("Player"),
@@ -59,13 +58,5 @@ public sealed class SourceApplicationPresentationCatalogTests
         Assert.Equal(2, presentations.Count);
         Assert.Equal("Player — Player.Alpha", presentations["Player.Alpha"].DisplayName);
         Assert.Equal("Player — Player.Beta", presentations["Player.Beta"].DisplayName);
-    }
-
-    private sealed class FakeMetadataResolver(
-        IReadOnlyDictionary<string, SourceApplicationMetadata> metadata)
-        : ISourceApplicationMetadataResolver
-    {
-        public SourceApplicationMetadata? TryResolve(string sourceAppUserModelId) =>
-            metadata.GetValueOrDefault(sourceAppUserModelId);
     }
 }

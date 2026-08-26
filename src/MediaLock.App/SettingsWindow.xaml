@@ -144,9 +144,18 @@
                             <Button DockPanel.Dock="Right" Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}"
                                     AutomationProperties.Name="{loc:Translate Settings_AddRuleAutomation}" Command="{Binding AddPriorityRuleCommand}" Content="{loc:Translate Settings_Add}" />
                             <ComboBox MinWidth="280" AutomationProperties.Name="{loc:Translate Settings_AvailableAppsAutomation}"
-                                      ItemsSource="{Binding AvailableApplications}" DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding AvailableApplications}"
                                       SelectedValuePath="SourceAppUserModelId"
-                                      SelectedValue="{Binding SelectedAvailableApplication}" />
+                                      SelectedValue="{Binding SelectedAvailableApplication}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   ToolTip="{Binding Details}"
+                                                   AutomationProperties.HelpText="{Binding Details}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </DockPanel>
                         <ItemsControl AutomationProperties.Name="{loc:Translate Settings_RulesAutomation}" ItemsSource="{Binding PriorityRules}">
                             <ItemsControl.ItemTemplate>

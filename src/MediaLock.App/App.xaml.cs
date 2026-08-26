@@ -129,7 +129,7 @@ public partial class App : System.Windows.Application
                 isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
                 playbackStateLockFeedback: new SystemPlaybackStateLockFeedback(),
                 sourceApplicationMetadataResolver:
-                    new WindowsSourceApplicationMetadataResolver());
+                    new WindowsSourceApplicationMetadataResolver(diagnosticLog));
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;

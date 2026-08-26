@@ -1,4 +1,5 @@
 using MediaLock.Application;
+using MediaLock.Core.Diagnostics;
 using Xunit;
 
 namespace MediaLock.Windows.Tests;
@@ -32,15 +33,22 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
     public void TryResolveFallsBackWithoutRetryingWhenTheShellCatalogIsUnavailable()
     {
         var loads = 0;
+        var diagnostics = new RecordingDiagnosticLog();
         var resolver = new WindowsSourceApplicationMetadataResolver(() =>
         {
             loads++;
             throw new InvalidOperationException("Shell catalog unavailable.");
-        });
+        }, diagnostics);
 
         Assert.Null(resolver.TryResolve("Brave._crx_music"));
         Assert.Null(resolver.TryResolve("Brave._crx_music"));
         Assert.Equal(1, loads);
+        var diagnostic = Assert.Single(diagnostics.Events);
+        Assert.Equal("source.metadata.failed", diagnostic.Name);
+        Assert.Equal("catalog", diagnostic.Properties?["stage"]);
+        Assert.Equal(
+            typeof(InvalidOperationException).FullName,
+            diagnostic.Properties?["exceptionType"]);
     }
 
     [Theory]
@@ -70,5 +78,18 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
         Assert.Null(WindowsSourceApplicationMetadataResolver.CreateMetadata(
             displayName,
             "Host"));
+    }
+
+    private sealed class RecordingDiagnosticLog : IDiagnosticLog
+    {
+        public List<DiagnosticEvent> Events { get; } = [];
+
+        public ValueTask WriteAsync(
+            DiagnosticEvent diagnosticEvent,
+            CancellationToken cancellationToken)
+        {
+            Events.Add(diagnosticEvent);
+            return ValueTask.CompletedTask;
+        }
     }
 }

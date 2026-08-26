@@ -45,6 +45,9 @@ public sealed class MainWindowContractTests
             element => (string?)element.Attribute("Text") == "{Binding TargetDescription}");
         Assert.Equal(
             "{Binding CurrentTargetSourceDetails}",
+            (string?)target.Attribute("ToolTip"));
+        Assert.Equal(
+            "{Binding CurrentTargetSourceDetails}",
             (string?)target.Attribute("AutomationProperties.HelpText"));
     }
 
