@@ -7,6 +7,7 @@
     getCandidates: () => document.querySelectorAll('video, audio'),
     isMediaElement: (candidate) => candidate instanceof HTMLMediaElement,
     createEndpointId: () => crypto.randomUUID(),
+    isSeekAllowed: globalThis.MediaLockPhase16A?.isSeekAllowed,
   });
   const controller = globalThis.MediaLockGenericContent.createGenericContentController({
     adapter,

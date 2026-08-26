@@ -11,7 +11,7 @@
 
         if (message?.type === 'bindGenericEndpoint') {
           const binding = message.binding;
-          if (binding?.scope !== 'temporary'
+          if ((binding?.scope !== 'temporary' && binding?.scope !== 'site')
               || binding?.frameId !== 0
               || binding?.pageOrigin !== pageOrigin
               || typeof binding?.bindingId !== 'string'

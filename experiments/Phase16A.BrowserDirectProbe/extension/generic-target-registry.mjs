@@ -19,54 +19,71 @@ export function createBrowserMediaTargetRegistry({ authorization, tabs }) {
       && current.pageOrigin === target.pageOrigin;
   };
 
-  return Object.freeze({
-    async bindActiveTemporaryTarget() {
-      const authorized = await authorization.authorizeActivePage({ scope: 'temporary' });
-      if (authorized.accepted !== true) {
-        return authorized;
-      }
+  const bindAuthorized = async (authorized) => {
+    if (authorized.accepted !== true) {
+      return authorized;
+    }
 
-      let endpoint;
-      try {
-        endpoint = await tabs.sendMessage(
-          authorized.binding.tabId,
-          { type: 'bindGenericEndpoint', binding: authorized.binding },
-          { documentId: authorized.binding.documentId },
-        );
-      } catch {
-        return { accepted: false, errorCode: 'target-unavailable' };
-      }
-      if (endpoint?.accepted !== true
-          || typeof endpoint.endpointId !== 'string'
-          || !OPAQUE_ENDPOINT_ID_PATTERN.test(endpoint.endpointId)
-          || !Array.isArray(endpoint.capabilities)
-          || endpoint.capabilities.length === 0
-          || new Set(endpoint.capabilities).size !== endpoint.capabilities.length
-          || endpoint.capabilities.some((capability) => !GENERIC_CAPABILITIES.has(capability))) {
-        return {
-          accepted: false,
-          errorCode: BINDING_ERRORS.has(endpoint?.errorCode)
-            ? endpoint.errorCode
-            : 'target-unavailable',
-        };
-      }
-
-      const target = Object.freeze({
-        bindingId: authorized.binding.bindingId,
-        endpointId: endpoint.endpointId,
-        scope: authorized.binding.scope,
-        tabId: authorized.binding.tabId,
-        frameId: authorized.binding.frameId,
-        documentId: authorized.binding.documentId,
-        pageOrigin: authorized.binding.pageOrigin,
-      });
-      const capabilities = Object.freeze([...endpoint.capabilities]);
-      targets.set(target.tabId, Object.freeze({ target, capabilities }));
+    let endpoint;
+    try {
+      endpoint = await tabs.sendMessage(
+        authorized.binding.tabId,
+        { type: 'bindGenericEndpoint', binding: authorized.binding },
+        { documentId: authorized.binding.documentId },
+      );
+    } catch {
+      return { accepted: false, errorCode: 'target-unavailable' };
+    }
+    if (endpoint?.accepted !== true
+        || typeof endpoint.endpointId !== 'string'
+        || !OPAQUE_ENDPOINT_ID_PATTERN.test(endpoint.endpointId)
+        || !Array.isArray(endpoint.capabilities)
+        || endpoint.capabilities.length === 0
+        || new Set(endpoint.capabilities).size !== endpoint.capabilities.length
+        || endpoint.capabilities.some((capability) => !GENERIC_CAPABILITIES.has(capability))) {
       return {
-        accepted: true,
-        target,
-        capabilities,
+        accepted: false,
+        errorCode: BINDING_ERRORS.has(endpoint?.errorCode)
+          ? endpoint.errorCode
+          : 'target-unavailable',
       };
+    }
+
+    const target = Object.freeze({
+      bindingId: authorized.binding.bindingId,
+      endpointId: endpoint.endpointId,
+      scope: authorized.binding.scope,
+      tabId: authorized.binding.tabId,
+      frameId: authorized.binding.frameId,
+      documentId: authorized.binding.documentId,
+      pageOrigin: authorized.binding.pageOrigin,
+    });
+    const capabilities = Object.freeze([...endpoint.capabilities]);
+    targets.set(target.tabId, Object.freeze({ target, capabilities }));
+    return {
+      accepted: true,
+      target,
+      capabilities,
+    };
+  };
+
+  return Object.freeze({
+    async bindActiveTarget({ scope }) {
+      const authorized = await authorization.authorizeActivePage({ scope });
+      return bindAuthorized(authorized);
+    },
+
+    async rebindTab(tabId) {
+      return bindAuthorized(await authorization.rebindTab(tabId));
+    },
+
+    suspendTab(tabId) {
+      targets.delete(tabId);
+    },
+
+    clearTab(tabId) {
+      targets.delete(tabId);
+      authorization.clearTab(tabId);
     },
 
     get(tabId) {

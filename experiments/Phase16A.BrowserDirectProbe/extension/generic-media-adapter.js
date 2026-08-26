@@ -3,6 +3,7 @@
     getCandidates,
     isMediaElement,
     createEndpointId,
+    isSeekAllowed,
   }) {
     let boundEndpoint;
 
@@ -22,14 +23,22 @@
           };
         }
 
+        const capabilities = ['pause', 'play'];
+        if (typeof isSeekAllowed === 'function'
+            && Number.isFinite(candidates[0].duration)
+            && Number.isSafeInteger(candidates[0].seekable?.length)
+            && candidates[0].seekable.length > 0) {
+          capabilities.push('seek');
+        }
         boundEndpoint = Object.freeze({
           endpointId: createEndpointId(),
           media: candidates[0],
+          capabilities: Object.freeze(capabilities),
         });
         return Object.freeze({
           accepted: true,
           endpointId: boundEndpoint.endpointId,
-          capabilities: Object.freeze(['pause', 'play']),
+          capabilities: boundEndpoint.capabilities,
         });
       },
 
@@ -37,12 +46,24 @@
         if (!boundEndpoint
             || endpointId !== boundEndpoint.endpointId
             || boundEndpoint.media.isConnected !== true
-            || (command?.name !== 'pause' && command?.name !== 'play')) {
+            || !boundEndpoint.capabilities.includes(command?.name)) {
           return { accepted: false, errorCode: 'media-element-unavailable' };
         }
 
         if (command.name === 'pause') {
           boundEndpoint.media.pause();
+          return { accepted: true, errorCode: null };
+        }
+
+        if (command.name === 'seek') {
+          if (!isSeekAllowed(
+            command.positionSeconds,
+            boundEndpoint.media.duration,
+            boundEndpoint.media.seekable,
+          )) {
+            return { accepted: false, errorCode: 'seek-out-of-range' };
+          }
+          boundEndpoint.media.currentTime = command.positionSeconds;
           return { accepted: true, errorCode: null };
         }
 

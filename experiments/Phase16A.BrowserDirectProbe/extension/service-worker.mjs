@@ -35,6 +35,7 @@ const documentRegistry = createDocumentRegistry(chrome.runtime.id);
 const browserAuthorization = createBrowserAuthorizationModule({
   tabs: chrome.tabs,
   scripting: chrome.scripting,
+  permissions: chrome.permissions,
 });
 const genericTargetRegistry = createBrowserMediaTargetRegistry({
   authorization: browserAuthorization,
@@ -64,8 +65,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  if (message?.type === 'authorizeGenericTarget' && message.scope === 'temporary') {
-    genericTargetRegistry.bindActiveTemporaryTarget().then(sendResponse, () => {
+  if (message?.type === 'authorizeGenericTarget'
+      && (message.scope === 'temporary' || message.scope === 'site')) {
+    genericTargetRegistry.bindActiveTarget({ scope: message.scope }).then(sendResponse, () => {
       sendResponse({ accepted: false, errorCode: 'target-unavailable' });
     });
     return true;
@@ -255,14 +257,30 @@ async function handleNativeMessage(message) {
   }
 }
 
-chrome.tabs.onRemoved.addListener((tabId) => documentRegistry.clear(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  documentRegistry.clear(tabId);
+  genericTargetRegistry.clearTab(tabId);
+});
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   documentRegistry.clear(removedTabId);
   documentRegistry.clear(addedTabId);
+  genericTargetRegistry.clearTab(removedTabId);
+  genericTargetRegistry.clearTab(addedTabId);
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading') {
     documentRegistry.clear(tabId);
+    genericTargetRegistry.suspendTab(tabId);
+  }
+  if (changeInfo.status === 'complete') {
+    genericTargetRegistry.rebindTab(tabId).then(
+      (result) => {
+        if (result.accepted !== true) {
+          genericTargetRegistry.suspendTab(tabId);
+        }
+      },
+      () => genericTargetRegistry.suspendTab(tabId),
+    );
   }
 });
 

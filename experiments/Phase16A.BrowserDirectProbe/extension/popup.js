@@ -1,4 +1,8 @@
 import { copyStatusText, createTransientFeedback } from './status-copy.mjs';
+import {
+  prepareExactActiveSitePermission,
+  requestPreparedSitePermission,
+} from './site-permission.mjs';
 
 const status = document.querySelector('#status');
 const copyStatusButton = document.querySelector('#copy-status');
@@ -17,14 +21,61 @@ const transientCopyFeedback = createTransientFeedback({
 document.querySelectorAll('[data-command]').forEach((button) => {
   button.addEventListener('click', () => runCommand({ name: button.dataset.command }));
 });
+let preparedSitePermission;
+prepareExactActiveSitePermission(chrome.tabs).then(
+  (result) => {
+    preparedSitePermission = result;
+  },
+  () => {
+    preparedSitePermission = { accepted: false, errorCode: 'target-unavailable' };
+  },
+);
 
-document.querySelector('#authorize-temporary').addEventListener('click', async () => {
+document.querySelector('#authorize-temporary').addEventListener('click', () => {
+  authorizeGenericTarget('temporary');
+});
+
+document.querySelector('#authorize-site').addEventListener('click', () => {
+  authorizeExactSite();
+});
+
+async function authorizeExactSite() {
+  if (!preparedSitePermission) {
+    setStatus('Reopen the Probe before requesting site access.');
+    return;
+  }
+  setControlsDisabled(true);
+  setStatus('Requesting access to this exact site…');
+  try {
+    const permission = await requestPreparedSitePermission({
+      prepared: preparedSitePermission,
+      requestPermission: (request) => chrome.permissions.request(request),
+    });
+    if (permission.accepted !== true) {
+      setStatus(`Rejected: ${permission.errorCode ?? 'permission-denied'}`);
+      return;
+    }
+    const result = await chrome.runtime.sendMessage({
+      type: 'authorizeGenericTarget',
+      scope: 'site',
+    });
+    setStatus(result?.accepted === true
+      ? 'Always allowed one media element on this site.'
+      : `Rejected: ${result?.errorCode ?? 'unknown-error'}`);
+  } catch {
+    setStatus('Rejected: extension-connection-failed');
+  } finally {
+    setControlsDisabled(false);
+  }
+}
+
+async function authorizeGenericTarget(scope) {
   setControlsDisabled(true);
   setStatus('Authorizing the active page once…');
   try {
     const result = await chrome.runtime.sendMessage({
       type: 'authorizeGenericTarget',
-      scope: 'temporary',
+      scope,
     });
     setStatus(result?.accepted === true
       ? 'Authorized one media element on this page.'
@@ -34,7 +85,7 @@ document.querySelector('#authorize-temporary').addEventListener('click', async (
   } finally {
     setControlsDisabled(false);
   }
-});
+}
 
 document.querySelector('#seek').addEventListener('click', () => {
   const positionSeconds = Number(document.querySelector('#seek-seconds').value);
