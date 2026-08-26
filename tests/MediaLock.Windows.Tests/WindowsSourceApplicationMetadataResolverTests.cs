@@ -52,10 +52,11 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
     }
 
     [Theory]
-    [InlineData("YouTube Music", "Brave Browser", "YouTube Music", "Brave Browser")]
+    [InlineData("YouTube Music", "Brave Browser", "YouTube Music", "Brave")]
     [InlineData("Brave", "Brave Browser", "Brave", null)]
     [InlineData("Google Chrome", "Google Chrome", "Google Chrome", null)]
     [InlineData("Player", "", "Player", null)]
+    [InlineData("Player", "Browser", "Player", null)]
     public void CreateMetadataAddsOnlyAUsefulDistinctHostQualifier(
         string displayName,
         string targetProductName,

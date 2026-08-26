@@ -258,6 +258,9 @@ The App presentation Module combines that metadata with the complete set of visi
 qualifier only when it contributes information, disambiguates friendly-name collisions with the exact raw identity,
 and otherwise falls back to that raw identity.
 
+The Windows Adapter removes only a trailing generic `Browser` suffix from an executable product name before exposing
+the host qualifier. It does not rewrite vendor names or infer browsers from `_crx_` identifiers.
+
 ```text
 GSMTC SourceAppUserModelId ──▶ Windows AppsFolder metadata Adapter
               │                              │

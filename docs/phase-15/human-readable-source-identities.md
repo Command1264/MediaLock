@@ -23,8 +23,9 @@ The Windows Adapter enumerates AppsFolder once, performs exact ordinal AUMID loo
 - a distinct target executable `ProductName` as an optional host qualifier;
 - no result when metadata is unavailable, allowing the App presentation Module to use the raw ID.
 
-The host qualifier is omitted when either name already contains the other. This yields concise ordinary-app labels and
-adds useful context to a hosted app without hard-coding `_crx_` IDs or browser names.
+The host qualifier is omitted when either name already contains the other. A trailing generic `Browser` product suffix
+is removed, yielding `YouTube Music — Brave` rather than `YouTube Music — Brave Browser`, without hard-coding `_crx_`
+IDs or rewriting other product names.
 
 ## Module shape
 
@@ -50,7 +51,7 @@ selection, collisions and fallback remain local. Core snapshots and settings doc
 - Settings: friendly available-app／Priority Rule label while Save persists raw identities.
 - WPF contract: raw identity remains in tooltip and accessibility help; ComboBox uses raw ID as selected value.
 
-The reviewed implementation passes 382 repository tests, a Release build with zero warnings／errors, formatting,
+The reviewed implementation passes 383 repository tests, a Release build with zero warnings／errors, formatting,
 Markdown relative-link validation, `git diff --check` and the isolated packaging regression suite. The named desktop
 matrix remains pending.
 
@@ -60,7 +61,7 @@ On the named development host, the exact Windows Adapter resolved:
 
 | GSMTC source identity | Shell display | Host qualifier | Candidate label |
 | --- | --- | --- | --- |
-| `Brave._crx_cinhimbnkkghhklpknlkffjgod` | YouTube Music | Brave Browser | YouTube Music — Brave Browser |
+| `Brave._crx_cinhimbnkkghhklpknlkffjgod` | YouTube Music | Brave | YouTube Music — Brave |
 | `Brave` | Brave | none | Brave |
 | `Chrome` | Google Chrome | none | Google Chrome |
 | `MSEdge` | Microsoft Edge | none | Microsoft Edge |

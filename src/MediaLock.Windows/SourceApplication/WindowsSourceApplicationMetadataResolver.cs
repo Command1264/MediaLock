@@ -54,7 +54,7 @@ public sealed class WindowsSourceApplicationMetadataResolver
             return null;
         }
 
-        var normalizedTargetProductName = targetProductName?.Trim();
+        var normalizedTargetProductName = NormalizeHostDisplayName(targetProductName);
         if (string.IsNullOrWhiteSpace(normalizedTargetProductName) ||
             normalizedDisplayName.Contains(
                 normalizedTargetProductName,
@@ -69,6 +69,24 @@ public sealed class WindowsSourceApplicationMetadataResolver
         return new SourceApplicationMetadata(
             normalizedDisplayName,
             normalizedTargetProductName);
+    }
+
+    private static string? NormalizeHostDisplayName(string? productName)
+    {
+        var normalized = productName?.Trim();
+        const string genericBrowserSuffix = " Browser";
+        if (string.Equals(normalized, "Browser", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = null;
+        }
+        else if (normalized?.EndsWith(
+                genericBrowserSuffix,
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            normalized = normalized[..^genericBrowserSuffix.Length].TrimEnd();
+        }
+
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
     private IReadOnlyDictionary<string, SourceApplicationMetadata> LoadSafely(
