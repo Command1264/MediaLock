@@ -9,6 +9,24 @@ Media Lock 的領域是選擇、鎖定、恢復及控制 Windows 媒體工作階
 一個由支援 System Media Transport Controls 的來源應用程式公開、可觀察且可能可遠端控制的播放工作階段。
 _Avoid_: Player instance, tab
 
+**Browser Media Target**:
+使用者明確授權、可由 Browser Adapter 解析成特定網頁播放端點的頁面級媒體目標；它不等於瀏覽器程序、
+網站名稱或當前分頁標題。
+_Avoid_: Browser Session, Chrome target, website player
+
+**Page Binding**:
+Browser Media Target 跨文件重建時保持的邏輯頁面身分；只有同一 binding 的後繼文件可以延續鎖定或規則。
+_Avoid_: Tab ID, URL match, page title
+
+**Browser Media Endpoint**:
+Browser Media Target 在目前文件與 frame 中實際接收命令的短生命週期播放端點；重新整理或導覽會使它失效。
+_Avoid_: Browser Media Target, saved tab
+
+**Browser Application Scope**:
+由特定瀏覽器設定檔與網站／已安裝 Web App 身分共同界定的應用程式範圍；它不能只由 Chrome、Brave 等
+瀏覽器程序名稱表示。
+_Avoid_: Browser executable, all browser tabs
+
 **Windows Current Session**:
 Windows 目前判定最適合接收媒體控制的 Media Session；它可以隨系統活動而改變。
 _Avoid_: Active player, default player

@@ -403,6 +403,49 @@ it predictably. A production seam is justified only when both a Windows implemen
 by Application tests. Failure to influence Windows' current-session choice is a probe result, not a reason to introduce
 undocumented API calls or move routing policy into the Windows project.
 
+### Future browser target seam
+
+Phase 16A／16B evidence may justify a neutral media-target seam only after both the existing GSMTC Adapter and a proven
+Browser Adapter exist. The Router-facing interface exposes immutable target identity, capabilities, observations and
+one-shot command results; it does not expose Extension IDs, Chrome tab IDs, frame IDs, document IDs, DOM selectors,
+site permissions or Native Messaging envelopes. Those facts remain inside one deep Browser Adapter Module.
+
+```text
+Browser profile + explicit permission + Page Binding
+                         │
+                         ▼
+             Browser Adapter Module
+                 │              │
+                 │ identity     │ live resolution
+                 ▼              ▼
+        Browser Media Target   Browser Media Endpoint
+                 │              │
+                 └──── command ─┘
+                         │
+                         ▼
+               neutral media-target seam
+```
+
+A Page Binding is Extension-issued and authoritative; URL, title, artist and browser executable are never sufficient
+identity. Live resolution adds the current document generation, frame and media-element endpoint, all of which become
+stale on navigation or reload. A successor is accepted only through the same Page Binding and an authorized site
+scope. If the Extension cannot prove continuity after browser restart, the target remains unavailable rather than
+being recovered by URL similarity.
+
+Routing modes keep their user meaning across providers:
+
+- Session Lock captures one exact Page Binding and follows only its authorized Endpoint succession.
+- App Lock captures a Browser Application Scope (browser profile plus origin／installed Web App identity), then applies
+  a deterministic candidate policy; multiple unresolved pages are an ambiguity, not permission to choose list order.
+- Priority Rules persist a typed selector and display whether it is page-scoped or application-scoped. Rules for two
+  pages in the same browser remain distinct.
+- Windows Auto persists no Browser Target, but every observation and route decision still names the exact resolved
+  page rather than only the browser executable.
+
+The generic site implementation uses stable `HTMLMediaElement` primitives after explicit `activeTab` or per-site
+permission. Rich site Adapters may add metadata or commands behind the same Browser Adapter interface. Unsupported,
+DRM-only or ambiguous pages advertise no direct capability and retain the existing GSMTC path.
+
 ## 10. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

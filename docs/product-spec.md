@@ -339,11 +339,24 @@ silently expose persisted settings to an older schema.
 
 #### Future direct browser integration
 
-A later optional integration may control supported YouTube and YouTube Music pages through a browser extension and
-Native Messaging rather than using the browser's GSMTC Session as the command transport. It may provide exact
-browser/profile/tab or installed-PWA identity, URL-aware Recovery, human-readable source names and direct playback
-state, metadata, timeline and command exchange. The existing GSMTC path remains available whenever the integration is
-absent, unsupported, disconnected or denied permission.
+A later optional integration may control supported standards-based web media through a browser extension and Native
+Messaging rather than using the browser's GSMTC Session as the command transport. A generic Adapter targets compatible
+`HTMLMediaElement` playback on a user-authorized page; site Adapters may add richer capabilities for platforms such as
+YouTube and YouTube Music. It may provide exact browser-profile／Page Binding／Endpoint or installed-PWA identity,
+page-aware Recovery, human-readable source names and direct playback state, metadata, timeline and command exchange.
+The existing GSMTC path remains available whenever the integration is absent, unsupported, disconnected or denied
+permission.
+
+The Extension is an optional enhancement, not a prerequisite or replacement installation path. A user who never
+installs it must retain the complete `0.3.0` GSMTC experience: Session discovery, all four routing modes, Recovery,
+global media-key interception, playback-state lock, controls, Seek, Settings, tray and startup continue through the
+existing adapters. Media Lock must not show a blocking installation prompt or silently disable a supported GSMTC
+capability merely because browser-direct capability is unavailable.
+
+Provider absence and an active-provider failure are different states. If no compatible Extension is installed, target
+discovery and routing remain GSMTC-only from the outset. If an already-bound direct target disconnects or becomes
+stale, Media Lock must preserve that logical target and enter explicit Recovery／Unavailable handling; it must not
+reinterpret "fallback" as permission to control Windows Current Session or another competing source.
 
 Direct browser control, source-native GSMTC suppression and Windows media-surface projection are separate product
 capabilities. Media Lock does not claim that direct control can hide another process's GSMTC Session. Public Windows
@@ -357,6 +370,13 @@ Sessions can share routing behavior without treating a URL, title or DOM object 
 preserve existing App Lock, Session Lock, Priority Rules, Recovery, expected-target capture and exactly-once command
 semantics. Site DOM or private JavaScript dependencies remain isolated behind site-specific adapters and must fail
 closed rather than route to another tab when the page changes.
+
+Browser routing identity is page-aware in every Routing Mode. Session Lock captures one Page Binding and only accepts
+its Endpoint successors. App Lock uses a Browser Application Scope rather than the whole browser executable and must
+resolve a unique page using an explicit candidate policy. Priority Rules persist their exact selector scope and never
+collapse distinct pages, profiles or Web Apps into one `Chrome`／`Brave` entry. Windows Auto does not persist a binding,
+but its selected target and UI projection still identify the exact page. Ambiguity produces no route instead of
+choosing the first tab.
 
 #### Human-readable source identities
 

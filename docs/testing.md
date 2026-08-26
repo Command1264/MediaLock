@@ -516,6 +516,60 @@ Record stable `0.2.0` evidence independently in
 Record stable `0.3.0` evidence independently in
 [Phase 14 packaged validation](phase-14/stable-release-smoke.md).
 
+### Phase 16A browser-direct Probe
+
+Phase 16A remains outside production packaging. Run its C# framing／protocol tests and dependency-free Node Extension
+tests explicitly, run its PowerShell registration contract test under Windows PowerShell 5.1, then syntax-check every
+executable Extension script. The fixed public manifest key／Extension ID,
+least-privilege permissions and exact Native Host `allowed_origins` are test contracts. A failure is a Prototype
+blocker rather than permission to weaken the origin or site allowlists.
+
+After first loading or reloading the unpacked Phase 16A Extension, an eligible page that predates that load must first
+reject as `target-unavailable`; reload the page once, then require the next command to be accepted exactly once. This
+documents Chrome's declarative content-script lifecycle and must not be hidden by retrying a mutating command.
+
+The named Chrome／Brave／Brave YouTube Music PWA matrix must distinguish command acceptance from observed movement and
+record duplicate count, reload／navigation target continuity, Native Host disconnect and competing-source isolation.
+Timeout or an unknown outcome must not retry a mutating command. See the
+[Phase 16A Probe plan](phase-16/browser-direct-probe-plan.md).
+
+The Extension protocol test also owns the initial-handshake readiness gate: a command may wait for negotiation only
+before dispatch, must proceed once after readiness, and must fail on bounded timeout or disconnect. It may never use
+that gate to retry a command already posted to the Host.
+
+On Windows, the Probe's Chrome and Brave registration commands share one Chrome-compatible current-user Native
+Messaging registry seam. The PowerShell contract test must invoke both public scripts against an isolated registry
+root, require the same manifest／registry identity, migrate only an exact legacy Probe-owned value and preserve a
+foreign value. It must also remove an exact obsolete Brave-specific Probe value without claiming or deleting a
+foreign value at that location. Registration output is content-addressed: the contract must keep one Host process
+running while an unchanged registration reuses its output, then switch a simulated new build to a different
+executable path without stopping or overwriting the running Host. Manual Brave evidence additionally verifies that
+the launched Host's process ancestry reaches `brave.exe`; a matching unused Brave-specific registry value is not
+acceptance evidence.
+
+Every future production integration gate also runs two independent compatibility lanes:
+
+1. **No Extension installed** — the complete stable `0.3.0` regression suite remains available through GSMTC, with no
+   blocking prompt or browser-integration dependency.
+2. **Extension available** — supported browser targets gain exact identity and direct capabilities, while unsupported
+   targets and applications retain their existing GSMTC behavior.
+
+Removing or disabling an Extension before startup must behave like provider absence. Disconnecting it after a direct
+target was bound must instead exercise explicit target-preserving Recovery and prove that no competing Session is
+controlled.
+
+Phase 16B adds a generic Adapter matrix for a directly hosted MP4, cloud-drive MP4, ordinary streaming page, multiple
+media elements, same-origin and cross-origin iframe, unsupported／DRM player and revoked site permission. For every
+supported row, record the browser profile, Page Binding, document generation, frame and selected Endpoint separately;
+page title, media title, origin and browser executable are presentation／scope inputs rather than sufficient identity.
+
+Routing-mode tests use two playable pages in the same browser. Session Lock and page-scoped Priority Rules must route
+only to the bound page. App Lock must use its explicit Browser Application Scope and refuse an ambiguous candidate.
+Windows Auto may change targets by policy, but its visible selection must still identify the exact page. Reload,
+same-origin navigation, cross-origin navigation, tab duplication, tab replacement and browser restart must never
+silently rebind a saved lock or rule to the other page.
+See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected
