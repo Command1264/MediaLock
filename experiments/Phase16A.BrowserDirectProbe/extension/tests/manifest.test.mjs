@@ -25,7 +25,11 @@ test('pins one stable Extension ID in both manifests', () => {
 });
 
 test('requests only the Phase 16A least-privilege surface', () => {
-  assert.deepEqual([...manifest.permissions].sort(), ['nativeMessaging', 'tabs']);
+  assert.deepEqual(
+    [...manifest.permissions].sort(),
+    ['clipboardWrite', 'nativeMessaging', 'tabs'],
+  );
+  assert.equal(manifest.permissions.includes('clipboardRead'), false);
   assert.deepEqual([...manifest.host_permissions].sort(), [
     'https://music.youtube.com/*',
     'https://www.youtube.com/*',

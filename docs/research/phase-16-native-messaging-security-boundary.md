@@ -250,8 +250,9 @@ Direct Browser Integration 失效時的預設是 `TargetUnavailable`，不是「
 
 ### Extension boundary
 
-- [ ] 只要求 `nativeMessaging`、`tabs` 與兩個 YouTube exact host permissions；不使用 `<all_urls>`。目前以
-  declarative content script 載入固定 Adapter，因此不需要額外的 `scripting` permission。
+- [ ] 只要求 `nativeMessaging`、`tabs`、供使用者主動複製 Probe 狀態的 write-only `clipboardWrite`，以及
+  兩個 YouTube exact host permissions；不要求 `clipboardRead` 或 `<all_urls>`。目前以 declarative content
+  script 載入固定 Adapter，因此不需要額外的 `scripting` permission。
 - [ ] 不宣告 `externally_connectable`，不使用 `eval`／遠端程式碼或接收 arbitrary JS。
 - [ ] Service worker 驗證 `sender.id`、exact origin、URL、top frame、tab ID、document ID。
 - [ ] Page payload 不能覆寫 authoritative sender identity。

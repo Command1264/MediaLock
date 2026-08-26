@@ -62,8 +62,9 @@ site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesse
 
 ## Security invariants
 
-- The Extension has only `nativeMessaging`, `tabs` and exact YouTube／YouTube Music host permissions. It has no
-  `<all_urls>`, `externally_connectable`, remote code or arbitrary script command.
+- The Extension has only `nativeMessaging`, `tabs`, write-only `clipboardWrite` and exact YouTube／YouTube Music
+  host permissions. `clipboardWrite` is used only by the user-invoked Probe status Copy button; the Extension has no
+  `clipboardRead`, `<all_urls>`, `externally_connectable`, remote code or arbitrary script command.
 - Only the Extension Popup may originate a Probe command. Page payload cannot choose a tab, frame or origin.
 - The service worker registers only top-level active-document metadata supplied by Chrome／Brave, carries that
   browser-owned `documentId` through the Host, and dispatches with `tabs.sendMessage(..., { documentId })`; the

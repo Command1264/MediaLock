@@ -19,8 +19,12 @@
         <input id="seek-seconds" type="number" min="0" step="0.1" value="30">
         <button id="seek" type="button">Seek</button>
       </div>
-      <p id="status" role="status" aria-live="polite">Ready.</p>
+      <div class="status-row">
+        <p id="status" role="status" aria-live="polite">Ready.</p>
+        <button id="copy-status" type="button">Copy</button>
+        <p id="copy-feedback" role="status" aria-live="polite" hidden></p>
+      </div>
     </main>
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>
