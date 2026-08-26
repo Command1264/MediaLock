@@ -609,10 +609,12 @@ GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve al
 `release/0.2` unless a later explicit maintenance decision authorizes otherwise.
 
 Status: complete and published on 2026-08-26. PR #47 synchronized the stable implementation to `main`, retained
-`release/0.3` was created at exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`, and the prior `release/0.2`
-hotfix baseline remains retained. The separately approved publication created GPG-signed annotated tag `v0.3.0` and a
+`release/0.3` was created at exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`. The separately approved
+publication created GPG-signed annotated tag `v0.3.0` and a
 [GitHub Stable／Latest Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0) containing only the
-independently verified ZIP and Setup. Historical Release assets remain unchanged.
+independently verified ZIP and Setup. A later authorized maintenance step retired the local／remote `release/0.2`
+branch and Worktree after confirming the new baseline and integration; historical `v0.2.0` tag, Release, asset and
+provenance remain unchanged.
 
 ## Phase 15 — Human-readable source identities
 
