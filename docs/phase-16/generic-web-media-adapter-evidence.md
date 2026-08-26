@@ -30,7 +30,7 @@ claimed by this slice.
 
 ## Manual Gate B1
 
-In progress against implementation commit `bf55b18`:
+Passed against implementation commit `bf55b18`:
 
 1. Load the unpacked Phase 16B Extension in Chrome and confirm the fixed Extension ID.
 2. Open an HTTPS page containing exactly one ordinary `<video>` or `<audio>` and start playback.
@@ -46,4 +46,7 @@ Observed on Chrome with the MDN single-video sample:
 - Temporary authorization reported one media element.
 - Pause was accepted once and paused the video once without an error or crash.
 - Play remained unavailable by design because the first slice advertises only the Pause capability.
-- Reload invalidation and no-Extension fallback remain pending.
+- After reload, the stale binding was rejected as `target-unavailable` and the playing replacement document did not
+  receive the old Pause command.
+- Reauthorization bound the replacement document, after which Pause was accepted exactly once.
+- With the Extension disabled, Media Lock's existing GSMTC path remained available without an error or crash.
