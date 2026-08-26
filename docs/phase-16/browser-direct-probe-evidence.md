@@ -8,7 +8,7 @@ Date: 2026-08-26
 | --- | --- |
 | Branch | `codex/feat/phase-16a-browser-direct-probe` |
 | Initial Probe implementation commit | `ca58e5c` |
-| Final hardening implementation commit | `e9e799b` |
+| Final hardening implementation commit | `52200f8` |
 | Windows | Windows 11 Pro 25H2, build `26200.9168`, 64-bit |
 | Chrome | `151.0.7922.174` |
 | Brave | `151.1.93.138` |
@@ -30,6 +30,12 @@ Revision ownership is intentionally split rather than assigning every observatio
 - stale-document races used `fb43393`;
 - `e9e799b` owns the closed-tab, full-lifecycle timeout, initial sender-tab URL and content-addressed registration
   hardening. Its affected live rows remain pending below until rerun against this exact implementation revision.
+- `7691dbf` queries the authoritative current tab URL because Chrome 151 and Brave do not always populate the
+  optional `sender.tab.url` field during registration;
+- `5ac5c24` exposes only bounded registration failure categories so live compatibility failures remain diagnosable;
+- `52200f8` treats browser-owned `documentId` as a bounded opaque identifier instead of imposing UUID syntax. This
+  follows live Brave rejection `registration-document-id-rejected`; the affected Chrome／Brave isolation rows remain
+  pending until the extensions and Native Host are reloaded from this revision.
 
 ## Chrome Gate A observations
 
