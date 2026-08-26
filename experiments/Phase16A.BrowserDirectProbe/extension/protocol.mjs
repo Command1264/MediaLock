@@ -5,6 +5,7 @@ const ALLOWED_PAGE_ORIGINS = new Set([
 ]);
 const ALLOWED_COMMANDS = new Set(['play', 'pause', 'seek']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OPAQUE_DOCUMENT_ID_PATTERN = /^[\x21-\x7e]{1,256}$/;
 const CONNECTION_ID_PATTERN = /^[0-9a-f]{64}$/;
 const BROWSER_FAMILIES = new Set(['chrome', 'brave']);
 const CAPABILITIES = new Set(['pause', 'play', 'seek']);
@@ -215,7 +216,7 @@ function validateTarget(value) {
   if (value.frameId !== 0) {
     throw new Error('Only the top frame can receive a browser media command.');
   }
-  requireUuid(value.documentId, 'document');
+  requireOpaqueDocumentId(value.documentId);
   if (!ALLOWED_PAGE_ORIGINS.has(value.pageOrigin)) {
     throw new Error('Command target page origin is not authorized.');
   }
@@ -261,5 +262,11 @@ function requireExactFields(value, expectedFields) {
 function requireUuid(value, label) {
   if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
     throw new Error(`${label} ID must be a UUID.`);
+  }
+}
+
+function requireOpaqueDocumentId(value) {
+  if (typeof value !== 'string' || !OPAQUE_DOCUMENT_ID_PATTERN.test(value)) {
+    throw new Error('document ID must be a bounded opaque identifier.');
   }
 }

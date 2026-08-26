@@ -2,7 +2,7 @@ const ALLOWED_PAGE_ORIGINS = new Set([
   'https://www.youtube.com',
   'https://music.youtube.com',
 ]);
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OPAQUE_DOCUMENT_ID_PATTERN = /^[\x21-\x7e]{1,256}$/;
 
 class DocumentRegistrationError extends Error {
   constructor(code, message) {
@@ -43,10 +43,11 @@ export function createDocumentRegistry(extensionId) {
           'Only an active document can be registered.',
         );
       }
-      if (typeof sender.documentId !== 'string' || !UUID_PATTERN.test(sender.documentId)) {
+      if (typeof sender.documentId !== 'string'
+        || !OPAQUE_DOCUMENT_ID_PATTERN.test(sender.documentId)) {
         throw new DocumentRegistrationError(
           'registration-document-id-rejected',
-          'Browser document ID must be a UUID.',
+          'Browser document ID must be a bounded opaque identifier.',
         );
       }
       if (!ALLOWED_PAGE_ORIGINS.has(sender.origin)) {

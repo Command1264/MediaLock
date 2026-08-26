@@ -7,7 +7,7 @@ const request = Object.freeze({
   target: Object.freeze({
     tabId: 42,
     frameId: 0,
-    documentId: '33333333-3333-4333-8333-333333333333',
+    documentId: 'ABCDEF0123456789ABCDEF0123456789',
     pageOrigin: 'https://music.youtube.com',
   }),
   command: Object.freeze({ name: 'pause' }),

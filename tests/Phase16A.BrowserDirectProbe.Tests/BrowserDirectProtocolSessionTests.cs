@@ -10,7 +10,7 @@ public sealed class BrowserDirectProtocolSessionTests
     private static readonly Guid ExtensionNonce = Guid.Parse("55555555-5555-4555-8555-555555555555");
     private const string ConnectionId = "2e9cfd93293ebe38ff70df4df25986f814b6c1b1ee52d345aa558bb3884f5223";
     private static readonly Guid RequestId = Guid.Parse("22222222-2222-4222-8222-222222222222");
-    private static readonly Guid DocumentId = Guid.Parse("33333333-3333-4333-8333-333333333333");
+    private const string DocumentId = "ABCDEF0123456789ABCDEF0123456789";
 
     [Fact]
     public void CreateHello_BindsTheProtocolToOneFreshSession()
@@ -80,7 +80,7 @@ public sealed class BrowserDirectProtocolSessionTests
         Assert.Equal(1, root.GetProperty("sequence").GetInt32());
         Assert.Equal(RequestId, root.GetProperty("requestId").GetGuid());
         Assert.Equal(42, root.GetProperty("target").GetProperty("tabId").GetInt32());
-        Assert.Equal(DocumentId, root.GetProperty("target").GetProperty("documentId").GetGuid());
+        Assert.Equal(DocumentId, root.GetProperty("target").GetProperty("documentId").GetString());
         Assert.Equal("pause", root.GetProperty("command").GetProperty("name").GetString());
     }
 
@@ -106,6 +106,24 @@ public sealed class BrowserDirectProtocolSessionTests
             pageOrigin: pageOrigin,
             frameId: frameId,
             commandName: command)));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("line\nbreak")]
+    public void Handle_RejectsMalformedOpaqueDocumentIds(string documentId)
+    {
+        var session = CreateConnectedSession();
+
+        Assert.Throws<InvalidDataException>(() => session.Handle(CreateProbeRequest(documentId: documentId)));
+    }
+
+    [Fact]
+    public void Handle_RejectsAnOverlongOpaqueDocumentId()
+    {
+        var session = CreateConnectedSession();
+
+        Assert.Throws<InvalidDataException>(() => session.Handle(CreateProbeRequest(documentId: new string('x', 257))));
     }
 
     [Fact]
@@ -187,7 +205,8 @@ public sealed class BrowserDirectProtocolSessionTests
         string pageOrigin = "https://music.youtube.com",
         int frameId = 0,
         string commandName = "pause",
-        string? connectionId = null)
+        string? connectionId = null,
+        string? documentId = null)
     {
         return JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -196,7 +215,7 @@ public sealed class BrowserDirectProtocolSessionTests
             connectionId = connectionId ?? ConnectionId,
             sequence,
             requestId = requestId ?? RequestId,
-            target = new { tabId = 42, frameId, documentId = DocumentId, pageOrigin },
+            target = new { tabId = 42, frameId, documentId = documentId ?? DocumentId, pageOrigin },
             command = new { name = commandName },
         });
     }

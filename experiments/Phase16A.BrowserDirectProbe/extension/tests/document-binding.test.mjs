@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createDocumentRegistry } from '../document-binding.mjs';
 
 const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
-const documentId = '33333333-3333-4333-8333-333333333333';
+const documentId = 'ABCDEF0123456789ABCDEF0123456789';
 
 function sender(overrides = {}) {
   const value = {
@@ -45,7 +45,9 @@ test('rejects an unauthorized, inactive, nested, or malformed document sender', 
     sender({ id: 'ponmlkjihgfedcbaponmlkjihgfedcba' }), currentTab), /sender/i);
   assert.throws(() => registry.register(sender({ frameId: 1 }), currentTab), /frame/i);
   assert.throws(() => registry.register(sender({ documentLifecycle: 'cached' }), currentTab), /active/i);
-  assert.throws(() => registry.register(sender({ documentId: 'page-chosen-value' }), currentTab), /document/i);
+  assert.throws(() => registry.register(sender({ documentId: '' }), currentTab), /document/i);
+  assert.throws(() => registry.register(sender({ documentId: 'line\nbreak' }), currentTab), /document/i);
+  assert.throws(() => registry.register(sender({ documentId: 'x'.repeat(257) }), currentTab), /document/i);
   assert.throws(() => registry.register(sender({ origin: 'https://example.com' }), currentTab), /origin/i);
   assert.throws(
     () => registry.register(sender(), { id: 42 }),
@@ -65,7 +67,7 @@ test('replaces an old binding and refuses stale document matches', () => {
   const registry = createDocumentRegistry(extensionId);
   const currentTab = { id: 42, url: 'https://music.youtube.com/watch?v=example' };
   const oldBinding = registry.register(sender(), currentTab);
-  const newDocumentId = '44444444-4444-4444-8444-444444444444';
+  const newDocumentId = 'FEDCBA9876543210FEDCBA9876543210';
 
   registry.clear(42);
   assert.equal(registry.matches(oldBinding), false);

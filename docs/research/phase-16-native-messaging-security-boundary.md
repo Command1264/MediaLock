@@ -111,7 +111,8 @@ Chrome 自己明確要求把 content script 視為低信任來源：惡意頁面
 - exact HTTPS origin 為 `https://www.youtube.com` 或 `https://music.youtube.com`；
 - `sender.tab.id` 存在，`tabs.get(sender.tab.id)` 回傳相同 tab ID，且其 current URL、`sender.url` 與
   `sender.origin` 符合相同 exact allowlist；
-- `documentId` 與 service worker 目前登記的 top-level document 相同；
+- `documentId` 視為 browser-owned opaque identifier，不假設 UUID 格式；只接受 1–256 個可見 ASCII
+  字元，並要求其與 service worker 目前登記的 top-level document 完全相同；
 - navigation、reload、tab replacement、Port disconnect 後舊 document binding 立即失效。
 
 不要開啟 `externally_connectable`；該 manifest key 會讓匹配的普通網頁直接連 Extension，而本 Prototype 已有

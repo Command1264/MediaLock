@@ -198,7 +198,7 @@ public sealed class BrowserDirectProtocolSession
         RequireExactProperties(target, "tabId", "frameId", "documentId", "pageOrigin");
         var tabId = RequireInt32(target, "tabId");
         var frameId = RequireInt32(target, "frameId");
-        var documentId = RequireGuid(target, "documentId");
+        var documentId = RequireOpaqueDocumentId(target, "documentId");
         var pageOrigin = RequireString(target, "pageOrigin");
         if (tabId < 0 || frameId != 0 || !AllowedPageOrigins.Contains(pageOrigin))
         {
@@ -421,6 +421,19 @@ public sealed class BrowserDirectProtocolSession
         }
 
         return result;
+    }
+
+    private static string RequireOpaqueDocumentId(JsonElement value, string propertyName)
+    {
+        var documentId = RequireString(value, propertyName);
+        if (documentId.Length is < 1 or > 256
+            || documentId.Any(character => character is < '\u0021' or > '\u007e'))
+        {
+            throw new InvalidDataException(
+                $"Protocol field '{propertyName}' must be a bounded opaque identifier.");
+        }
+
+        return documentId;
     }
 
     private static int RequireInt32(JsonElement value, string propertyName)
