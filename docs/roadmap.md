@@ -608,10 +608,11 @@ integrate the stable change through `develop` and `main`, then separately create
 GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve all older public Release assets and keep
 `release/0.2` unless a later explicit maintenance decision authorizes otherwise.
 
-Status: integration complete; publication pending separate approval. PR #47 synchronized `develop` to `main` on
-2026-08-26, and retained `release/0.3` was created at exact artifact source
-`a773fac983728f5d4b2d8cbe40bfad9d1c016737`. The prior `release/0.2` hotfix baseline remains retained. No `v0.3.0`
-tag, GitHub Stable／Latest Release or public artifact upload has been created.
+Status: complete and published on 2026-08-26. PR #47 synchronized the stable implementation to `main`, retained
+`release/0.3` was created at exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`, and the prior `release/0.2`
+hotfix baseline remains retained. The separately approved publication created GPG-signed annotated tag `v0.3.0` and a
+[GitHub Stable／Latest Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0) containing only the
+independently verified ZIP and Setup. Historical Release assets remain unchanged.
 
 ## Phase 15 — Human-readable source identities
 
