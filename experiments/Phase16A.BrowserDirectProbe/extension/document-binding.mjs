@@ -30,6 +30,10 @@ export function createDocumentRegistry(extensionId) {
       if (typeof sender.url !== 'string' || new URL(sender.url).origin !== sender.origin) {
         throw new Error('Document URL does not match its origin.');
       }
+      if (typeof sender.tab.url !== 'string'
+          || new URL(sender.tab.url).origin !== sender.origin) {
+        throw new Error('Document tab URL does not match its origin.');
+      }
 
       const binding = Object.freeze({
         tabId: sender.tab.id,

@@ -44,14 +44,18 @@ export function createPendingRequestRegistry(capacity, timeoutMilliseconds, onTi
       entry.claimed = true;
       return true;
     },
-    take(requestId) {
+    has(requestId) {
+      return requests.has(requestId);
+    },
+    complete(requestId, outcome) {
       const entry = requests.get(requestId);
       if (!entry) {
-        return undefined;
+        return false;
       }
       requests.delete(requestId);
       clearTimeout(entry.timeoutId);
-      return entry;
+      entry.resolve(outcome);
+      return true;
     },
     reset(outcome) {
       for (const [requestId, entry] of requests) {

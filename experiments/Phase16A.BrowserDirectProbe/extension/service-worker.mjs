@@ -8,6 +8,7 @@ import {
 import { createDocumentRegistry } from './document-binding.mjs';
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createPendingRequestRegistry } from './pending-request-registry.mjs';
+import { completePendingRequest } from './request-completion.mjs';
 
 const NATIVE_HOST_NAME = 'com.command1264.medialock.phase16a';
 const ALLOWED_PAGE_ORIGINS = new Set([
@@ -189,13 +190,8 @@ async function handleNativeMessage(message) {
       documentRegistry,
       request,
     });
-    const pending = pendingRequests.take(request.requestId);
-    if (!pending) {
-      return;
-    }
     completeRequest(
       request,
-      pending,
       result?.accepted === true,
       result?.accepted === true ? null : normalizeResultError(result?.errorCode),
     );
@@ -216,18 +212,25 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
-function completeRequest(request, pending, accepted, errorCode) {
-  outboundSequence += 1;
-  nativePort.postMessage({
-    protocolVersion: 1,
-    type: 'commandResult',
-    connectionId: activeConnection.connectionId,
-    sequence: outboundSequence,
+function completeRequest(request, accepted, errorCode) {
+  const nextSequence = outboundSequence + 1;
+  const completed = completePendingRequest({
+    pendingRequests,
     requestId: request.requestId,
-    accepted,
-    errorCode,
+    outcome: { accepted, errorCode },
+    sendResult: () => nativePort.postMessage({
+      protocolVersion: 1,
+      type: 'commandResult',
+      connectionId: activeConnection.connectionId,
+      sequence: nextSequence,
+      requestId: request.requestId,
+      accepted,
+      errorCode,
+    }),
   });
-  pending.resolve({ accepted, errorCode });
+  if (completed) {
+    outboundSequence = nextSequence;
+  }
 }
 
 async function detectBrowserFamily() {

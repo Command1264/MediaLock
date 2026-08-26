@@ -9,7 +9,10 @@ param(
 
     [Parameter(DontShow)]
     [string] $ObsoleteBraveRegistryRoot =
-        'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts'
+        'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts',
+
+    [Parameter(DontShow)]
+    [string] $BuildFingerprint
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,7 +24,35 @@ $projectPath = Join-Path $PSScriptRoot 'Phase16A.BrowserDirectProbe.csproj'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $artifactRoot = Join-Path $repositoryRoot 'artifacts\phase16a-browser-direct'
 $outputRoot = Join-Path $artifactRoot 'chromium'
-$publishRoot = Join-Path $outputRoot 'native-host'
+
+if ([string]::IsNullOrWhiteSpace($BuildFingerprint)) {
+    $fingerprintInputs = @(
+        Get-ChildItem -LiteralPath $PSScriptRoot -File |
+            Where-Object { $_.Extension -in '.cs', '.csproj', '.json' } |
+            Sort-Object Name
+    )
+    $fingerprintLines = @(
+        foreach ($fingerprintInput in $fingerprintInputs) {
+            $inputHash = (Get-FileHash -LiteralPath $fingerprintInput.FullName -Algorithm SHA256).Hash
+            "$($fingerprintInput.Name):$inputHash"
+        }
+    )
+    $fingerprintBytes = [System.Text.Encoding]::UTF8.GetBytes(
+        [string]::Join("`n", $fingerprintLines))
+    $fingerprintHash = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $BuildFingerprint = [BitConverter]::ToString(
+            $fingerprintHash.ComputeHash($fingerprintBytes)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $fingerprintHash.Dispose()
+    }
+}
+if ($BuildFingerprint -notmatch '^[0-9a-f]{64}$') {
+    throw 'The Phase 16A Native Host build fingerprint must contain 64 lowercase hexadecimal characters.'
+}
+
+$publishRoot = Join-Path (Join-Path $outputRoot 'native-host') $BuildFingerprint
 $manifestPath = Join-Path $outputRoot 'native-host-manifest.json'
 $registryPath = Join-Path $registryRoot $hostName
 $obsoleteBraveRegistryPath = Join-Path $ObsoleteBraveRegistryRoot $hostName
@@ -45,14 +76,35 @@ if (Test-Path -LiteralPath $registryPath) {
     }
 }
 
-dotnet publish $projectPath `
-    --configuration Release `
-    --runtime win-x64 `
-    --self-contained false `
-    --output $publishRoot |
-    Out-Host
-if ($LASTEXITCODE -ne 0) {
-    throw "Phase 16A Native Host publish failed with exit code $LASTEXITCODE."
+$requiredHostFiles = @(
+    'MediaLock.Phase16ABrowserDirectProbe.exe',
+    'MediaLock.Phase16ABrowserDirectProbe.dll',
+    'MediaLock.Phase16ABrowserDirectProbe.deps.json',
+    'MediaLock.Phase16ABrowserDirectProbe.runtimeconfig.json',
+    'phase16a-native-host.json'
+)
+$nativeHostPublishReused = $false
+if (Test-Path -LiteralPath $publishRoot) {
+    $missingHostFiles = @(
+        $requiredHostFiles | Where-Object {
+            !(Test-Path -LiteralPath (Join-Path $publishRoot $_) -PathType Leaf)
+        }
+    )
+    if ($missingHostFiles.Count -ne 0) {
+        throw "The cached Phase 16A Native Host output is incomplete: $publishRoot"
+    }
+    $nativeHostPublishReused = $true
+}
+else {
+    dotnet publish $projectPath `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained false `
+        --output $publishRoot |
+        Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Phase 16A Native Host publish failed with exit code $LASTEXITCODE."
+    }
 }
 
 $hostExecutable = (Resolve-Path (Join-Path $publishRoot 'MediaLock.Phase16ABrowserDirectProbe.exe')).Path
@@ -101,6 +153,8 @@ if (Test-Path -LiteralPath $obsoleteBraveRegistryPath) {
     ExtensionRoot = (Resolve-Path (Join-Path $PSScriptRoot 'extension')).Path
     NativeHostExecutable = $hostExecutable
     NativeHostManifest = $manifestPath
+    NativeHostBuildFingerprint = $BuildFingerprint
+    NativeHostPublishReused = $nativeHostPublishReused
     RegistryPath = $registryPath
     RegistrationMatches = $true
     SharedChromiumRegistration = $true

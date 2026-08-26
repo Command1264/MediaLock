@@ -7,9 +7,9 @@ const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
 const documentId = '33333333-3333-4333-8333-333333333333';
 
 function sender(overrides = {}) {
-  return {
+  const value = {
     id: extensionId,
-    tab: { id: 42 },
+    tab: { id: 42, url: 'https://music.youtube.com/watch?v=example' },
     frameId: 0,
     documentId,
     documentLifecycle: 'active',
@@ -17,6 +17,7 @@ function sender(overrides = {}) {
     url: 'https://music.youtube.com/watch?v=example',
     ...overrides,
   };
+  return value;
 }
 
 test('registers only browser-owned active top-frame document metadata', () => {
@@ -41,6 +42,10 @@ test('rejects an unauthorized, inactive, nested, or malformed document sender', 
   assert.throws(() => registry.register(sender({ documentLifecycle: 'cached' })), /active/i);
   assert.throws(() => registry.register(sender({ documentId: 'page-chosen-value' })), /document/i);
   assert.throws(() => registry.register(sender({ origin: 'https://example.com' })), /origin/i);
+  assert.throws(() => registry.register(sender({ tab: { id: 42 } })), /tab URL/i);
+  assert.throws(() => registry.register(sender({
+    tab: { id: 42, url: 'https://www.youtube.com/watch?v=other' },
+  })), /tab URL/i);
 });
 
 test('replaces an old binding and refuses stale document matches', () => {

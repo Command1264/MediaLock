@@ -50,6 +50,7 @@ $registryRoot = Join-Path $testRoot 'NativeMessagingHosts'
 $registryPath = Join-Path $registryRoot $hostName
 $obsoleteBraveRegistryRoot = Join-Path $testRoot 'ObsoleteBraveNativeMessagingHosts'
 $obsoleteBraveRegistryPath = Join-Path $obsoleteBraveRegistryRoot $hostName
+$runningHost = $null
 
 try {
     $legacyBraveManifest = Join-Path `
@@ -62,6 +63,22 @@ try {
         -Browser Chrome `
         -RegistryRoot $registryRoot `
         -ObsoleteBraveRegistryRoot $obsoleteBraveRegistryRoot
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $chrome.NativeHostExecutable
+    $startInfo.Arguments = "chrome-extension://$($chrome.ExtensionId)/ --parent-window=0"
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $runningHost = New-Object System.Diagnostics.Process
+    $runningHost.StartInfo = $startInfo
+    Assert-Condition $runningHost.Start() 'The registration test Native Host did not start.'
+    Start-Sleep -Milliseconds 250
+    Assert-Condition (!$runningHost.HasExited) `
+        'The registration test Native Host exited before the idempotent registration check.'
+
     $brave = & $registerPath `
         -Browser Brave `
         -RegistryRoot $registryRoot `
@@ -71,6 +88,8 @@ try {
         'Chrome must report the shared Chromium registration contract.'
     Assert-Condition $brave.SharedChromiumRegistration `
         'Brave must report the shared Chromium registration contract.'
+    Assert-Condition $brave.NativeHostPublishReused `
+        'The second browser registration must reuse the complete content-addressed Host output.'
     Assert-Condition `
         ([string]::Equals($chrome.RegistryPath, $brave.RegistryPath, [StringComparison]::Ordinal)) `
         'Chrome and Brave must use the same Native Messaging registry path.'
@@ -84,6 +103,28 @@ try {
         'Register must remove its exact obsolete Brave-specific registration.'
     Assert-Condition (!(Test-Path -LiteralPath $obsoleteBraveRegistryPath)) `
         'The exact obsolete Brave-specific registration remained after migration.'
+
+    $nextFingerprint = 'b' * 64
+    $upgraded = & $registerPath `
+        -Browser Chrome `
+        -RegistryRoot $registryRoot `
+        -ObsoleteBraveRegistryRoot $obsoleteBraveRegistryRoot `
+        -BuildFingerprint $nextFingerprint
+    Assert-Condition (!$runningHost.HasExited) `
+        'Registering a new content-addressed Host stopped the already-running Host.'
+    Assert-Condition `
+        (![string]::Equals(
+            $chrome.NativeHostExecutable,
+            $upgraded.NativeHostExecutable,
+            [StringComparison]::OrdinalIgnoreCase)) `
+        'A new Host build fingerprint must publish to a different executable path.'
+    $upgradedManifest = Get-Content -LiteralPath $upgraded.NativeHostManifest -Raw | ConvertFrom-Json
+    Assert-Condition `
+        ([string]::Equals(
+            $upgradedManifest.path,
+            $upgraded.NativeHostExecutable,
+            [StringComparison]::OrdinalIgnoreCase)) `
+        'The shared manifest did not switch to the content-addressed Host executable.'
 
     $removed = & $unregisterPath `
         -Browser Brave `
@@ -140,6 +181,13 @@ try {
         'Unregister removed a foreign registration.'
 }
 finally {
+    if ($null -ne $runningHost) {
+        if (!$runningHost.HasExited) {
+            $runningHost.Kill()
+            $runningHost.WaitForExit()
+        }
+        $runningHost.Dispose()
+    }
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
     }
