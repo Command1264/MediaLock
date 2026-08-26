@@ -32,6 +32,8 @@ the row explicitly says the user supplied the visible result.
 | Reload target document, then Pause | Accepted once | New document paused at approximately 10.39 seconds | Pass |
 | Force-stop the exact disposable Native Host, then Play | `native-host-unavailable` | Target remained paused; no fallback／retry | Pass, fail closed |
 | Reload Extension and target page, then Play | Accepted once | Playing at approximately 26.77 seconds; one new Host process | Pass |
+| Chrome YouTube Music Pause while ordinary Chrome YouTube also plays | Accepted once | YouTube Music paused; ordinary YouTube continued to approximately 116.19 seconds | Pass, exact-page isolation |
+| Ordinary Chrome YouTube Pause while YouTube Music is paused | Accepted once | Ordinary YouTube paused at approximately 134.40 seconds; YouTube Music remained unchanged | Pass, reverse isolation |
 
 The Host registration still matched the Probe-owned manifest after the forced process stop. Reconnection required an
 explicit Extension reload in this first slice; Phase 16B requires user-triggered, bounded lazy reconnect rather than an
@@ -39,10 +41,10 @@ unbounded background retry loop.
 
 ## Current conclusion
 
-Chrome fixed-site Play, Pause, Seek, origin isolation, document reload, Host-loss safety and explicit reconnect pass
-the first manual slice. This is **not** complete Phase 16A Gate A evidence. It does not yet prove:
+Chrome fixed-site Play, Pause, Seek, same-browser exact-page isolation, disallowed-origin isolation, document reload,
+Host-loss safety and explicit reconnect pass the first manual slice. This is **not** complete Phase 16A Gate A
+evidence. It does not yet prove:
 
-- ordinary YouTube competing-source isolation in the same browser;
 - stale iframe, closed-tab or timeout behavior at the live browser seam;
 - full Chrome process restart and target reacquisition;
 - ordinary Brave registration／control;
