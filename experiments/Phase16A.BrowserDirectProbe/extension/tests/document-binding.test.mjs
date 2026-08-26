@@ -47,7 +47,10 @@ test('rejects an unauthorized, inactive, nested, or malformed document sender', 
   assert.throws(() => registry.register(sender({ documentLifecycle: 'cached' }), currentTab), /active/i);
   assert.throws(() => registry.register(sender({ documentId: 'page-chosen-value' }), currentTab), /document/i);
   assert.throws(() => registry.register(sender({ origin: 'https://example.com' }), currentTab), /origin/i);
-  assert.throws(() => registry.register(sender(), { id: 42 }), /tab URL/i);
+  assert.throws(
+    () => registry.register(sender(), { id: 42 }),
+    (error) => error.code === 'registration-tab-url-rejected',
+  );
   assert.throws(() => registry.register(sender(), {
     id: 42,
     url: 'https://example.com/watch?v=other',

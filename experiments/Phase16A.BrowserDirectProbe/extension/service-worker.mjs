@@ -40,7 +40,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'registerDocument') {
     registerDocument(sender).then(
       (binding) => sendResponse({ accepted: true, documentId: binding.documentId }),
-      () => sendResponse({ accepted: false, errorCode: 'unauthorized-command' }),
+      (error) => sendResponse({
+        accepted: false,
+        errorCode: normalizeRegistrationError(error),
+      }),
     );
     return true;
   }
@@ -61,8 +64,21 @@ async function registerDocument(sender) {
   if (!Number.isSafeInteger(sender?.tab?.id)) {
     throw new Error('Document sender does not identify a browser tab.');
   }
-  const currentTab = await chrome.tabs.get(sender.tab.id);
+  let currentTab;
+  try {
+    currentTab = await chrome.tabs.get(sender.tab.id);
+  } catch {
+    const error = new Error('The browser tab was unavailable during document registration.');
+    error.code = 'registration-tab-lookup-failed';
+    throw error;
+  }
   return documentRegistry.register(sender, currentTab);
+}
+
+function normalizeRegistrationError(error) {
+  return typeof error?.code === 'string' && error.code.startsWith('registration-')
+    ? error.code
+    : 'registration-rejected';
 }
 
 function connectNativeHost() {
@@ -119,7 +135,12 @@ async function queueProbeRequest(message) {
       || !target
       || target.documentId !== registration.documentId
       || target.pageOrigin !== pageOrigin) {
-    return { accepted: false, errorCode: 'target-unavailable' };
+    return {
+      accepted: false,
+      errorCode: registration?.accepted === false
+        ? registration.errorCode ?? 'registration-rejected'
+        : 'target-unavailable',
+    };
   }
 
   const requestId = crypto.randomUUID();
