@@ -59,10 +59,18 @@ Observed on Chrome with the MDN single-video sample:
 
 ## Manual Gate B2
 
-Pending against Play implementation commit `9d3d258`:
+Passed against Play implementation commit `9d3d258`:
 
 1. Reload the unpacked Phase 16B Extension in Chrome.
 2. Open the MDN single-video sample, start playback and authorize the page.
 3. Press Pause once and verify the video pauses once.
 4. Press Play once and verify the video resumes once.
 5. Verify no other media source changes and no delayed or duplicate command occurs.
+
+Observed on Chrome with the MDN single-video sample:
+
+- Temporary authorization reported one media element.
+- Pause was accepted once and paused the video once.
+- Play was accepted once and resumed the video once.
+- No delayed or duplicate command appeared after three seconds.
+- Other media sources did not change, and no error or crash occurred.
