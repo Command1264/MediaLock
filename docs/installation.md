@@ -1,11 +1,11 @@
 # 下載、安裝、更新與移除
 
-Media Lock 以 unsigned `win-x64` 套件發布，不需要另外安裝 .NET Runtime。Stable／Latest `0.2.0` 提供
-portable ZIP；`0.3.0-rc.1` Prerelease 同時提供 portable ZIP 與 per-user Setup。只有 GitHub Release 明確
+Media Lock 以 unsigned `win-x64` 套件發布，不需要另外安裝 .NET Runtime。Stable／Latest `0.3.0` 同時
+提供 portable ZIP 與 per-user Setup。只有 GitHub Release 明確
 列出且 SHA-256 相符的檔案才是正式下載，不要使用開發或測試用 Setup。
 
-Stable `0.3.0` 正在本機驗證，尚未公開，也尚未取代 `0.2.0` Stable／Latest。除非 GitHub Release 已正式
-列出 `0.3.0` 與對應 SHA-256，否則不要把同名本機候選視為官方下載。
+[Media Lock 0.3.0 Stable／Latest Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0) 是官方
+下載來源；歷史 `0.2.0` 與 `0.3.0-rc.1` Release 仍保留供驗證或必要的回復調查。
 
 ## 系統需求與限制
 
@@ -16,10 +16,8 @@ Stable `0.3.0` 正在本機驗證，尚未公開，也尚未取代 `0.2.0` Stabl
 
 ## 下載與驗證
 
-1. 從 [Media Lock 0.2.0 Stable Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 下載
-   `MediaLock-0.2.0-win-x64.zip`，或從
-   [Media Lock 0.3.0-rc.1 Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1)
-   下載該候選的 ZIP／Setup。後續版本請從
+1. 從 [Media Lock 0.3.0 Stable／Latest Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0)
+   下載 portable ZIP 或 per-user Setup。其他版本請從
    [Media Lock Releases](https://github.com/Command1264/MediaLock/releases) 選擇所需 Stable 或 Prerelease；
    不要從不明鏡像下載。
 2. 在 PowerShell 將 `<version>` 換成實際版本，以實際檔名計算 SHA-256：
@@ -32,11 +30,9 @@ Stable `0.3.0` 正在本機驗證，尚未公開，也尚未取代 `0.2.0` Stabl
 3. 將結果與該版本 GitHub Release 說明中的 SHA-256 完整比對。大小寫不影響雜湊值，但每個十六進位字元
    都必須相同；不相同時不要執行檔案。
 
-`0.2.0` 的 SHA-256 是
-`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`。
-`0.3.0-rc.1` ZIP 的 SHA-256 是
-`bfcbc61998173c036ce1beb7574013920a906f6a01d2f1df1599791d24e29066`；Setup 的 SHA-256 是
-`0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3`。
+`0.3.0` ZIP 的 SHA-256 是
+`94deac66e195cfca21c826ee86f3e61097f3440d3a84ebb5af2439ef3ad3d437`；Setup 的 SHA-256 是
+`7937f807b2ec577b88d3506735dfb7c26fe0c12b0f055a2b739364bb9ab4d00d`。
 
 ## Portable ZIP 第一次執行
 
@@ -50,7 +46,7 @@ Stable `0.3.0` 正在本機驗證，尚未公開，也尚未取代 `0.2.0` Stabl
 
 ## Setup 第一次安裝
 
-只有 GitHub Release 同時列出 Setup 與其 SHA-256 時，該檔案才是正式候選下載：
+只有 GitHub Release 同時列出 Setup 與其 SHA-256 時，該檔案才是正式下載：
 
 1. 驗證 `MediaLock-Setup-<version>-win-x64.exe` 的 SHA-256。
 2. 以目前使用者執行 Setup；它不要求系統管理員權限，安裝至

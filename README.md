@@ -9,10 +9,9 @@ Media Lock 是 Windows 桌面媒體控制路由器：它位於實體媒體鍵與
 目前已有可執行的 WPF 桌面應用程式與 Console Probe。桌面程式可列出 GSMTC Sessions、鎖定目標、
 提供媒體控制、攔截全域媒體鍵、常駐通知區域，並保存設定與執行狀態。App Lock、有序的來源應用程式
 Priority Rules、雙語介面、Light/Dark 主題、封面與可互動時間軸均已實作；實機相容性仍依測試矩陣記錄。
-`0.2.0` 正式版已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的
-Stable／Latest 版本。`0.3.0-rc.1` 已公開為 Prerelease，加入單向 Keep Playing、per-user Setup 與壓縮後的
-self-contained single-file payload；其 exact-artifact 自動、主機與 Windows Sandbox 驗證均已完成。
-Phase 14B 正在將相同功能範圍晉升為 `0.3.0` stable；目前只是本機候選，尚未完成正式 Artifact 驗證或公開發布。
+`0.3.0` 已完成獨立 commit、digest、主機與 Windows Sandbox 驗證，並已公開為目前的 Stable／Latest
+版本。它將 `0.3.0-rc.1` 驗證過的單向 Keep Playing、per-user Setup 與壓縮後的 self-contained
+single-file payload 晉升為正式版；`0.2.0` 與 `0.3.0-rc.1` 的歷史 Release 與資產維持不變。
 Windows 原生媒體卡片同步仍不在產品承諾內。
 
 已驗證的基礎能力包括：
@@ -27,14 +26,14 @@ Windows 原生媒體卡片同步仍不在產品承諾內。
 
 目前公開版本是 unsigned `win-x64` stable release：
 
-- [下載 Media Lock 0.2.0](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0)
-- SHA-256：`f368421481fa0a99516618873dfd4e0422c241deae2033b105869471eab27bb0`
-- [試用 Media Lock 0.3.0-rc.1 Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1)
-- Prerelease 同時提供 portable ZIP 與 per-user Setup；各自 SHA-256 列於 Release 頁面。
+- [下載 Media Lock 0.3.0 Stable／Latest](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0)
+- Portable ZIP SHA-256：`94deac66e195cfca21c826ee86f3e61097f3440d3a84ebb5af2439ef3ad3d437`
+- Per-user Setup SHA-256：`7937f807b2ec577b88d3506735dfb7c26fe0c12b0f055a2b739364bb9ab4d00d`
+- [歷史版本與 Prerelease](https://github.com/Command1264/MediaLock/releases)
 - [下載、驗證、更新、回復與移除說明](docs/installation.md)
 
-ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。目前公開的 `0.2.0` 保留原始 payload；
-Phase 12B 之後的 source-built 候選會壓縮單檔 bundle 內的 managed assemblies，以降低解壓或安裝後的 EXE
+ZIP 內只有 self-contained `MediaLock.exe`，不需要另外安裝 .NET Runtime。`0.3.0` 會壓縮單檔 bundle
+內的 managed assemblies，以降低解壓或安裝後的 EXE
 體積，功能、語言資源與隨附 runtime 不會因此被裁剪。由於執行檔尚未 code signing，Windows SmartScreen
 或信譽警告仍可能出現；請只從官方 GitHub Release 下載並在執行前比對 SHA-256。
 
@@ -95,19 +94,15 @@ Inno Setup installer，並為兩者產生 manifest 與 SHA-256。除了 `global.
 
 此命令同時支援穩定版與 `-rc.N` 版本，會建立本機輸出；只有經獨立驗證且正式發布的 artifact 才是
 官方下載。輸出位於 `artifacts\`，ZIP 內只包含 self-contained `MediaLock.exe`，Setup 預設安裝至
-`%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。目前公開的
-`0.2.0` 已以 source commit `7ce40ab31433998665b30ac18a7f50ebb3dafec7` 與 archive digest 通過主機及
-Windows Sandbox gate，該 Stable Release 仍只提供既有 portable ZIP。第一個公開候選 Setup 已隨
-`0.3.0-rc.1` GitHub Prerelease 發布；正式 ZIP／Setup 來自同一份已驗證 payload，Stable／Latest 仍維持
-`0.2.0`。`0.3.0` stable 目前只在本機準備，尚不是官方下載。
+`%LocalAppData%\Programs\MediaLock\` 並建立 Start Menu 捷徑。`0.3.0` 的正式 ZIP／Setup 來自同一份已
+驗證 payload，已通過 exact-artifact 主機與 Windows Sandbox gate，並已公開為 Stable／Latest。
 完整驗證、證據與回復流程見
 [Release artifact runbook](docs/release-candidate.md)，正式版內容見
 [0.2.0 release notes](docs/releases/0.2.0.md)，歷史候選內容見
-[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)，目前公開候選內容見
-[0.3.0-rc.1 release notes](docs/releases/0.3.0-rc.1.md)，未發布的 stable 候選內容見
-[0.3.0 release notes](docs/releases/0.3.0.md)。目前正式版與候選版分別透過
-[Stable Release](https://github.com/Command1264/MediaLock/releases/tag/v0.2.0) 與
-[0.3.0-rc.1 Prerelease](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0-rc.1) 公開；Release 頁面
+[0.2.0-rc.3 release notes](docs/releases/0.2.0-rc.3.md)，歷史候選內容見
+[0.3.0-rc.1 release notes](docs/releases/0.3.0-rc.1.md)，目前正式版內容見
+[0.3.0 release notes](docs/releases/0.3.0.md)。正式版透過
+[Stable／Latest Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0) 公開；Release 頁面
 列出 SHA-256，manifest 與獨立 checksum 檔仍保留於受信任的本機建置輸出。
 
 .NET 10 於 2025-11-11 發布，支援至 2028-11-14。WPF 為 Windows-only 的 .NET UI framework，
