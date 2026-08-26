@@ -175,8 +175,24 @@ or remove only the exact current-user `MediaLock` startup entry after confirming
 The separately approved publication created GPG-signed annotated tag `v0.3.0` at exact artifact source
 `a773fac983728f5d4b2d8cbe40bfad9d1c016737` and published a GitHub Stable／Latest Release on 2026-08-26. Its only
 assets are the independently verified ZIP and Setup. Manifest and standalone checksum files remain trusted local
-provenance evidence. Published `v0.2.0`／`v0.3.0-rc.1` assets and the retained `release/0.2` hotfix baseline remain
-unchanged.
+provenance evidence. Published `v0.2.0`／`v0.3.0-rc.1` assets and the then-retained `release/0.2` hotfix baseline remain
+unchanged during the stable publication itself. After public verification, the separately authorized retirement
+removed the local／remote `release/0.2` branch and its Worktree while preserving its historical tag, Release, assets
+and provenance.
+
+## Release baseline retention policy
+
+Keep one current stable release branch／Worktree per product edition as the hotfix baseline. Once a newer stable
+baseline is established at its exact verified artifact source, integrated through `develop` and `main`, publicly
+released and independently download-verified, the immediately preceding release branch／Worktree becomes eligible for
+routine retirement. The destructive local／remote deletion still requires task-specific authorization naming the
+branch; no additional product or architecture decision is needed once these eligibility gates pass.
+
+Before retirement, verify the previous Worktree is clean, its commits are reachable from `develop` or `main`, no open
+PR uses the branch as head or base, and the successor branch exists locally and remotely at the accepted source. Remove
+the exact Worktree without force, delete the local and remote branch, prune Worktree metadata, then verify all three are
+absent and the successor remains clean. Historical tags, GitHub Releases, public assets and provenance stay immutable;
+deleting any of those requires separate explicit authorization naming the exact target.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md), and `0.2.0-rc.2` evidence is preserved in
