@@ -9,12 +9,13 @@ namespace MediaLock.Windows;
 public sealed class WindowsSourceApplicationMetadataResolver
     : ISourceApplicationMetadataResolver
 {
-    private readonly IDiagnosticLog? diagnosticLog;
+    private readonly Action<DiagnosticEvent>? reportDiagnostic;
     private readonly Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>> metadata;
 
-    public WindowsSourceApplicationMetadataResolver(IDiagnosticLog? diagnosticLog = null)
+    public WindowsSourceApplicationMetadataResolver(
+        Action<DiagnosticEvent>? reportDiagnostic = null)
     {
-        this.diagnosticLog = diagnosticLog;
+        this.reportDiagnostic = reportDiagnostic;
         metadata = new Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>>(
             () => LoadSafely(LoadShellApplicationMetadata),
             LazyThreadSafetyMode.ExecutionAndPublication);
@@ -22,10 +23,10 @@ public sealed class WindowsSourceApplicationMetadataResolver
 
     internal WindowsSourceApplicationMetadataResolver(
         Func<IReadOnlyDictionary<string, SourceApplicationMetadata>> loadMetadata,
-        IDiagnosticLog? diagnosticLog = null)
+        Action<DiagnosticEvent>? reportDiagnostic = null)
     {
         ArgumentNullException.ThrowIfNull(loadMetadata);
-        this.diagnosticLog = diagnosticLog;
+        this.reportDiagnostic = reportDiagnostic;
         metadata = new Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>>(
             () => LoadSafely(loadMetadata),
             LazyThreadSafetyMode.ExecutionAndPublication);
@@ -194,29 +195,31 @@ public sealed class WindowsSourceApplicationMetadataResolver
 
     private void ReportFailure(string stage, Exception exception)
     {
-        System.Diagnostics.Trace.TraceError(exception.ToString());
-        if (diagnosticLog is null)
+        var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
+        System.Diagnostics.Trace.TraceError(
+            $"Source application metadata lookup failed at {stage}: {exceptionType}.");
+        if (reportDiagnostic is null)
         {
             return;
         }
 
         try
         {
-            diagnosticLog.WriteAsync(
-                new DiagnosticEvent(
-                    "source.metadata.failed",
-                    new Dictionary<string, string>
-                    {
-                        ["stage"] = stage,
-                        ["exceptionType"] = exception.GetType().FullName ??
-                            exception.GetType().Name,
-                    }),
-                CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            reportDiagnostic(new DiagnosticEvent(
+                "source.metadata.failed",
+                new Dictionary<string, string>
+                {
+                    ["stage"] = stage,
+                    ["exceptionType"] = exceptionType,
+                }));
         }
         catch (Exception diagnosticException) when (
             diagnosticException is not OutOfMemoryException)
         {
-            System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
+            var diagnosticExceptionType = diagnosticException.GetType().FullName ??
+                diagnosticException.GetType().Name;
+            System.Diagnostics.Trace.TraceError(
+                $"Source metadata diagnostic scheduling failed: {diagnosticExceptionType}.");
         }
     }
 

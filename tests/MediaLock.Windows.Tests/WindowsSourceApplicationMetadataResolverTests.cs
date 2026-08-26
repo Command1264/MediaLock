@@ -33,17 +33,17 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
     public void TryResolveFallsBackWithoutRetryingWhenTheShellCatalogIsUnavailable()
     {
         var loads = 0;
-        var diagnostics = new RecordingDiagnosticLog();
+        var diagnostics = new List<DiagnosticEvent>();
         var resolver = new WindowsSourceApplicationMetadataResolver(() =>
         {
             loads++;
             throw new InvalidOperationException("Shell catalog unavailable.");
-        }, diagnostics);
+        }, diagnostics.Add);
 
         Assert.Null(resolver.TryResolve("Brave._crx_music"));
         Assert.Null(resolver.TryResolve("Brave._crx_music"));
         Assert.Equal(1, loads);
-        var diagnostic = Assert.Single(diagnostics.Events);
+        var diagnostic = Assert.Single(diagnostics);
         Assert.Equal("source.metadata.failed", diagnostic.Name);
         Assert.Equal("catalog", diagnostic.Properties?["stage"]);
         Assert.Equal(
@@ -80,16 +80,16 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
             "Host"));
     }
 
-    private sealed class RecordingDiagnosticLog : IDiagnosticLog
+    [Fact]
+    public void DiagnosticReporterFailureCannotInterruptRawIdentityFallback()
     {
-        public List<DiagnosticEvent> Events { get; } = [];
+        var resolver = new WindowsSourceApplicationMetadataResolver(
+            () => throw new InvalidOperationException("Shell catalog unavailable."),
+            _ => throw new IOException("Diagnostic destination unavailable."));
 
-        public ValueTask WriteAsync(
-            DiagnosticEvent diagnosticEvent,
-            CancellationToken cancellationToken)
-        {
-            Events.Add(diagnosticEvent);
-            return ValueTask.CompletedTask;
-        }
+        var exception = Record.Exception(() => resolver.TryResolve("Unknown.Source"));
+
+        Assert.Null(exception);
+        Assert.Null(resolver.TryResolve("Unknown.Source"));
     }
 }

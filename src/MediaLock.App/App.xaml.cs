@@ -129,7 +129,8 @@ public partial class App : System.Windows.Application
                 isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
                 playbackStateLockFeedback: new SystemPlaybackStateLockFeedback(),
                 sourceApplicationMetadataResolver:
-                    new WindowsSourceApplicationMetadataResolver(diagnosticLog));
+                    new WindowsSourceApplicationMetadataResolver(
+                        QueueSourceMetadataDiagnostic));
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -383,6 +384,29 @@ public partial class App : System.Windows.Application
         {
             System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
         }
+    }
+
+    private void QueueSourceMetadataDiagnostic(DiagnosticEvent diagnosticEvent)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticEvent);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (diagnosticLog is not null)
+                {
+                    await diagnosticLog.WriteAsync(
+                        diagnosticEvent,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
+                System.Diagnostics.Trace.TraceError(
+                    $"Source metadata diagnostic write failed: {exceptionType}.");
+            }
+        });
     }
 
     internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
