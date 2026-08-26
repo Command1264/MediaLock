@@ -1,6 +1,6 @@
 # Phase 16A browser-direct Probe evidence
 
-Date: 2026-08-26
+Date: 2026-08-27
 
 ## Environment
 
@@ -8,7 +8,7 @@ Date: 2026-08-26
 | --- | --- |
 | Branch | `codex/feat/phase-16a-browser-direct-probe` |
 | Initial Probe implementation commit | `ca58e5c` |
-| Final hardening implementation commit | `52200f8` |
+| Final hardening implementation commit | `786a1de` |
 | Probe status Copy UI commit | `5c2e69a` |
 | Windows | Windows 11 Pro 25H2, build `26200.9168`, 64-bit |
 | Chrome | `151.0.7922.174` |
@@ -29,14 +29,16 @@ Revision ownership is intentionally split rather than assigning every observatio
 - shared Chrome-compatible registration migration used `e505dfb`;
 - five-second cold-start negotiation and the no-Extension fallback observation used `920b997`;
 - stale-document races used `fb43393`;
-- `e9e799b` owns the closed-tab, full-lifecycle timeout, initial sender-tab URL and content-addressed registration
-  hardening. Its affected live rows remain pending below until rerun against this exact implementation revision.
+- `e9e799b` introduced closed-tab, initial sender-tab URL and content-addressed registration hardening;
 - `7691dbf` queries the authoritative current tab URL because Chrome 151 and Brave do not always populate the
   optional `sender.tab.url` field during registration;
 - `5ac5c24` exposes only bounded registration failure categories so live compatibility failures remain diagnosable;
 - `52200f8` treats browser-owned `documentId` as a bounded opaque identifier instead of imposing UUID syntax. This
   follows live Brave rejection `registration-document-id-rejected`; the affected Chrome／Brave cross-browser
   isolation rows passed after both extensions and the Native Host were reloaded from this revision.
+- `321ba24` added the bounded Host response-delay seam used by the closed-tab and full-lifecycle timeout rows;
+  `0fc37c6` and `786a1de` then hardened cached delay and Extension-ID types. Those delayed rows and the final
+  zero-delay Chrome／Brave smoke used `786a1de`.
 
 ## Chrome Gate A observations
 
@@ -56,6 +58,7 @@ Revision ownership is intentionally split rather than assigning every observatio
 | Chrome YouTube Music Pause while ordinary Brave YouTube also plays, after opaque document-ID fix | Accepted once | Chrome YouTube Music paused once; ordinary Brave YouTube continued playing | Pass, cross-browser exact-page isolation |
 | Pause from the loopback iframe harness while its cross-origin YouTube iframe plays | `target-unavailable` | Embedded video continued playing; no other media source changed | Pass, nested frame rejected without fallback |
 | Pause with a 3000 ms Host command delay, then close the target YouTube Music tab | Popup closed with its tab before a visible result | After more than 5 seconds, ordinary Chrome YouTube continued playing, Brave media was unchanged and no duplicate occurred | Pass, closed document did not fall through to another target |
+| Pause with a 3000 ms Host command delay, then navigate the target tab to `https://example.com` within the delay | Popup closed during navigation before a visible result | The replacement page received no old command or abnormal effect; ordinary Chrome YouTube continued playing; Brave media was unchanged; no delayed or duplicate switch occurred | Pass, replacement document did not inherit the old request |
 | Pause with a 6000 ms Host command delay against the five-second command deadline | `outcome-unknown` at approximately 5 seconds | After more than 8 seconds, YouTube Music continued playing; ordinary Chrome YouTube and Brave were unchanged; no late retry or duplicate occurred | Pass, full-lifecycle timeout failed closed |
 | Final zero-delay Pause smoke after restoring the shared Chrome／Brave registration | Accepted once in each browser | Each selected target paused immediately; every competing source remained unchanged; no delayed or duplicate switch occurred | Pass, production-default Probe timing restored |
 
