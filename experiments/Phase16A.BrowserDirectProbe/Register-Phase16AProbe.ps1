@@ -122,6 +122,8 @@ if ($nativeHostPublishReused) {
         Get-Content -LiteralPath $hostConfigurationPath -Raw |
         ConvertFrom-Json
     $existingProperties = @($existingHostConfiguration.PSObject.Properties.Name)
+    $existingExtensionId = $existingHostConfiguration.extensionId
+    $existingExtensionIdIsString = $existingExtensionId -is [string]
     $existingDelay = $existingHostConfiguration.commandResponseDelayMilliseconds
     $existingDelayIsInteger = `
         ($existingDelay -is [int]) -or `
@@ -129,8 +131,9 @@ if ($nativeHostPublishReused) {
     if ($existingProperties.Count -ne 2 `
         -or $existingProperties -notcontains 'extensionId' `
         -or $existingProperties -notcontains 'commandResponseDelayMilliseconds' `
+        -or !$existingExtensionIdIsString `
         -or ![string]::Equals(
-            [string]$existingHostConfiguration.extensionId,
+            $existingExtensionId,
             $extensionId,
             [StringComparison]::Ordinal) `
         -or !$existingDelayIsInteger `

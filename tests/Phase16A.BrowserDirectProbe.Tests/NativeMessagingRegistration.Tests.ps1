@@ -160,7 +160,10 @@ try {
     $invalidCachedConfigurations = @(
         "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": `"0`" }",
         "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": 0.4 }",
-        "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": false }"
+        "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": false }",
+        "{ `"extensionId`": [`"$($chrome.ExtensionId)`"], `"commandResponseDelayMilliseconds`": 0 }",
+        "{ `"extensionId`": true, `"commandResponseDelayMilliseconds`": 0 }",
+        "{ `"extensionId`": null, `"commandResponseDelayMilliseconds`": 0 }"
     )
     foreach ($invalidCachedConfiguration in $invalidCachedConfigurations) {
         [System.IO.File]::WriteAllText(
