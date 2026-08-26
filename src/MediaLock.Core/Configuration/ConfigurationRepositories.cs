@@ -33,3 +33,8 @@ public interface ILoginStartupManager
 
     ValueTask SetEnabledAsync(bool enabled, CancellationToken cancellationToken);
 }
+
+public interface ILoginStartupChangeSource
+{
+    IAsyncEnumerable<bool> WatchEnabledAsync(CancellationToken cancellationToken);
+}

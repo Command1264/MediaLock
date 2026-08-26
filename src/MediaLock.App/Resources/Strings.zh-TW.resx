@@ -104,7 +104,7 @@
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>復原逾時秒數</value></data>
   <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>請輸入 0 到 300 之間的有限數值。</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>備援政策</value></data>
-  <data name="Settings_RoutingHelp" xml:space="preserve"><value>啟動時會沿用主畫面最後選擇的路由模式。復原與優先規則變更會在 Media Lock 重新啟動後套用。優先規則會使用第一個可用且已啟用的應用程式，否則使用 Windows 目前工作階段。應用程式鎖定會還原已儲存的來源應用程式；工作階段鎖定只會還原唯一且明確相符的工作階段。</value></data>
+  <data name="Settings_RoutingHelp" xml:space="preserve"><value>啟動時會沿用主畫面最後選擇的路由模式。復原與優先規則變更會在儲存後立即套用。優先規則會使用第一個可用且已啟用的應用程式，否則使用 Windows 目前工作階段。應用程式鎖定會還原已儲存的來源應用程式；工作階段鎖定只會還原唯一且明確相符的工作階段。</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>應用程式優先規則</value></data>
   <data name="Settings_PriorityRulesHelp" xml:space="preserve"><value>從目前媒體工作階段清單加入來源應用程式。規則會由上而下評估，停用的規則會被略過。</value></data>
   <data name="Settings_Add" xml:space="preserve"><value>新增</value></data>

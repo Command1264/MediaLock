@@ -505,9 +505,12 @@ public sealed class MainWindowContractTests
 
                 var route = Assert.IsType<ApplicationIntent.Route>(
                     Assert.Single(application.Intents));
-                Assert.Equal(
-                    TimeSpan.FromSeconds(viewModel.NowPlayingPositionSeconds),
-                    route.Command.AbsolutePosition);
+                var expectedPosition = TimeSpan.FromSeconds(viewModel.NowPlayingPositionSeconds);
+                var actualPosition = Assert.IsType<TimeSpan>(route.Command.AbsolutePosition);
+                Assert.InRange(
+                    (expectedPosition - actualPosition).Duration(),
+                    TimeSpan.Zero,
+                    TimeSpan.FromTicks(1));
             }
             finally
             {

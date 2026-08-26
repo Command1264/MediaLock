@@ -86,4 +86,35 @@ public sealed class RegistryLoginStartupManagerTests
             Registry.CurrentUser.DeleteSubKeyTree(subKey, throwOnMissingSubKey: false);
         }
     }
+
+    [Fact]
+    public async Task WatchEnabledReportsExternalRegistryChanges()
+    {
+        var subKey = $"Software\\MediaLock.Tests\\{Guid.NewGuid():N}";
+        try
+        {
+            var manager = new RegistryLoginStartupManager(
+                Registry.CurrentUser,
+                subKey,
+                "MediaLock",
+                @"C:\Users\Example\AppData\Local\Programs\MediaLock\MediaLock.exe");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await using var changes = manager
+                .WatchEnabledAsync(timeout.Token)
+                .GetAsyncEnumerator(timeout.Token);
+
+            Assert.True(await changes.MoveNextAsync());
+            Assert.False(changes.Current);
+
+            var next = changes.MoveNextAsync().AsTask();
+            await manager.SetEnabledAsync(true, timeout.Token);
+
+            Assert.True(await next);
+            Assert.True(changes.Current);
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(subKey, throwOnMissingSubKey: false);
+        }
+    }
 }

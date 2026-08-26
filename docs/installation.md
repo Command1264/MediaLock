@@ -4,6 +4,9 @@ Media Lock 以 unsigned `win-x64` 套件發布，不需要另外安裝 .NET Runt
 portable ZIP；`0.3.0-rc.1` Prerelease 同時提供 portable ZIP 與 per-user Setup。只有 GitHub Release 明確
 列出且 SHA-256 相符的檔案才是正式下載，不要使用開發或測試用 Setup。
 
+Stable `0.3.0` 正在本機驗證，尚未公開，也尚未取代 `0.2.0` Stable／Latest。除非 GitHub Release 已正式
+列出 `0.3.0` 與對應 SHA-256，否則不要把同名本機候選視為官方下載。
+
 ## 系統需求與限制
 
 - 64 位元 Windows 11；Windows 與播放器必須提供 GSMTC。

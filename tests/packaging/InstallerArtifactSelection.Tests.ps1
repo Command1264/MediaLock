@@ -52,11 +52,36 @@ foreach ($scriptName in @(
         "$scriptName must require an explicit OlderVersion."
     Assert-Condition $command.Parameters.ContainsKey('NewerVersion') `
         "$scriptName must require an explicit NewerVersion."
+    Assert-Condition $command.Parameters.ContainsKey('ExpectedOlderInstallerSha256') `
+        "$scriptName must require the expected older-installer SHA-256."
     $scriptText = Get-Content -LiteralPath $scriptPath -Raw
     Assert-Condition ($scriptText -notmatch '\[version\]') `
         "$scriptName must not cast release candidates to [version]."
     Assert-Condition ($scriptText -match 'Get-MediaLockArtifactPair') `
         "$scriptName must use the shared explicit artifact-selection seam."
+    foreach ($resultField in @(
+        'payloadUnchanged',
+        'registrationUnchanged',
+        'shortcutUnchanged',
+        'settingsUnchanged',
+        'stateUnchanged')) {
+        Assert-Condition ($scriptText -match $resultField) `
+            "$scriptName must report $resultField."
+    }
+    if ($scriptName -eq 'WindowsSandbox-InstallerUpgradeSmoke.ps1') {
+        Assert-Condition ($scriptText -match '\$repair\s*=\s*Invoke-Installer') `
+            'The upgrade smoke must execute the newer installer again for same-version repair.'
+        Assert-Condition ($scriptText -match 'repairExitCode') `
+            'The upgrade-smoke result must report repairExitCode.'
+        Assert-Condition ($scriptText -match 'Assert-MediaLockInstalledStateUnchanged') `
+            'The upgrade smoke must compare the complete installed-state snapshot after blocked downgrade.'
+    }
+    else {
+        Assert-Condition ($scriptText -match '\$preparationPath') `
+            'The cancellation smoke must persist a preparation snapshot across its two phases.'
+        Assert-Condition ($scriptText -match 'Assert-MediaLockInstalledStateUnchanged') `
+            'The cancellation smoke must compare the complete installed-state snapshot after cancellation.'
+    }
 }
 
 $temporaryRoot = Join-Path `
@@ -74,11 +99,14 @@ function Add-TestArtifact {
     $directory = Join-Path $temporaryRoot $DirectoryName
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     $installerName = "MediaLock-Setup-$Version-win-x64.exe"
-    [IO.File]::WriteAllText((Join-Path $directory $installerName), 'installer')
+    $installerPath = Join-Path $directory $installerName
+    [IO.File]::WriteAllText($installerPath, "installer-$Version")
+    $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
     [ordered]@{
         version = $Version
         installer = [ordered]@{
             fileName = $installerName
+            sha256 = $installerHash
         }
     } |
         ConvertTo-Json -Depth 3 |
@@ -101,6 +129,34 @@ try {
     Assert-Condition ($pair[0].Manifest.version -eq '0.2.0') 'The explicitly selected older artifact was not first.'
     Assert-Condition ($pair[1].Manifest.version -eq '0.3.0-rc.1') `
         'The explicitly selected prerelease artifact was not second.'
+
+    $stablePair = @(Get-MediaLockArtifactPair `
+        -ArtifactRoot $temporaryRoot `
+        -OlderVersion '0.3.0-rc.1' `
+        -NewerVersion '0.3.0')
+    Assert-Condition ($stablePair.Count -eq 2) `
+        'The prerelease-to-stable pair must contain exactly two artifacts.'
+    Assert-Condition ($stablePair[0].Manifest.version -eq '0.3.0-rc.1') `
+        'The explicitly selected release candidate was not first.'
+    Assert-Condition ($stablePair[1].Manifest.version -eq '0.3.0') `
+        'The explicitly selected stable release was not second.'
+
+    $validatedRcInstaller = Assert-MediaLockInstallerArtifact `
+        -Artifact $stablePair[0] `
+        -ExpectedSha256 $stablePair[0].Manifest.installer.sha256
+    Assert-Condition ($validatedRcInstaller.Sha256 -eq $stablePair[0].Manifest.installer.sha256) `
+        'The pinned release-candidate installer digest was not returned.'
+    Assert-Throws `
+        { Assert-MediaLockInstallerArtifact -Artifact $stablePair[0] -ExpectedSha256 ('0' * 64) } `
+        'does not match the pinned digest'
+    $rcInstallerPath = Join-Path `
+        $stablePair[0].Directory `
+        $stablePair[0].Manifest.installer.fileName
+    [IO.File]::AppendAllText($rcInstallerPath, '-tampered')
+    Assert-Throws `
+        { Assert-MediaLockInstallerArtifact -Artifact $stablePair[0] } `
+        'does not match the 0.3.0-rc.1 manifest'
+    [IO.File]::WriteAllText($rcInstallerPath, 'installer-0.3.0-rc.1')
 
     Assert-Condition `
         ((Compare-MediaLockReleaseVersion -Left '0.3.0-rc.1' -Right '0.3.0') -lt 0) `

@@ -594,7 +594,8 @@ After separate approval, change only stable identity, transition automation and 
 local gate and two-axis review, then create and validate one provenance-clean `0.3.0` ZIP／Setup pair on the host and a
 fresh Windows Sandbox. Record results in `docs/phase-14/stable-release-smoke.md` without rebuilding the artifact.
 
-Status: not started.
+Status: in progress. Phase 14B implementation was approved on 2026-08-26. Stable identity and transition tests run on
+`codex/release/phase-14b-0.3-stable`; remote integration, `release/0.3`, tag and publication remain separately gated.
 
 ### Phase 14C — integration and stable publication
 
@@ -604,3 +605,30 @@ GitHub Stable／Latest Release with only the verified ZIP and Setup. Preserve al
 `release/0.2` unless a later explicit maintenance decision authorizes otherwise.
 
 Status: not started.
+
+## Phase 15 — Human-readable source identities
+
+Replace raw source-application identifiers in user-facing Session and Priority Rules surfaces with a trustworthy,
+human-readable presentation while preserving the exact GSMTC identity used by routing. For example, an installed
+YouTube Music PWA currently exposed as `Brave._crx_cinhimbnkkghhklpknlkffjgod` may display as
+`YouTube Music — Brave Web App` when Windows application metadata can verify both parts.
+
+This is a presentation resolver, not browser URL detection and not an identity migration. App Lock, Priority Rules,
+Recovery and persisted state continue comparing the complete `SourceAppUserModelId`; the friendly name may change
+without changing the routed target. The resolver must prefer authoritative Windows application／package metadata,
+retain the raw identifier in an accessible details surface, and fall back to that identifier when no reliable name
+exists. It must not infer an application name from a song title, artist, browser tab title or hard-coded `_crx_` value.
+
+Exit criteria:
+
+- Ordinary browsers, installed Chromium PWAs, packaged apps and classic desktop sources have deterministic display
+  resolution and raw-ID fallback behavior.
+- Duplicate friendly names remain distinguishable without changing their routing identities.
+- Main Session rows, Priority Rules, App Lock details, accessibility text and English／Traditional Chinese surfaces
+  use one shared resolver rather than independent labels.
+- PWA reinstall／identity changes and unavailable Windows metadata fail safely without rebinding a saved rule to a
+  different source.
+- Unit tests cover resolver precedence, collisions, fallback and localization; a named Brave YouTube Music PWA plus
+  ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
+
+Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.

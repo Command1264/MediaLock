@@ -114,6 +114,18 @@ Store user files beneath `%LocalAppData%\MediaLock\`:
 Writes must be atomic enough that interruption cannot replace a valid file with partial JSON. Corrupt files yield
 an actionable error and safe defaults; they are not silently overwritten.
 
+A successful Settings save is an application-wide commit, not only a file write. Before reporting success or closing
+Settings, Media Lock must persist the validated snapshot, apply it to every running consumer and publish application
+state containing the same snapshot. Priority Rules, Recovery timeout and Fallback Policy update the active Router
+immediately; changing the timeout during Recovery replaces the outstanding deadline. Desktop lifecycle, global-key
+interception, Playback State Lock override behavior, language and theme likewise observe the committed values without
+a process restart. A failed runtime or platform update leaves Settings open, reports an actionable failure and attempts
+to restore the previous durable and platform values.
+
+Every future setting must identify its runtime consumer and application time. Runtime-applicable settings require an
+observable immediate-application test; an intentionally startup-only setting must say so explicitly in the UI and
+specification rather than silently deferring its effect.
+
 The desktop settings persist a UI language preference independently from routing state. Supported choices are
 Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`). Windows-language selection uses Traditional
 Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English. Language changes take effect on
@@ -316,8 +328,10 @@ Start Menu entry for Windows Search, register one Installed apps uninstall entry
 Installer and ZIP must contain the same reviewed payload and carry independent hashes tied to the same source commit.
 
 Login startup remains an explicit Settings choice. In-place upgrades must preserve its exact executable command, while
-uninstall may remove only a matching installed-path value and must not disturb a portable copy. Until a trusted signing
-path is separately approved, documentation must identify both installer and executable as unsigned and must not imply
+the running primary instance must repair a later external overwrite when the persisted choice remains enabled.
+Disabling startup and uninstall may remove only a matching installed-path value and must not disturb a portable copy.
+Until a trusted signing path is separately approved, documentation must identify both installer and executable as
+unsigned and must not imply
 that installer format suppresses SmartScreen or Smart App Control. Portable distribution remains available until
 clean-Windows upgrade, rollback and uninstall evidence passes. The installer permits same-version repair and upgrades,
 but blocks a complete release version older than the registered installation with an actionable message so it cannot
