@@ -37,4 +37,3 @@ Pending against an exact committed revision:
 5. Navigate or reload the page and verify the old binding cannot command the replacement document until the user
    authorizes it again.
 6. Disable the Extension and verify Media Lock's existing GSMTC path remains available without a prompt or crash.
-

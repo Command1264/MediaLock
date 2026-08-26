@@ -56,4 +56,3 @@
 
   globalThis.MediaLockGenericContent = Object.freeze({ createGenericContentController });
 })();
-

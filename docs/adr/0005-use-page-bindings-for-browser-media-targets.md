@@ -49,4 +49,3 @@ Browser Adapter Module.
   capability and remain GSMTC-capable when the browser publishes a Session.
 - Browser restart Recovery remains unavailable unless the Extension can prove Page Binding continuity.
 - Production settings, migration and packaging do not change during the disposable Probe.
-

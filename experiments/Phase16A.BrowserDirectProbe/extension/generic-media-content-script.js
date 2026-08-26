@@ -28,4 +28,3 @@
 
   globalThis.MediaLockGenericContentRuntime = Object.freeze({ installed: true });
 })();
-
