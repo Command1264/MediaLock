@@ -12,8 +12,9 @@ tag identify exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`; t
 
 Stable work starts from `develop` after this plan is integrated. The public `v0.2.0` Release, its immutable assets and
 the retained `release/0.2` hotfix Worktree/branch remain untouched throughout Phase 14. A verified `release/0.3`
-baseline is created only from the accepted stable source commit; Phase 14 does not delete `release/0.2` afterward.
-Any future retirement of an older supported branch is a separate, explicitly authorized maintenance decision.
+baseline is created only from the accepted stable source commit. After Phase 14 publication and independent public
+download verification completed, the separately authorized maintenance step retired `release/0.2` while preserving
+its historical tag, GitHub Release, asset and provenance.
 
 ## Stable scope
 
@@ -162,6 +163,7 @@ and Setup listed above. The Release body must include both SHA-256 values, exact
 supported Windows/RID, Setup-versus-portable guidance, upgrade notes and the Phase 11B limitation.
 
 Do not delete, replace or attach rebuilt assets to `v0.2.0` or `v0.3.0-rc.1`. Keep `release/0.2` and its Worktree during
-Phase 14 even after `release/0.3` exists. Any later cleanup of an older release baseline requires a separate explicit
-decision after the new stable branch and public Release have been verified.
+Phase 14 even after `release/0.3` exists. After the new stable branch and public Release are verified, apply the
+[release baseline retention policy](../release-candidate.md#release-baseline-retention-policy); this release's approved
+follow-up retired `release/0.2` on 2026-08-26 without changing its historical publication.
 
