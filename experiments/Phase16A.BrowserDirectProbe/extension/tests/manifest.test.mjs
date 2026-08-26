@@ -24,16 +24,19 @@ test('pins one stable Extension ID in both manifests', () => {
   assert.deepEqual(nativeHostManifest.allowed_origins, [`chrome-extension://${extensionId}/`]);
 });
 
-test('requests only the Phase 16A least-privilege surface', () => {
+test('requests only the Phase 16B user-authorized least-privilege surface', () => {
   assert.deepEqual(
     [...manifest.permissions].sort(),
-    ['clipboardWrite', 'nativeMessaging', 'tabs'],
+    ['activeTab', 'clipboardWrite', 'nativeMessaging', 'scripting', 'tabs'],
   );
   assert.equal(manifest.permissions.includes('clipboardRead'), false);
+  assert.equal(manifest.permissions.includes('<all_urls>'), false);
   assert.deepEqual([...manifest.host_permissions].sort(), [
     'https://music.youtube.com/*',
     'https://www.youtube.com/*',
   ]);
+  assert.deepEqual(manifest.optional_host_permissions, ['https://*/*']);
+  assert.equal(manifest.optional_host_permissions.includes('<all_urls>'), false);
   assert.equal(Object.hasOwn(manifest, 'externally_connectable'), false);
   assert.equal(manifest.content_scripts[0].all_frames, false);
   assert.equal(manifest.background.type, 'module');

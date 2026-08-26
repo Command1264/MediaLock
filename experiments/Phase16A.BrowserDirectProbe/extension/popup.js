@@ -18,6 +18,24 @@ document.querySelectorAll('[data-command]').forEach((button) => {
   button.addEventListener('click', () => runCommand({ name: button.dataset.command }));
 });
 
+document.querySelector('#authorize-temporary').addEventListener('click', async () => {
+  setControlsDisabled(true);
+  setStatus('Authorizing the active page once…');
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: 'authorizeGenericTarget',
+      scope: 'temporary',
+    });
+    setStatus(result?.accepted === true
+      ? 'Authorized one media element on this page.'
+      : `Rejected: ${result?.errorCode ?? 'unknown-error'}`);
+  } catch {
+    setStatus('Rejected: extension-connection-failed');
+  } finally {
+    setControlsDisabled(false);
+  }
+});
+
 document.querySelector('#seek').addEventListener('click', () => {
   const positionSeconds = Number(document.querySelector('#seek-seconds').value);
   if (!Number.isFinite(positionSeconds) || positionSeconds < 0) {

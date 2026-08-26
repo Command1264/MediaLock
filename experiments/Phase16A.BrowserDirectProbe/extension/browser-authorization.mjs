@@ -1,0 +1,78 @@
+const GENERIC_CONTENT_SCRIPT_FILES = Object.freeze([
+  'media-policy.js',
+  'generic-media-adapter.js',
+  'generic-content-controller.js',
+  'generic-media-content-script.js',
+]);
+const OPAQUE_DOCUMENT_ID_PATTERN = /^[\x21-\x7e]{1,256}$/;
+const OPAQUE_BINDING_ID_PATTERN = /^[\x21-\x7e]{1,128}$/;
+
+export function createBrowserAuthorizationModule({
+  tabs,
+  scripting,
+  createBindingId = () => crypto.randomUUID(),
+}) {
+  const bindings = new Map();
+
+  return Object.freeze({
+    async authorizeActivePage({ scope }) {
+      if (scope !== 'temporary') {
+        throw new TypeError('Only temporary page authorization is implemented by this slice.');
+      }
+
+      const activeTabs = await tabs.query({ active: true, currentWindow: true });
+      if (activeTabs.length !== 1
+          || !Number.isSafeInteger(activeTabs[0].id)
+          || typeof activeTabs[0].url !== 'string') {
+        return { accepted: false, errorCode: 'target-unavailable' };
+      }
+
+      let pageUrl;
+      try {
+        pageUrl = new URL(activeTabs[0].url);
+      } catch {
+        return { accepted: false, errorCode: 'page-not-eligible' };
+      }
+      if (pageUrl.protocol !== 'https:') {
+        return { accepted: false, errorCode: 'page-not-eligible' };
+      }
+
+      const injectionResults = await scripting.executeScript({
+        target: { tabId: activeTabs[0].id, frameIds: [0] },
+        files: [...GENERIC_CONTENT_SCRIPT_FILES],
+      });
+      if (!Array.isArray(injectionResults)
+          || injectionResults.length !== 1
+          || injectionResults[0].frameId !== 0
+          || typeof injectionResults[0].documentId !== 'string'
+          || !OPAQUE_DOCUMENT_ID_PATTERN.test(injectionResults[0].documentId)) {
+        return { accepted: false, errorCode: 'document-identity-unavailable' };
+      }
+
+      const bindingId = createBindingId();
+      if (typeof bindingId !== 'string' || !OPAQUE_BINDING_ID_PATTERN.test(bindingId)) {
+        return { accepted: false, errorCode: 'binding-identity-unavailable' };
+      }
+      const binding = Object.freeze({
+        bindingId,
+        scope: 'temporary',
+        tabId: activeTabs[0].id,
+        frameId: 0,
+        documentId: injectionResults[0].documentId,
+        pageOrigin: pageUrl.origin,
+      });
+      bindings.set(binding.tabId, binding);
+      return { accepted: true, binding };
+    },
+
+    matches(binding) {
+      const current = bindings.get(binding.tabId);
+      return current !== undefined
+        && current.bindingId === binding.bindingId
+        && current.scope === binding.scope
+        && current.frameId === binding.frameId
+        && current.documentId === binding.documentId
+        && current.pageOrigin === binding.pageOrigin;
+    },
+  });
+}

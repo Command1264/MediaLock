@@ -85,6 +85,41 @@ public sealed class BrowserDirectProtocolSessionTests
     }
 
     [Fact]
+    public void Handle_ReturnsOneExplicitlyBoundGenericHttpsEndpointCommand()
+    {
+        var session = CreateConnectedSession();
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            protocolVersion = 1,
+            type = "probeRequest",
+            connectionId = ConnectionId,
+            sequence = 1,
+            requestId = RequestId,
+            target = new
+            {
+                bindingId = "binding-0123456789abcdef",
+                endpointId = "endpoint-0123456789abcdef",
+                scope = "temporary",
+                tabId = 42,
+                frameId = 0,
+                documentId = DocumentId,
+                pageOrigin = "https://media.example.test",
+            },
+            command = new { name = "pause" },
+        });
+
+        var response = session.Handle(payload);
+
+        Assert.NotNull(response);
+        using var parsed = JsonDocument.Parse(response);
+        var target = parsed.RootElement.GetProperty("target");
+        Assert.Equal("binding-0123456789abcdef", target.GetProperty("bindingId").GetString());
+        Assert.Equal("endpoint-0123456789abcdef", target.GetProperty("endpointId").GetString());
+        Assert.Equal("temporary", target.GetProperty("scope").GetString());
+        Assert.Equal("https://media.example.test", target.GetProperty("pageOrigin").GetString());
+    }
+
+    [Fact]
     public void Handle_RejectsReplayAndOutOfOrderRequests()
     {
         var session = CreateConnectedSession();

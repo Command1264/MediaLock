@@ -709,9 +709,10 @@ Exit criteria:
 - User-facing documentation distinguishes "Media Lock controls the selected browser target directly" from
   "Windows shows only Media Lock"; the latter is never promised without separate source-by-source evidence.
 
-Status: Phase 16A security-first disposable Probe in progress after Phase 15. The first slice keeps the production
-Router and release payload unchanged while validating a fixed-ID Extension, bounded Native Messaging protocol and
-explicitly authorized YouTube targets. See the
+Status: Phase 16A Gate A completed and merged through PR #56. Phase 16B is active on its first disposable `activeTab`
+slice: an explicit user gesture creates a temporary Page Binding, binds one unambiguous generic media Endpoint and
+routes Pause through the existing bounded Native Messaging protocol. The production Router, persistence and release
+payload remain unchanged, and the no-Extension GSMTC path stays authoritative. See the
 [`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
 [`Phase 16A browser-direct Probe evidence`](phase-16/browser-direct-probe-evidence.md),
 [`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
