@@ -122,6 +122,10 @@ if ($nativeHostPublishReused) {
         Get-Content -LiteralPath $hostConfigurationPath -Raw |
         ConvertFrom-Json
     $existingProperties = @($existingHostConfiguration.PSObject.Properties.Name)
+    $existingDelay = $existingHostConfiguration.commandResponseDelayMilliseconds
+    $existingDelayIsInteger = `
+        ($existingDelay -is [int]) -or `
+        ($existingDelay -is [long])
     if ($existingProperties.Count -ne 2 `
         -or $existingProperties -notcontains 'extensionId' `
         -or $existingProperties -notcontains 'commandResponseDelayMilliseconds' `
@@ -129,8 +133,10 @@ if ($nativeHostPublishReused) {
             [string]$existingHostConfiguration.extensionId,
             $extensionId,
             [StringComparison]::Ordinal) `
-        -or [int]$existingHostConfiguration.commandResponseDelayMilliseconds `
-            -ne $CommandResponseDelayMilliseconds) {
+        -or !$existingDelayIsInteger `
+        -or $existingDelay -lt 0 `
+        -or $existingDelay -gt 10000 `
+        -or $existingDelay -ne $CommandResponseDelayMilliseconds) {
         throw "The cached Phase 16A Native Host configuration does not match its build identity: $publishRoot"
     }
 }

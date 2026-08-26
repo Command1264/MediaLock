@@ -155,6 +155,32 @@ try {
             $upgraded.NativeHostExecutable,
             [StringComparison]::OrdinalIgnoreCase)) `
         'The shared manifest did not switch to the content-addressed Host executable.'
+    $upgradedConfigurationPath = Join-Path $upgradedPublishRoot 'phase16a-native-host.json'
+    $validUpgradedConfiguration = Get-Content -LiteralPath $upgradedConfigurationPath -Raw
+    $invalidCachedConfigurations = @(
+        "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": `"0`" }",
+        "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": 0.4 }",
+        "{ `"extensionId`": `"$($chrome.ExtensionId)`", `"commandResponseDelayMilliseconds`": false }"
+    )
+    foreach ($invalidCachedConfiguration in $invalidCachedConfigurations) {
+        [System.IO.File]::WriteAllText(
+            $upgradedConfigurationPath,
+            $invalidCachedConfiguration,
+            [System.Text.UTF8Encoding]::new($false))
+        Assert-Throws `
+            {
+                & $registerPath `
+                    -Browser Chrome `
+                    -RegistryRoot $registryRoot `
+                    -ObsoleteBraveRegistryRoot $obsoleteBraveRegistryRoot `
+                    -BuildFingerprint $nextFingerprint
+            } `
+            'configuration does not match its build identity'
+    }
+    [System.IO.File]::WriteAllText(
+        $upgradedConfigurationPath,
+        $validUpgradedConfiguration,
+        [System.Text.UTF8Encoding]::new($false))
     Assert-Throws `
         {
             & $registerPath `

@@ -55,6 +55,7 @@ Revision ownership is intentionally split rather than assigning every observatio
 | Three Pause／immediate Ctrl+R stale-document races | `target-unavailable` in all three rounds | Reloaded YouTube Music never received the old command; ordinary YouTube was unchanged; at most one media change per round | Pass, stale document rejected |
 | Chrome YouTube Music Pause while ordinary Brave YouTube also plays, after opaque document-ID fix | Accepted once | Chrome YouTube Music paused once; ordinary Brave YouTube continued playing | Pass, cross-browser exact-page isolation |
 | Pause from the loopback iframe harness while its cross-origin YouTube iframe plays | `target-unavailable` | Embedded video continued playing; no other media source changed | Pass, nested frame rejected without fallback |
+| Pause with a 3000 ms Host command delay, then close the target YouTube Music tab | Popup closed with its tab before a visible result | After more than 5 seconds, ordinary Chrome YouTube continued playing, Brave media was unchanged and no duplicate occurred | Pass, closed document did not fall through to another target |
 
 After reloading the `5c2e69a` Popup in Chrome, its Copy button copied the complete accepted status exactly, displayed
 `Copied.` transiently and cleared that feedback automatically. No permission confirmation, error or crash appeared.
@@ -155,7 +156,7 @@ first command, Brave passed active non-target-page isolation, Chrome passed a se
 the no-Extension stable GSMTC fallback observation passed. This is **not** complete Phase 16A Gate A evidence. It
 does not yet prove:
 
-- closed-tab or command-timeout behavior at the live browser seam on the final hardening revision;
+- command-timeout behavior at the live browser seam on the final hardening revision;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
 The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
