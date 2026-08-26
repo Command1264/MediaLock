@@ -51,6 +51,7 @@ $registryPath = Join-Path $registryRoot $hostName
 $obsoleteBraveRegistryRoot = Join-Path $testRoot 'ObsoleteBraveNativeMessagingHosts'
 $obsoleteBraveRegistryPath = Join-Path $obsoleteBraveRegistryRoot $hostName
 $runningHost = $null
+$upgradedPublishRoot = $null
 
 try {
     $legacyBraveManifest = Join-Path `
@@ -90,6 +91,8 @@ try {
         'Brave must report the shared Chromium registration contract.'
     Assert-Condition $brave.NativeHostPublishReused `
         'The second browser registration must reuse the complete content-addressed Host output.'
+    Assert-Condition ($chrome.CommandResponseDelayMilliseconds -eq 0) `
+        'The default registration must use a zero command response delay.'
     Assert-Condition `
         ([string]::Equals($chrome.RegistryPath, $brave.RegistryPath, [StringComparison]::Ordinal)) `
         'Chrome and Brave must use the same Native Messaging registry path.'
@@ -104,7 +107,34 @@ try {
     Assert-Condition (!(Test-Path -LiteralPath $obsoleteBraveRegistryPath)) `
         'The exact obsolete Brave-specific registration remained after migration.'
 
-    $nextFingerprint = 'b' * 64
+    $delayed = & $registerPath `
+        -Browser Chrome `
+        -RegistryRoot $registryRoot `
+        -ObsoleteBraveRegistryRoot $obsoleteBraveRegistryRoot `
+        -CommandResponseDelayMilliseconds 6000
+    Assert-Condition (!$runningHost.HasExited) `
+        'Registering a delayed Host stopped the already-running Host.'
+    Assert-Condition `
+        (![string]::Equals(
+            $chrome.NativeHostExecutable,
+            $delayed.NativeHostExecutable,
+            [StringComparison]::OrdinalIgnoreCase)) `
+        'A different command response delay must publish to a different executable path.'
+    Assert-Condition ($delayed.CommandResponseDelayMilliseconds -eq 6000) `
+        'The delayed registration did not report its exact command response delay.'
+    $delayedConfigurationPath = Join-Path `
+        (Split-Path -Parent $delayed.NativeHostExecutable) `
+        'phase16a-native-host.json'
+    $delayedConfiguration = Get-Content -LiteralPath $delayedConfigurationPath -Raw | ConvertFrom-Json
+    Assert-Condition ($delayedConfiguration.commandResponseDelayMilliseconds -eq 6000) `
+        'The delayed Host configuration did not persist its exact command response delay.'
+
+    $nextFingerprint = `
+        [Guid]::NewGuid().ToString('N') + `
+        [Guid]::NewGuid().ToString('N')
+    $upgradedPublishRoot = Join-Path `
+        $repositoryRoot `
+        "artifacts\phase16a-browser-direct\chromium\native-host\$nextFingerprint"
     $upgraded = & $registerPath `
         -Browser Chrome `
         -RegistryRoot $registryRoot `
@@ -125,6 +155,16 @@ try {
             $upgraded.NativeHostExecutable,
             [StringComparison]::OrdinalIgnoreCase)) `
         'The shared manifest did not switch to the content-addressed Host executable.'
+    Assert-Throws `
+        {
+            & $registerPath `
+                -Browser Chrome `
+                -RegistryRoot $registryRoot `
+                -ObsoleteBraveRegistryRoot $obsoleteBraveRegistryRoot `
+                -BuildFingerprint $nextFingerprint `
+                -CommandResponseDelayMilliseconds 1
+        } `
+        'configuration does not match its build identity'
 
     $removed = & $unregisterPath `
         -Browser Brave `
@@ -190,5 +230,9 @@ finally {
     }
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Recurse -Force
+    }
+    if ($null -ne $upgradedPublishRoot `
+        -and (Test-Path -LiteralPath $upgradedPublishRoot)) {
+        Remove-Item -LiteralPath $upgradedPublishRoot -Recurse -Force
     }
 }

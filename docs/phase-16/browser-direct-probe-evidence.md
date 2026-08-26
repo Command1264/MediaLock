@@ -140,6 +140,9 @@ observations:
   once as `outcome-unknown`, disconnects the protocol session and rejects any late Host result instead of retrying;
 - nested frames remain excluded twice: the declarative content script has `all_frames: false`, and sender registration
   independently rejects every nonzero `frameId`.
+- the Native Host test configuration accepts only a 0–10000 millisecond command-response delay, never delays
+  `helloAck`, and includes the exact delay in its content-addressed registration identity. Cache reuse rejects a
+  mismatched configuration instead of overwriting an active Host.
 
 These seams pass in the dependency-free Extension suite. Live iframe, closed-tab and deliberately suspended Host
 observations remain explicit Gate A rows to execute rather than inferred evidence.

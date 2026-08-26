@@ -1,3 +1,4 @@
 {
-  "extensionId": "kggfkkiifnclhhmibdglkbdfbacakemn"
+  "extensionId": "kggfkkiifnclhhmibdglkbdfbacakemn",
+  "commandResponseDelayMilliseconds": 0
 }

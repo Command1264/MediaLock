@@ -12,7 +12,11 @@ param(
         'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts',
 
     [Parameter(DontShow)]
-    [string] $BuildFingerprint
+    [string] $BuildFingerprint,
+
+    [Parameter(DontShow)]
+    [ValidateRange(0, 10000)]
+    [int] $CommandResponseDelayMilliseconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +40,7 @@ if ([string]::IsNullOrWhiteSpace($BuildFingerprint)) {
             $inputHash = (Get-FileHash -LiteralPath $fingerprintInput.FullName -Algorithm SHA256).Hash
             "$($fingerprintInput.Name):$inputHash"
         }
+        "commandResponseDelayMilliseconds:$CommandResponseDelayMilliseconds"
     )
     $fingerprintBytes = [System.Text.Encoding]::UTF8.GetBytes(
         [string]::Join("`n", $fingerprintLines))
@@ -107,6 +112,35 @@ else {
     }
 }
 
+$hostConfigurationPath = Join-Path $publishRoot 'phase16a-native-host.json'
+$hostConfiguration = [ordered]@{
+    extensionId = $extensionId
+    commandResponseDelayMilliseconds = $CommandResponseDelayMilliseconds
+}
+if ($nativeHostPublishReused) {
+    $existingHostConfiguration = `
+        Get-Content -LiteralPath $hostConfigurationPath -Raw |
+        ConvertFrom-Json
+    $existingProperties = @($existingHostConfiguration.PSObject.Properties.Name)
+    if ($existingProperties.Count -ne 2 `
+        -or $existingProperties -notcontains 'extensionId' `
+        -or $existingProperties -notcontains 'commandResponseDelayMilliseconds' `
+        -or ![string]::Equals(
+            [string]$existingHostConfiguration.extensionId,
+            $extensionId,
+            [StringComparison]::Ordinal) `
+        -or [int]$existingHostConfiguration.commandResponseDelayMilliseconds `
+            -ne $CommandResponseDelayMilliseconds) {
+        throw "The cached Phase 16A Native Host configuration does not match its build identity: $publishRoot"
+    }
+}
+else {
+    [System.IO.File]::WriteAllText(
+        $hostConfigurationPath,
+        (($hostConfiguration | ConvertTo-Json -Depth 2) + [Environment]::NewLine),
+        [System.Text.UTF8Encoding]::new($false))
+}
+
 $hostExecutable = (Resolve-Path (Join-Path $publishRoot 'MediaLock.Phase16ABrowserDirectProbe.exe')).Path
 $manifest = [ordered]@{
     name = $hostName
@@ -155,6 +189,7 @@ if (Test-Path -LiteralPath $obsoleteBraveRegistryPath) {
     NativeHostManifest = $manifestPath
     NativeHostBuildFingerprint = $BuildFingerprint
     NativeHostPublishReused = $nativeHostPublishReused
+    CommandResponseDelayMilliseconds = $CommandResponseDelayMilliseconds
     RegistryPath = $registryPath
     RegistrationMatches = $true
     SharedChromiumRegistration = $true

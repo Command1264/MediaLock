@@ -53,6 +53,8 @@ The first slice provides:
 - a Popup whose Play／Pause／Seek request makes a complete Extension → Host → Extension → content-script round trip;
 - a 5-second bounded wait for the initial Host handshake before the first command is dispatched;
 - one result for one pending request, with no mutating-command retry after timeout;
+- a manual-Gate-only `CommandResponseDelayMilliseconds` seam bounded from 0 through 10000, defaulting to zero,
+  applied only to Host `command` responses and included in the content-addressed Host identity;
 - `play()` Promise observation, Seek restricted to finite duration and finite browser-reported `seekable` ranges,
   and explicit rejection when the media element or target is unavailable;
 - one Chrome-compatible current-user registration shared by Chrome and Brave, plus ownership-safe unregister scripts.
@@ -76,6 +78,8 @@ site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesse
 - A Native Host disconnect, command timeout or target mismatch reports failure／outcome unknown and does not reroute
   to Windows Current Session.
 - Initial handshake waiting occurs only before dispatch. A command already posted to the Host is never retried.
+- The bounded command-delay seam must never delay `helloAck`; after closed-tab／timeout evidence, public Chrome／Brave
+  registration must be restored to zero delay and one ordinary command must pass.
 - `stdout` contains only framed protocol messages; diagnostics use `stderr`.
 - Same-user replacement of the unsigned HKCU registration, manifest, host or unpacked Extension is an explicit
   Prototype limitation. Custom encryption would not repair a replaced endpoint or make the unsigned files trusted.

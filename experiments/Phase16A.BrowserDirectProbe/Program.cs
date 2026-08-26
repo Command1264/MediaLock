@@ -37,6 +37,11 @@ try
         var response = protocolSession.Handle(payload);
         if (response is not null)
         {
+            await NativeHostCommandDelay.ApplyAsync(
+                response,
+                configuration.CommandResponseDelayMilliseconds,
+                Task.Delay,
+                CancellationToken.None);
             await NativeMessagingFrame.WriteAsync(
                 Console.OpenStandardOutput(),
                 response,

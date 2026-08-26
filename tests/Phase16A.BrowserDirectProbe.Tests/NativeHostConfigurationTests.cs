@@ -10,18 +10,41 @@ public sealed class NativeHostConfigurationTests
     public void Load_AcceptsOneStrictExtensionIdField()
     {
         using var fixture = ConfigurationFixture.Create($$"""
-            { "extensionId": "{{ExtensionId}}" }
+            {
+              "extensionId": "{{ExtensionId}}",
+              "commandResponseDelayMilliseconds": 0
+            }
             """);
 
         var configuration = NativeHostConfiguration.Load(fixture.ExecutablePath);
 
         Assert.Equal(ExtensionId, configuration.ExtensionId);
+        Assert.Equal(0, configuration.CommandResponseDelayMilliseconds);
+    }
+
+    [Fact]
+    public void Load_AcceptsABoundedCommandResponseDelay()
+    {
+        using var fixture = ConfigurationFixture.Create($$"""
+            {
+              "extensionId": "{{ExtensionId}}",
+              "commandResponseDelayMilliseconds": 6000
+            }
+            """);
+
+        var configuration = NativeHostConfiguration.Load(fixture.ExecutablePath);
+
+        Assert.Equal(6000, configuration.CommandResponseDelayMilliseconds);
     }
 
     [Theory]
     [InlineData("{}")]
-    [InlineData("{ \"extensionId\": \"abc\" }")]
-    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\", \"allowAny\": true }")]
+    [InlineData("{ \"extensionId\": \"abc\", \"commandResponseDelayMilliseconds\": 0 }")]
+    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\" }")]
+    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\", \"commandResponseDelayMilliseconds\": -1 }")]
+    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\", \"commandResponseDelayMilliseconds\": 10001 }")]
+    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\", \"commandResponseDelayMilliseconds\": 1.5 }")]
+    [InlineData("{ \"extensionId\": \"abcdefghijklmnopabcdefghijklmnop\", \"commandResponseDelayMilliseconds\": 0, \"allowAny\": true }")]
     public void Load_RejectsMissingMalformedOrUnknownConfiguration(string json)
     {
         using var fixture = ConfigurationFixture.Create(json);

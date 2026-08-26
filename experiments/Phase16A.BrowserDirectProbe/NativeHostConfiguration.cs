@@ -2,7 +2,9 @@ using System.Text.Json;
 
 namespace MediaLock.Phase16ABrowserDirectProbe;
 
-internal sealed record NativeHostConfiguration(string ExtensionId)
+internal sealed record NativeHostConfiguration(
+    string ExtensionId,
+    int CommandResponseDelayMilliseconds)
 {
     private const int MaximumConfigurationBytes = 4 * 1024;
 
@@ -29,7 +31,7 @@ internal sealed record NativeHostConfiguration(string ExtensionId)
             MaxDepth = 4,
         });
         var root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Count() != 1)
+        if (root.ValueKind != JsonValueKind.Object || root.EnumerateObject().Count() != 2)
         {
             throw new InvalidDataException("The Phase 16A Native Host configuration schema is invalid.");
         }
@@ -42,6 +44,17 @@ internal sealed record NativeHostConfiguration(string ExtensionId)
 
         var extensionId = extensionIdElement.GetString()!;
         _ = NativeHostOrigin.Validate($"chrome-extension://{extensionId}/", extensionId);
-        return new NativeHostConfiguration(extensionId);
+        if (!root.TryGetProperty(
+                "commandResponseDelayMilliseconds",
+                out var commandResponseDelayElement)
+            || commandResponseDelayElement.ValueKind != JsonValueKind.Number
+            || !commandResponseDelayElement.TryGetInt32(out var commandResponseDelayMilliseconds)
+            || commandResponseDelayMilliseconds is < 0 or > 10000)
+        {
+            throw new InvalidDataException(
+                "The Phase 16A command response delay must be an integer from 0 through 10000 milliseconds.");
+        }
+
+        return new NativeHostConfiguration(extensionId, commandResponseDelayMilliseconds);
     }
 }
