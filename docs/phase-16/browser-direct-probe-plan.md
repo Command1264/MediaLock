@@ -127,6 +127,10 @@ Gate A is not complete until the Extension can rediscover and bind the same logi
 media title or artist as identity. Passing Gate A does not imply Chromium stopped publishing GSMTC or that Media Lock
 can own Windows Current Session.
 
+Preserve completed observations in
+[Phase 16A browser-direct Probe evidence](browser-direct-probe-evidence.md); untested rows remain explicit rather than
+being inferred from automated protocol coverage.
+
 ## Exit and cleanup
 
 The unregister script removes only an exact registry value that still points to the Probe-owned manifest. It preserves

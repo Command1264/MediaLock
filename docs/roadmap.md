@@ -713,6 +713,7 @@ Status: Phase 16A security-first disposable Probe in progress after Phase 15. Th
 Router and release payload unchanged while validating a fixed-ID Extension, bounded Native Messaging protocol and
 explicitly authorized YouTube targets. See the
 [`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
+[`Phase 16A browser-direct Probe evidence`](phase-16/browser-direct-probe-evidence.md),
 [`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
 [`Native Messaging security boundary`](research/phase-16-native-messaging-security-boundary.md) and
 [`direct-browser integration limits`](research/direct-browser-integration-and-gsmtc-limits.md).
