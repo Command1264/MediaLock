@@ -9,6 +9,7 @@ Date: 2026-08-26
 | Branch | `codex/feat/phase-16a-browser-direct-probe` |
 | Initial Probe implementation commit | `ca58e5c` |
 | Final hardening implementation commit | `52200f8` |
+| Probe status Copy UI commit | `5c2e69a` |
 | Windows | Windows 11 Pro 25H2, build `26200.9168`, 64-bit |
 | Chrome | `151.0.7922.174` |
 | Brave | `151.1.93.138` |
@@ -34,8 +35,8 @@ Revision ownership is intentionally split rather than assigning every observatio
   optional `sender.tab.url` field during registration;
 - `5ac5c24` exposes only bounded registration failure categories so live compatibility failures remain diagnosable;
 - `52200f8` treats browser-owned `documentId` as a bounded opaque identifier instead of imposing UUID syntax. This
-  follows live Brave rejection `registration-document-id-rejected`; the affected Chrome／Brave isolation rows remain
-  pending until the extensions and Native Host are reloaded from this revision.
+  follows live Brave rejection `registration-document-id-rejected`; the affected Chrome／Brave cross-browser
+  isolation rows passed after both extensions and the Native Host were reloaded from this revision.
 
 ## Chrome Gate A observations
 
@@ -53,6 +54,9 @@ Revision ownership is intentionally split rather than assigning every observatio
 | Ordinary Chrome YouTube Pause while YouTube Music is paused | Accepted once | Ordinary YouTube paused at approximately 134.40 seconds; YouTube Music remained unchanged | Pass, reverse isolation |
 | Three Pause／immediate Ctrl+R stale-document races | `target-unavailable` in all three rounds | Reloaded YouTube Music never received the old command; ordinary YouTube was unchanged; at most one media change per round | Pass, stale document rejected |
 | Chrome YouTube Music Pause while ordinary Brave YouTube also plays, after opaque document-ID fix | Accepted once | Chrome YouTube Music paused once; ordinary Brave YouTube continued playing | Pass, cross-browser exact-page isolation |
+
+After reloading the `5c2e69a` Popup in Chrome, its Copy button copied the complete accepted status exactly, displayed
+`Copied.` transiently and cleared that feedback automatically. No permission confirmation, error or crash appeared.
 
 The Host registration still matched the Probe-owned manifest after the forced process stop. Reconnection required an
 explicit Extension reload in this first slice; Phase 16B requires user-triggered, bounded lazy reconnect rather than an
@@ -73,6 +77,9 @@ unbounded background retry loop.
 | Reload Extension and PWA, then Play | Accepted once | PWA played; ordinary YouTube unchanged | Pass |
 | Three PWA Pause／immediate Ctrl+R stale-document races | `target-unavailable` in all three rounds | Reloaded PWA never received the old command; ordinary Brave YouTube was unchanged; at most one media change per round | Pass, stale document rejected |
 | Ordinary Brave YouTube Pause while Chrome YouTube Music also plays, after opaque document-ID fix | Accepted once | Ordinary Brave YouTube paused once; Chrome YouTube Music continued playing | Pass, cross-browser exact-page isolation |
+
+After reloading the `5c2e69a` Popup in Brave, its Copy button copied the complete accepted status exactly, displayed
+`Copied.` transiently and cleared that feedback automatically. No permission confirmation, error or crash appeared.
 
 Initial registration exposed a false browser-specific assumption: the old Brave registry value matched what the
 script wrote, but `brave.exe` launched the Host referenced by the Chrome-compatible registry instead. The process
