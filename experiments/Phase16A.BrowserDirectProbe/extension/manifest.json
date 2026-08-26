@@ -27,6 +27,7 @@
         "https://music.youtube.com/*"
       ],
       "js": [
+        "media-policy.js",
         "content-script.js"
       ],
       "all_frames": false,

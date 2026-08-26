@@ -4,12 +4,18 @@ namespace MediaLock.Phase16ABrowserDirectProbe;
 
 public static class NativeMessagingFrame
 {
+    private static readonly TimeSpan DefaultFrameCompletionTimeout = TimeSpan.FromSeconds(5);
+
     public static async Task<byte[]> ReadAsync(
         Stream input,
         int maximumPayloadBytes,
         CancellationToken cancellationToken)
     {
-        return await TryReadAsync(input, maximumPayloadBytes, cancellationToken).ConfigureAwait(false)
+        return await TryReadAsync(
+            input,
+            maximumPayloadBytes,
+            DefaultFrameCompletionTimeout,
+            cancellationToken).ConfigureAwait(false)
             ?? throw new EndOfStreamException("Native Messaging input ended before a frame was available.");
     }
 
@@ -18,8 +24,28 @@ public static class NativeMessagingFrame
         int maximumPayloadBytes,
         CancellationToken cancellationToken)
     {
+        return await TryReadAsync(
+            input,
+            maximumPayloadBytes,
+            DefaultFrameCompletionTimeout,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async Task<byte[]?> TryReadAsync(
+        Stream input,
+        int maximumPayloadBytes,
+        TimeSpan frameCompletionTimeout,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(input);
         ValidateMaximum(maximumPayloadBytes);
+        if (frameCompletionTimeout <= TimeSpan.Zero || frameCompletionTimeout > TimeSpan.FromMinutes(1))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(frameCompletionTimeout),
+                frameCompletionTimeout,
+                "The frame completion timeout must be positive and no greater than one minute.");
+        }
 
         var lengthPrefix = new byte[sizeof(uint)];
         var initialRead = await input.ReadAsync(lengthPrefix.AsMemory(0, 1), cancellationToken).ConfigureAwait(false);
@@ -28,22 +54,33 @@ public static class NativeMessagingFrame
             return null;
         }
 
-        await ReadExactlyAsync(input, lengthPrefix.AsMemory(1), cancellationToken).ConfigureAwait(false);
-        var payloadLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix);
-        if (payloadLength == 0)
+        using var completion = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        completion.CancelAfter(frameCompletionTimeout);
+        try
         {
-            throw new InvalidDataException("Native Messaging payloads must not be empty.");
-        }
+            await ReadExactlyAsync(input, lengthPrefix.AsMemory(1), completion.Token).ConfigureAwait(false);
+            var payloadLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix);
+            if (payloadLength == 0)
+            {
+                throw new InvalidDataException("Native Messaging payloads must not be empty.");
+            }
 
-        if (payloadLength > maximumPayloadBytes)
+            if (payloadLength > maximumPayloadBytes)
+            {
+                throw new InvalidDataException(
+                    $"Native Messaging payload exceeds the configured maximum of {maximumPayloadBytes} bytes.");
+            }
+
+            var payload = new byte[checked((int)payloadLength)];
+            await ReadExactlyAsync(input, payload, completion.Token).ConfigureAwait(false);
+            return payload;
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new InvalidDataException(
-                $"Native Messaging payload exceeds the configured maximum of {maximumPayloadBytes} bytes.");
+            throw new TimeoutException(
+                "Native Messaging frame did not complete within the configured deadline.",
+                exception);
         }
-
-        var payload = new byte[checked((int)payloadLength)];
-        await ReadExactlyAsync(input, payload, cancellationToken).ConfigureAwait(false);
-        return payload;
     }
 
     public static async Task WriteAsync(

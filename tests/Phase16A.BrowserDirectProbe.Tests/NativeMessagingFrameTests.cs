@@ -79,6 +79,20 @@ public sealed class NativeMessagingFrameTests
             () => NativeMessagingFrame.WriteAsync(stream, payload, payload.Length - 1, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task TryReadAsync_TimesOutOneIncompleteFrameAfterTheFirstByte()
+    {
+        await using var stream = new FirstByteThenBlockingStream();
+
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => NativeMessagingFrame.TryReadAsync(
+            stream,
+            64 * 1024,
+            TimeSpan.FromMilliseconds(50),
+            CancellationToken.None));
+
+        Assert.Contains("complete", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static MemoryStream CreateFrame(byte[] payload)
     {
         var stream = new MemoryStream();
@@ -88,5 +102,37 @@ public sealed class NativeMessagingFrameTests
         stream.Write(payload);
         stream.Position = 0;
         return stream;
+    }
+
+    private sealed class FirstByteThenBlockingStream : Stream
+    {
+        private bool returnedFirstByte;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            if (!returnedFirstByte)
+            {
+                returnedFirstByte = true;
+                buffer.Span[0] = 1;
+                return 1;
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

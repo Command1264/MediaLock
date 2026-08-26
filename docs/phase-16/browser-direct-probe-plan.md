@@ -20,9 +20,9 @@ by the same Windows user and unsafe fallback. The controls and remaining unsigne
 YouTube／YouTube Music top-level document
         ↕ fixed media-element actions
 Extension service worker
-        ↕ validated tab／frame／origin + fixed Extension ID
+        ↕ browser-owned document ID + validated tab／frame／origin + fixed Extension ID
 Native Messaging protocol Module
-        ↕ bounded framed JSON + session／sequence／request correlation
+        ↕ bounded framed JSON + connection／sequence／request correlation
 Disposable Native Host
         ↕ future neutral browser-target seam
 Production Router (not connected in Phase 16A first slice)
@@ -45,13 +45,16 @@ The first slice provides:
 - a fixed unpacked-Extension ID, `kggfkkiifnclhhmibdglkbdfbacakemn`, derived from the checked-in public manifest
   key;
 - exact `allowed_origins` admission and a second exact launch-origin check in the Native Host;
-- 64 KiB inbound／outbound Native Messaging limits before payload allocation;
-- strict protocol version, session UUID, monotonic sequence, request UUID, bounded dedupe cache, target origin,
+- 64 KiB inbound／outbound Native Messaging limits before payload allocation, plus one completion deadline after
+  the first byte of a frame arrives;
+- strict protocol version, two fresh nonces, derived connection ID, browser family／capability negotiation, monotonic
+  sequence, request UUID, 64-command pending limit, bounded dedupe cache, browser-owned document ID, target origin,
   top-frame and command allowlist validation;
 - a Popup whose Play／Pause／Seek request makes a complete Extension → Host → Extension → content-script round trip;
 - a 5-second bounded wait for the initial Host handshake before the first command is dispatched;
 - one result for one pending request, with no mutating-command retry after timeout;
-- `play()` Promise observation, bounded Seek and explicit rejection when the media element or target is unavailable;
+- `play()` Promise observation, Seek restricted to finite duration and finite browser-reported `seekable` ranges,
+  and explicit rejection when the media element or target is unavailable;
 - one Chrome-compatible current-user registration shared by Chrome and Brave, plus ownership-safe unregister scripts.
 
 Only `play`, `pause` and `seek` are enabled. `toggle`, `next`, `previous` and `stop` remain unavailable until a later
@@ -62,9 +65,13 @@ site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesse
 - The Extension has only `nativeMessaging`, `tabs` and exact YouTube／YouTube Music host permissions. It has no
   `<all_urls>`, `externally_connectable`, remote code or arbitrary script command.
 - Only the Extension Popup may originate a Probe command. Page payload cannot choose a tab, frame or origin.
-- The service worker re-reads the actual active tab URL before dispatch; the content script rechecks the current
-  top-level origin and fixed action.
-- Unknown fields, schema versions, sessions, sequences, request IDs, origins, frames and commands fail closed.
+- The service worker registers only top-level active-document metadata supplied by Chrome／Brave, carries that
+  browser-owned `documentId` through the Host, and dispatches with `tabs.sendMessage(..., { documentId })`; the
+  content script independently rechecks its registered document, current origin and fixed action.
+- Unknown fields, schema versions, connection IDs, nonces, capabilities, sequences, request IDs, documents, origins,
+  frames and commands fail closed.
+- Every command must be present in the capabilities negotiated for that exact connection; membership in the broader
+  Probe command allowlist is not sufficient.
 - A Native Host disconnect, command timeout or target mismatch reports failure／outcome unknown and does not reroute
   to Windows Current Session.
 - Initial handshake waiting occurs only before dispatch. A command already posted to the Host is never retried.
@@ -84,6 +91,7 @@ dotnet test '.\tests\Phase16A.BrowserDirectProbe.Tests\Phase16A.BrowserDirectPro
 node --test '.\experiments\Phase16A.BrowserDirectProbe\extension\tests\*.test.mjs'
 node --check '.\experiments\Phase16A.BrowserDirectProbe\extension\service-worker.mjs'
 node --check '.\experiments\Phase16A.BrowserDirectProbe\extension\content-script.js'
+node --check '.\experiments\Phase16A.BrowserDirectProbe\extension\media-policy.js'
 node --check '.\experiments\Phase16A.BrowserDirectProbe\extension\popup.js'
 ```
 

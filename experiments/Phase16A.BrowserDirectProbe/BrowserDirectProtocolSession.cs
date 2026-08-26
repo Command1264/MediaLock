@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MediaLock.Phase16ABrowserDirectProbe;
 
@@ -6,6 +8,7 @@ public sealed class BrowserDirectProtocolSession
 {
     private const int ProtocolVersion = 1;
     private const int MaximumRememberedRequestIds = 1024;
+    private const int MaximumPendingRequests = 64;
     private static readonly HashSet<string> AllowedPageOrigins = new(StringComparer.Ordinal)
     {
         "https://www.youtube.com",
@@ -17,6 +20,12 @@ public sealed class BrowserDirectProtocolSession
         "pause",
         "seek",
     };
+    private static readonly string[] HostCapabilities = ["pause", "play", "seek"];
+    private static readonly HashSet<string> AllowedBrowserFamilies = new(StringComparer.Ordinal)
+    {
+        "chrome",
+        "brave",
+    };
     private static readonly HashSet<string> AllowedResultErrors = new(StringComparer.Ordinal)
     {
         "media-element-unavailable",
@@ -27,24 +36,26 @@ public sealed class BrowserDirectProtocolSession
     };
 
     private readonly string extensionId;
-    private readonly Guid sessionId;
+    private readonly Guid hostNonce;
     private readonly HashSet<Guid> observedRequestIds = [];
     private readonly Queue<Guid> requestIdOrder = [];
     private readonly HashSet<Guid> pendingRequestIds = [];
     private bool extensionConnected;
+    private string? connectionId;
+    private HashSet<string>? negotiatedCapabilities;
     private int inboundSequence;
     private int outboundSequence;
 
-    public BrowserDirectProtocolSession(string extensionId, Guid sessionId)
+    public BrowserDirectProtocolSession(string extensionId, Guid hostNonce)
     {
         _ = NativeHostOrigin.Validate($"chrome-extension://{extensionId}/", extensionId);
-        if (sessionId == Guid.Empty)
+        if (hostNonce == Guid.Empty)
         {
-            throw new ArgumentException("The protocol session ID must not be empty.", nameof(sessionId));
+            throw new ArgumentException("The protocol host nonce must not be empty.", nameof(hostNonce));
         }
 
         this.extensionId = extensionId;
-        this.sessionId = sessionId;
+        this.hostNonce = hostNonce;
     }
 
     public byte[] CreateHello()
@@ -53,7 +64,8 @@ public sealed class BrowserDirectProtocolSession
         {
             protocolVersion = ProtocolVersion,
             type = "hostHello",
-            sessionId,
+            hostNonce,
+            capabilities = HostCapabilities,
         });
     }
 
@@ -94,8 +106,20 @@ public sealed class BrowserDirectProtocolSession
 
     private byte[] HandleExtensionHello(JsonElement root)
     {
-        RequireExactProperties(root, "protocolVersion", "type", "sessionId", "extensionId");
-        RequireProtocolAndSession(root);
+        RequireExactProperties(
+            root,
+            "protocolVersion",
+            "type",
+            "hostNonce",
+            "extensionNonce",
+            "extensionId",
+            "browserFamily",
+            "capabilities");
+        RequireProtocol(root);
+        if (RequireGuid(root, "hostNonce") != hostNonce)
+        {
+            throw new InvalidDataException("The Extension hello host nonce does not match.");
+        }
         if (extensionConnected)
         {
             throw new InvalidDataException("The Extension hello has already been accepted.");
@@ -107,12 +131,32 @@ public sealed class BrowserDirectProtocolSession
             throw new UnauthorizedAccessException("The Extension hello identity is not authorized.");
         }
 
+        var extensionNonce = RequireGuid(root, "extensionNonce");
+        var browserFamily = RequireString(root, "browserFamily");
+        if (!AllowedBrowserFamilies.Contains(browserFamily))
+        {
+            throw new InvalidDataException("The browser family is not supported.");
+        }
+        var capabilities = RequireStringArray(root, "capabilities");
+        if (capabilities.Length == 0 || capabilities.Any(capability => !HostCapabilities.Contains(capability, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("The negotiated capabilities are not supported.");
+        }
+
+        Array.Sort(capabilities, StringComparer.Ordinal);
+        negotiatedCapabilities = new HashSet<string>(capabilities, StringComparer.Ordinal);
+        connectionId = DeriveConnectionId(extensionId, hostNonce, extensionNonce, browserFamily, capabilities);
+
         extensionConnected = true;
         return JsonSerializer.SerializeToUtf8Bytes(new
         {
             protocolVersion = ProtocolVersion,
             type = "helloAck",
-            sessionId,
+            hostNonce,
+            extensionNonce,
+            connectionId,
+            browserFamily,
+            capabilities,
         });
     }
 
@@ -127,12 +171,12 @@ public sealed class BrowserDirectProtocolSession
             root,
             "protocolVersion",
             "type",
-            "sessionId",
+            "connectionId",
             "sequence",
             "requestId",
             "target",
             "command");
-        RequireProtocolAndSession(root);
+        RequireProtocolAndConnection(root);
 
         var sequence = RequireInt32(root, "sequence");
         if (sequence != inboundSequence + 1)
@@ -145,11 +189,16 @@ public sealed class BrowserDirectProtocolSession
         {
             throw new InvalidDataException("The request ID was already observed in this protocol session.");
         }
+        if (pendingRequestIds.Count >= MaximumPendingRequests)
+        {
+            throw new InvalidDataException("The maximum number of pending media commands was reached.");
+        }
 
         var target = RequireObject(root, "target");
-        RequireExactProperties(target, "tabId", "frameId", "pageOrigin");
+        RequireExactProperties(target, "tabId", "frameId", "documentId", "pageOrigin");
         var tabId = RequireInt32(target, "tabId");
         var frameId = RequireInt32(target, "frameId");
+        var documentId = RequireGuid(target, "documentId");
         var pageOrigin = RequireString(target, "pageOrigin");
         if (tabId < 0 || frameId != 0 || !AllowedPageOrigins.Contains(pageOrigin))
         {
@@ -161,6 +210,10 @@ public sealed class BrowserDirectProtocolSession
         if (!AllowedCommands.Contains(commandName))
         {
             throw new InvalidDataException("The requested media command is not allowed.");
+        }
+        if (negotiatedCapabilities is null || !negotiatedCapabilities.Contains(commandName))
+        {
+            throw new InvalidDataException("The requested media command was not negotiated for this connection.");
         }
 
         double? positionSeconds = null;
@@ -187,10 +240,10 @@ public sealed class BrowserDirectProtocolSession
             {
                 protocolVersion = ProtocolVersion,
                 type = "command",
-                sessionId,
+                connectionId,
                 sequence = outboundSequence,
                 requestId,
-                target = new { tabId, frameId, pageOrigin },
+                target = new { tabId, frameId, documentId, pageOrigin },
                 command = new { name = commandName },
             }
             : null;
@@ -203,10 +256,10 @@ public sealed class BrowserDirectProtocolSession
         {
             protocolVersion = ProtocolVersion,
             type = "command",
-            sessionId,
+            connectionId,
             sequence = outboundSequence,
             requestId,
-            target = new { tabId, frameId, pageOrigin },
+            target = new { tabId, frameId, documentId, pageOrigin },
             command = new { name = commandName, positionSeconds = positionSeconds!.Value },
         });
     }
@@ -222,12 +275,12 @@ public sealed class BrowserDirectProtocolSession
             root,
             "protocolVersion",
             "type",
-            "sessionId",
+            "connectionId",
             "sequence",
             "requestId",
             "accepted",
             "errorCode");
-        RequireProtocolAndSession(root);
+        RequireProtocolAndConnection(root);
         var sequence = RequireInt32(root, "sequence");
         if (sequence != inboundSequence + 1)
         {
@@ -264,17 +317,57 @@ public sealed class BrowserDirectProtocolSession
         return null;
     }
 
-    private void RequireProtocolAndSession(JsonElement root)
+    private void RequireProtocolAndConnection(JsonElement root)
+    {
+        RequireProtocol(root);
+        if (!string.Equals(RequireString(root, "connectionId"), connectionId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The message belongs to a stale protocol connection.");
+        }
+    }
+
+    private static void RequireProtocol(JsonElement root)
     {
         if (RequireInt32(root, "protocolVersion") != ProtocolVersion)
         {
             throw new InvalidDataException("The protocol version is not supported.");
         }
+    }
 
-        if (RequireGuid(root, "sessionId") != sessionId)
+    private static string DeriveConnectionId(
+        string extensionId,
+        Guid hostNonce,
+        Guid extensionNonce,
+        string browserFamily,
+        IReadOnlyCollection<string> capabilities)
+    {
+        var canonical = string.Join(
+            '|',
+            "phase16a",
+            ProtocolVersion,
+            extensionId,
+            hostNonce.ToString("D"),
+            extensionNonce.ToString("D"),
+            browserFamily,
+            string.Join(',', capabilities));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
+
+    private static string[] RequireStringArray(JsonElement value, string propertyName)
+    {
+        var property = value.GetProperty(propertyName);
+        if (property.ValueKind != JsonValueKind.Array)
         {
-            throw new InvalidDataException("The message belongs to a stale protocol session.");
+            throw new InvalidDataException($"Protocol field '{propertyName}' must be an array.");
         }
+        var result = property.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String
+            ? item.GetString()!
+            : throw new InvalidDataException($"Protocol field '{propertyName}' must contain strings.")).ToArray();
+        if (result.Distinct(StringComparer.Ordinal).Count() != result.Length)
+        {
+            throw new InvalidDataException($"Protocol field '{propertyName}' must not contain duplicates.");
+        }
+        return result;
     }
 
     private void RememberRequestId(Guid requestId)

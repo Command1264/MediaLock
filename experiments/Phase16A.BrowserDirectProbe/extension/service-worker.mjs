@@ -5,6 +5,7 @@ import {
   validateHostHello,
   validateNativeCommand,
 } from './protocol.mjs';
+import { createDocumentRegistry } from './document-binding.mjs';
 
 const NATIVE_HOST_NAME = 'com.command1264.medialock.phase16a';
 const ALLOWED_PAGE_ORIGINS = new Set([
@@ -13,13 +14,15 @@ const ALLOWED_PAGE_ORIGINS = new Set([
 ]);
 const COMMAND_TIMEOUT_MILLISECONDS = 5000;
 const INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS = 5000;
+const MAXIMUM_PENDING_REQUESTS = 64;
 
 let nativePort;
-let activeSessionId;
+let activeConnection;
 let replayGuard;
 let negotiated = false;
 let outboundSequence = 0;
 const pendingRequests = new Map();
+const documentRegistry = createDocumentRegistry(chrome.runtime.id);
 const nativeHostReadiness = createNativeHostReadinessGate(
   INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS,
 );
@@ -27,6 +30,16 @@ const nativeHostReadiness = createNativeHostReadinessGate(
 connectNativeHost();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'registerDocument') {
+    try {
+      const binding = documentRegistry.register(sender);
+      sendResponse({ accepted: true, documentId: binding.documentId });
+    } catch {
+      sendResponse({ accepted: false, errorCode: 'unauthorized-command' });
+    }
+    return false;
+  }
+
   if (sender.id !== chrome.runtime.id
       || sender.url !== chrome.runtime.getURL('popup.html')) {
     sendResponse({ accepted: false, errorCode: 'unauthorized-command' });
@@ -51,7 +64,7 @@ function connectNativeHost() {
 
 function resetConnectionState(errorCode) {
   nativeHostReadiness.reset();
-  activeSessionId = undefined;
+  activeConnection = undefined;
   replayGuard = undefined;
   negotiated = false;
   outboundSequence = 0;
@@ -70,7 +83,7 @@ async function queueProbeRequest(message) {
   if (!negotiated && !await nativeHostReadiness.waitUntilReady()) {
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
-  if (!negotiated || !nativePort || !activeSessionId) {
+  if (!negotiated || !nativePort || !activeConnection) {
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
 
@@ -82,8 +95,28 @@ async function queueProbeRequest(message) {
   if (!ALLOWED_PAGE_ORIGINS.has(pageOrigin)) {
     return { accepted: false, errorCode: 'target-unavailable' };
   }
+  let registration;
+  try {
+    registration = await chrome.tabs.sendMessage(
+      tabs[0].id,
+      { type: 'requestDocumentRegistration' },
+      { frameId: 0 },
+    );
+  } catch {
+    return { accepted: false, errorCode: 'target-unavailable' };
+  }
+  const target = documentRegistry.get(tabs[0].id);
+  if (registration?.accepted !== true
+      || !target
+      || target.documentId !== registration.documentId
+      || target.pageOrigin !== pageOrigin) {
+    return { accepted: false, errorCode: 'target-unavailable' };
+  }
 
   const requestId = crypto.randomUUID();
+  if (pendingRequests.size >= MAXIMUM_PENDING_REQUESTS) {
+    return { accepted: false, errorCode: 'outcome-unknown' };
+  }
   const result = new Promise((resolve) => {
     const timeoutId = setTimeout(() => {
       pendingRequests.delete(requestId);
@@ -96,14 +129,10 @@ async function queueProbeRequest(message) {
   nativePort.postMessage({
     protocolVersion: 1,
     type: 'probeRequest',
-    sessionId: activeSessionId,
+    connectionId: activeConnection.connectionId,
     sequence: outboundSequence,
     requestId,
-    target: {
-      tabId: tabs[0].id,
-      frameId: 0,
-      pageOrigin,
-    },
+    target,
     command,
   });
   return result;
@@ -111,35 +140,56 @@ async function queueProbeRequest(message) {
 
 async function handleNativeMessage(message) {
   try {
-    if (!activeSessionId) {
+    if (!activeConnection) {
       const hello = validateHostHello(message);
-      activeSessionId = hello.sessionId;
+      const extensionNonce = crypto.randomUUID();
+      const browserFamily = await detectBrowserFamily();
+      const capabilities = hello.capabilities.filter(
+        (capability) => capability === 'pause' || capability === 'play' || capability === 'seek',
+      );
+      if (capabilities.length === 0) {
+        throw new Error('Native Host and Extension have no shared capabilities.');
+      }
+      activeConnection = {
+        extensionId: chrome.runtime.id,
+        hostNonce: hello.hostNonce,
+        extensionNonce,
+        browserFamily,
+        capabilities,
+      };
       replayGuard = createReplayGuard(1024);
       nativePort.postMessage({
         protocolVersion: 1,
         type: 'extensionHello',
-        sessionId: activeSessionId,
+        hostNonce: hello.hostNonce,
+        extensionNonce,
         extensionId: chrome.runtime.id,
+        browserFamily,
+        capabilities,
       });
       return;
     }
 
     if (!negotiated) {
-      validateHelloAck(message, activeSessionId);
+      const acknowledgement = await validateHelloAck(message, activeConnection);
+      activeConnection = { ...activeConnection, connectionId: acknowledgement.connectionId };
       negotiated = true;
       nativeHostReadiness.markReady();
       return;
     }
 
-    const request = validateNativeCommand(message, activeSessionId, replayGuard);
+    const request = validateNativeCommand(
+      message,
+      activeConnection.connectionId,
+      replayGuard,
+      activeConnection.capabilities,
+    );
     const pending = pendingRequests.get(request.requestId);
     if (!pending) {
       throw new Error('Native Host returned a stale or unknown request.');
     }
 
-    const tab = await chrome.tabs.get(request.target.tabId);
-    const actualOrigin = new URL(tab.url).origin;
-    if (actualOrigin !== request.target.pageOrigin) {
+    if (!documentRegistry.matches(request.target)) {
       completeRequest(request, pending, false, 'target-unavailable');
       return;
     }
@@ -149,7 +199,7 @@ async function handleNativeMessage(message) {
       result = await chrome.tabs.sendMessage(
         request.target.tabId,
         request,
-        { frameId: 0 },
+        { documentId: request.target.documentId },
       );
     } catch {
       result = { accepted: false, errorCode: 'target-unavailable' };
@@ -166,6 +216,17 @@ async function handleNativeMessage(message) {
   }
 }
 
+chrome.tabs.onRemoved.addListener((tabId) => documentRegistry.clear(tabId));
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  documentRegistry.clear(removedTabId);
+  documentRegistry.clear(addedTabId);
+});
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'loading') {
+    documentRegistry.clear(tabId);
+  }
+});
+
 function completeRequest(request, pending, accepted, errorCode) {
   pendingRequests.delete(request.requestId);
   clearTimeout(pending.timeoutId);
@@ -173,13 +234,20 @@ function completeRequest(request, pending, accepted, errorCode) {
   nativePort.postMessage({
     protocolVersion: 1,
     type: 'commandResult',
-    sessionId: activeSessionId,
+    connectionId: activeConnection.connectionId,
     sequence: outboundSequence,
     requestId: request.requestId,
     accepted,
     errorCode,
   });
   pending.resolve({ accepted, errorCode });
+}
+
+async function detectBrowserFamily() {
+  if (typeof navigator.brave?.isBrave === 'function' && await navigator.brave.isBrave()) {
+    return 'brave';
+  }
+  return 'chrome';
 }
 
 function validatePopupCommand(message) {

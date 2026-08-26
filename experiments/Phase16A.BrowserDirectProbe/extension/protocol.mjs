@@ -5,6 +5,34 @@ const ALLOWED_PAGE_ORIGINS = new Set([
 ]);
 const ALLOWED_COMMANDS = new Set(['play', 'pause', 'seek']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CONNECTION_ID_PATTERN = /^[0-9a-f]{64}$/;
+const BROWSER_FAMILIES = new Set(['chrome', 'brave']);
+const CAPABILITIES = new Set(['pause', 'play', 'seek']);
+
+export async function deriveConnectionId(value) {
+  requireUuid(value.hostNonce, 'host nonce');
+  requireUuid(value.extensionNonce, 'extension nonce');
+  if (typeof value.extensionId !== 'string' || value.extensionId.length === 0) {
+    throw new Error('Extension ID is required.');
+  }
+  if (!BROWSER_FAMILIES.has(value.browserFamily)) {
+    throw new Error('Browser family is not supported.');
+  }
+  const capabilities = validateCapabilities(value.capabilities);
+  const canonical = [
+    'phase16a',
+    PROTOCOL_VERSION,
+    value.extensionId,
+    value.hostNonce,
+    value.extensionNonce,
+    value.browserFamily,
+    capabilities.join(','),
+  ].join('|');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export function createNativeHostReadinessGate(timeoutMilliseconds) {
   if (!Number.isSafeInteger(timeoutMilliseconds)
@@ -80,33 +108,60 @@ export function createReplayGuard(capacity) {
 
 export function validateHostHello(value) {
   requirePlainObject(value, 'Host hello');
-  requireExactFields(value, ['protocolVersion', 'type', 'sessionId']);
+  requireExactFields(value, ['protocolVersion', 'type', 'hostNonce', 'capabilities']);
   if (value.protocolVersion !== PROTOCOL_VERSION || value.type !== 'hostHello') {
     throw new Error('Unsupported Native Host protocol.');
   }
-  requireUuid(value.sessionId, 'session');
-  return Object.freeze({ sessionId: value.sessionId });
+  requireUuid(value.hostNonce, 'host nonce');
+  const capabilities = validateCapabilities(value.capabilities);
+  return Object.freeze({ hostNonce: value.hostNonce, capabilities });
 }
 
-export function validateHelloAck(value, expectedSessionId) {
+export async function validateHelloAck(value, expected) {
   requirePlainObject(value, 'Hello acknowledgement');
-  requireExactFields(value, ['protocolVersion', 'type', 'sessionId']);
+  requireExactFields(value, [
+    'protocolVersion',
+    'type',
+    'hostNonce',
+    'extensionNonce',
+    'connectionId',
+    'browserFamily',
+    'capabilities',
+  ]);
   if (value.protocolVersion !== PROTOCOL_VERSION || value.type !== 'helloAck') {
     throw new Error('Unsupported Native Host hello acknowledgement.');
   }
-  if (value.sessionId !== expectedSessionId) {
-    throw new Error('Hello acknowledgement session does not match the active host session.');
+  if (value.hostNonce !== expected.hostNonce || value.extensionNonce !== expected.extensionNonce) {
+    throw new Error('Hello acknowledgement nonce does not match the active connection.');
   }
-  requireUuid(value.sessionId, 'session');
-  return { sessionId: value.sessionId };
+  if (value.browserFamily !== expected.browserFamily) {
+    throw new Error('Hello acknowledgement browser family does not match.');
+  }
+  const capabilities = validateCapabilities(value.capabilities);
+  if (capabilities.join(',') !== validateCapabilities(expected.capabilities).join(',')) {
+    throw new Error('Hello acknowledgement capabilities do not match.');
+  }
+  if (!CONNECTION_ID_PATTERN.test(value.connectionId)) {
+    throw new Error('Connection ID is invalid.');
+  }
+  const derived = await deriveConnectionId(expected);
+  if (value.connectionId !== derived) {
+    throw new Error('Hello acknowledgement connection ID does not match.');
+  }
+  return Object.freeze({ connectionId: value.connectionId, capabilities });
 }
 
-export function validateNativeCommand(value, expectedSessionId, replayGuard) {
+export function validateNativeCommand(
+  value,
+  expectedConnectionId,
+  replayGuard,
+  negotiatedCapabilities,
+) {
   requirePlainObject(value, 'Native command');
   requireExactFields(value, [
     'protocolVersion',
     'type',
-    'sessionId',
+    'connectionId',
     'sequence',
     'requestId',
     'target',
@@ -115,19 +170,24 @@ export function validateNativeCommand(value, expectedSessionId, replayGuard) {
   if (value.protocolVersion !== PROTOCOL_VERSION || value.type !== 'command') {
     throw new Error('Unsupported Native command protocol.');
   }
-  if (value.sessionId !== expectedSessionId) {
-    throw new Error('Native command session does not match the active host session.');
+  if (value.connectionId !== expectedConnectionId) {
+    throw new Error('Native command connection does not match the active connection.');
   }
-  requireUuid(value.sessionId, 'session');
+  if (!CONNECTION_ID_PATTERN.test(value.connectionId)) {
+    throw new Error('Native command connection ID is invalid.');
+  }
   requireUuid(value.requestId, 'request');
 
   const target = validateTarget(value.target);
   const command = validateCommand(value.command);
+  if (!validateCapabilities(negotiatedCapabilities).includes(command.name)) {
+    throw new Error('Media command was not negotiated for this connection.');
+  }
   replayGuard.observe(value.sequence, value.requestId);
   return Object.freeze({
     protocolVersion: PROTOCOL_VERSION,
     type: 'command',
-    sessionId: value.sessionId,
+    connectionId: value.connectionId,
     sequence: value.sequence,
     requestId: value.requestId,
     target,
@@ -135,21 +195,34 @@ export function validateNativeCommand(value, expectedSessionId, replayGuard) {
   });
 }
 
+function validateCapabilities(value) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('Capabilities must be a non-empty array.');
+  }
+  const sorted = [...value].sort();
+  if (new Set(sorted).size !== sorted.length || sorted.some((item) => !CAPABILITIES.has(item))) {
+    throw new Error('Capabilities contain duplicates or unsupported values.');
+  }
+  return Object.freeze(sorted);
+}
+
 function validateTarget(value) {
   requirePlainObject(value, 'Command target');
-  requireExactFields(value, ['tabId', 'frameId', 'pageOrigin']);
+  requireExactFields(value, ['tabId', 'frameId', 'documentId', 'pageOrigin']);
   if (!Number.isSafeInteger(value.tabId) || value.tabId < 0) {
     throw new Error('Command target tab ID is invalid.');
   }
   if (value.frameId !== 0) {
     throw new Error('Only the top frame can receive a browser media command.');
   }
+  requireUuid(value.documentId, 'document');
   if (!ALLOWED_PAGE_ORIGINS.has(value.pageOrigin)) {
     throw new Error('Command target page origin is not authorized.');
   }
   return Object.freeze({
     tabId: value.tabId,
     frameId: value.frameId,
+    documentId: value.documentId,
     pageOrigin: value.pageOrigin,
   });
 }

@@ -35,6 +35,7 @@ the row explicitly says the user supplied the visible result.
 | Reload Extension and target page, then Play | Accepted once | Playing at approximately 26.77 seconds; one new Host process | Pass |
 | Chrome YouTube Music Pause while ordinary Chrome YouTube also plays | Accepted once | YouTube Music paused; ordinary YouTube continued to approximately 116.19 seconds | Pass, exact-page isolation |
 | Ordinary Chrome YouTube Pause while YouTube Music is paused | Accepted once | Ordinary YouTube paused at approximately 134.40 seconds; YouTube Music remained unchanged | Pass, reverse isolation |
+| Three Pause／immediate Ctrl+R stale-document races | `target-unavailable` in all three rounds | Reloaded YouTube Music never received the old command; ordinary YouTube was unchanged; at most one media change per round | Pass, stale document rejected |
 
 The Host registration still matched the Probe-owned manifest after the forced process stop. Reconnection required an
 explicit Extension reload in this first slice; Phase 16B requires user-triggered, bounded lazy reconnect rather than an
@@ -53,6 +54,7 @@ unbounded background retry loop.
 | Reload PWA document, then Pause | Accepted once | PWA paused; ordinary YouTube unchanged | Pass |
 | Force-stop every exact disposable Host, then PWA Play | `native-host-unavailable` | PWA remained paused; ordinary YouTube unchanged | Pass, fail closed |
 | Reload Extension and PWA, then Play | Accepted once | PWA played; ordinary YouTube unchanged | Pass |
+| Three PWA Pause／immediate Ctrl+R stale-document races | `target-unavailable` in all three rounds | Reloaded PWA never received the old command; ordinary Brave YouTube was unchanged; at most one media change per round | Pass, stale document rejected |
 
 Initial registration exposed a false browser-specific assumption: the old Brave registry value matched what the
 script wrote, but `brave.exe` launched the Host referenced by the Chrome-compatible registry instead. The process
@@ -101,9 +103,14 @@ and explicit reconnect pass the first manual slices. Both browsers passed full p
 Brave passed active non-target-page isolation, Chrome passed a separate disallowed-origin check, and the no-Extension
 stable GSMTC lane passed. This is **not** complete Phase 16A Gate A evidence. It does not yet prove:
 
-- stale iframe, closed-tab or timeout behavior at the live browser seam;
+- stale iframe, closed-tab or command-timeout behavior at the live browser seam;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
-Automated protocol tests cover malformed／oversized frames, exact Extension origin, stale session, sequence and request
-replay, target origin／frame rejection, strict schema and command allowlists. Manual evidence remains authoritative for
-actual browser media movement and duplicate count.
+The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
+binding rejection; a Host／Extension fixed-vector connection ID derived from two nonces, browser family and negotiated
+capabilities plus per-command capability enforcement; a 64-command pending ceiling; a single post-first-byte frame
+completion timeout; and finite duration／`seekable`-range Seek checks. The complete Extension suite contains 21
+passing tests and the complete .NET solution contains 417 passing tests. Manual Chrome／Brave stale-document evidence
+passed three rounds per browser: every old command was rejected as `target-unavailable`, no replacement document
+received the old command, every round made at most one media change and each competing ordinary YouTube source was
+unchanged.
