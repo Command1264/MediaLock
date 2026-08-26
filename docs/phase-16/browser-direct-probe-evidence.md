@@ -122,6 +122,12 @@ This passes the disabled-Extension GSMTC fallback observation. It does not prove
 profile／never-installed Extension lane, nor imply that direct page identity or commands remain available after the
 Extension is disabled; those capabilities are intentionally absent.
 
+A separate Chrome Guest session, which had no Phase 16A Extension, published a GSMTC Session that stable Media Lock
+`0.3.0` displayed as browser-level `Chrome`. Session Lock routed two physical Play/Pause presses to the Guest YouTube
+Music source exactly once each: the first paused and the second resumed playback. No Extension installation prompt,
+error or crash appeared. Browser-level naming is expected in this compatibility lane because page／profile identity
+is intentionally unavailable without the Extension. This passes the clean-profile／never-installed Extension Gate.
+
 ## Remaining-boundary automated evidence
 
 The final Gate A hardening adds three deterministic seams without treating them as substitutes for live-browser
@@ -146,7 +152,6 @@ the no-Extension stable GSMTC fallback observation passed. This is **not** compl
 does not yet prove:
 
 - iframe, closed-tab or command-timeout behavior at the live browser seam on the final hardening revision;
-- a clean Chrome profile in which the Extension was never installed;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
 The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
