@@ -19,7 +19,15 @@
       return false;
     }
     try {
-      sendResponse(controller.handle(message, sender));
+      const result = controller.handle(message, sender);
+      if (typeof result?.then === 'function') {
+        result.then(
+          sendResponse,
+          () => sendResponse({ accepted: false, errorCode: 'media-element-unavailable' }),
+        );
+        return true;
+      }
+      sendResponse(result);
     } catch {
       sendResponse({ accepted: false, errorCode: 'media-element-unavailable' });
     }

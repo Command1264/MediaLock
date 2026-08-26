@@ -29,7 +29,7 @@
         return Object.freeze({
           accepted: true,
           endpointId: boundEndpoint.endpointId,
-          capabilities: Object.freeze(['pause']),
+          capabilities: Object.freeze(['pause', 'play']),
         });
       },
 
@@ -37,12 +37,21 @@
         if (!boundEndpoint
             || endpointId !== boundEndpoint.endpointId
             || boundEndpoint.media.isConnected !== true
-            || command?.name !== 'pause') {
+            || (command?.name !== 'pause' && command?.name !== 'play')) {
           return { accepted: false, errorCode: 'media-element-unavailable' };
         }
 
-        boundEndpoint.media.pause();
-        return { accepted: true, errorCode: null };
+        if (command.name === 'pause') {
+          boundEndpoint.media.pause();
+          return { accepted: true, errorCode: null };
+        }
+
+        return Promise.resolve()
+          .then(() => boundEndpoint.media.play())
+          .then(
+            () => ({ accepted: true, errorCode: null }),
+            () => ({ accepted: false, errorCode: 'play-rejected' }),
+          );
       },
     });
   }

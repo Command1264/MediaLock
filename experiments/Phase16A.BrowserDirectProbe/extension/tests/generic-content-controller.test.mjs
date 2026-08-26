@@ -48,7 +48,7 @@ test('an exact Page Binding binds one Endpoint and dispatches Pause once', () =>
   assert.deepEqual(endpoint, {
     accepted: true,
     endpointId: 'endpoint-0123456789abcdef',
-    capabilities: ['pause'],
+    capabilities: ['pause', 'play'],
   });
   assert.deepEqual(result, { accepted: true, errorCode: null });
   assert.equal(pauseCount, 1);
