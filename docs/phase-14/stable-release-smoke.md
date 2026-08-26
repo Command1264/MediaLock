@@ -5,11 +5,11 @@ produced after its source commit is reviewed and clean.
 
 ## Release identity
 
-Status: final provenance-clean local formal artifact created after the approved settings-synchronization stable
-blocker and stale Settings copy fixes; the fresh Windows Sandbox matrix remains pending.
+Status: final provenance-clean local formal artifact created after the approved settings-synchronization, stale
+Settings copy and login-startup self-repair fixes; the targeted host and fresh Windows Sandbox replacement gates passed.
 
 - Version: `0.3.0`.
-- Source commit: `7273165234a418d1334fc2075adc7e876db89db2`.
+- Source commit: `a773fac983728f5d4b2d8cbe40bfad9d1c016737`.
 - Source dirty: `false`.
 - Runtime identifier: `win-x64`.
 - Self-contained: must be `true`.
@@ -18,12 +18,12 @@ blocker and stale Settings copy fixes; the fresh Windows Sandbox matrix remains 
 - Signed: `false`; payload and Setup both report Authenticode `NotSigned`.
 - Archive: `MediaLock-0.3.0-win-x64.zip`.
 - Installer: `MediaLock-Setup-0.3.0-win-x64.exe`.
-- Archive SHA-256: `c85869fe7232275a4c651447e8db51614bc536a9cc7cdf5d0011fb50481d557e`.
-- Installer SHA-256: `dc610ed0d6c7b0f09f94e98443652f3a75bf8ac16348ed37a872a71bf731668b`.
-- Shared payload SHA-256: `cff2031f712731123622416e637fac2695192bbcf78d112e2e43c9527ce4bd5b`.
-- Archive size: 76,501,806 bytes.
-- Installer size: 76,912,550 bytes.
-- Payload size: 82,316,731 bytes.
+- Archive SHA-256: `94deac66e195cfca21c826ee86f3e61097f3440d3a84ebb5af2439ef3ad3d437`.
+- Installer SHA-256: `7937f807b2ec577b88d3506735dfb7c26fe0c12b0f055a2b739364bb9ab4d00d`.
+- Shared payload SHA-256: `07bdb1f281333df5cb43b2d0a6bb74daf881a9a15419389f15583ca2d27f4a02`.
+- Archive size: 76,504,983 bytes.
+- Installer size: 76,915,357 bytes.
+- Payload size: 82,319,809 bytes.
 
 Independent inspection matched both container manifests and checksum files, matched the shared payload hash and found
 exactly one extracted `MediaLock.exe`. Payload and Setup report ProductVersion `0.3.0`, FileVersion `0.3.0.0` and
@@ -88,7 +88,16 @@ artifacts:
 - 362/362 Release tests passed;
 - Release build completed with zero warnings and zero errors;
 - format verification, the publish packaging contract and `git diff --check` passed; and
-- the formal ZIP and Setup were built from a clean worktree at the exact source commit recorded above.
+- the superseded ZIP and Setup were built from a clean worktree at that exact source commit.
+
+The first host sign-out/sign-in attempt then exposed a stale `Run` value owned by an unavailable historical portable
+path after the installed `0.3.0` process had launched. The `7273165` artifacts were preserved as superseded and were
+not published. RED Application coverage reproduced a platform value changing after initial synchronization; Windows
+adapter coverage exercises the real Registry notification. Commit
+`a773fac983728f5d4b2d8cbe40bfad9d1c016737` monitors the Run key with `RegNotifyChangeKeyValue`, reconciles changes
+through the serialized settings boundary and retains the disabled-setting rule that does not delete another portable
+owner. Its clean gate passed 365/365 Release tests, format verification, a zero-warning／zero-error Release build, the
+publish packaging contract and `git diff --check` before the final artifacts recorded above were built.
 
 ## Exact-artifact host gate
 
@@ -105,32 +114,30 @@ source isolation, Playback State Lock external-pause recovery and three-pause es
 sleep/resume checks. Sleep/resume intentionally disables Keep Playing and does not restart audio without user input.
 Close-to-Tray, second-instance activation and Tray Exit also passed. No Error/Critical log entry or crash was found.
 
-The final exact ZIP payload from `7273165234a418d1334fc2075adc7e876db89db2` then cold-started as one process,
+The superseded exact ZIP payload from `7273165234a418d1334fc2075adc7e876db89db2` then cold-started as one process,
 displayed stable version `0.3.0`, and exposed the corrected Traditional Chinese Settings text stating that Recovery
 and Priority Rule changes apply immediately after Save. The English wording is covered by the same bilingual resource
 contract. Cancelling the inspection preserved `language=system`, `theme=dark` and disabled login startup. A second
 launch retained one process, closing the main window retained the Tray process, and relaunching restored the same
-window. The final process was then stopped after inspection; no product behavior changed after the functional host
-matrix other than the verified localized copy.
+window. That process was stopped after inspection.
 
-The remaining release blocker is the fresh Windows Sandbox matrix below, using only the final formal ZIP and Setup.
+The final exact Setup from `a773fac983728f5d4b2d8cbe40bfad9d1c016737` repaired the same-version host install.
+Before launch, the Run value intentionally remained the stale historical portable path; the installed primary process
+repaired it to `"%LocalAppData%\Programs\MediaLock\MediaLock.exe" --startup` while retaining one process and the
+persisted enabled preference. A real sign-out/sign-in then started that exact installed payload without manual launch.
+The notification-area icon appeared, process path and command line matched the installed executable, the Run value
+remained correct, settings/state were valid and two rotated JSONL files contained zero invalid or Error／Critical lines.
 
 ## Windows Sandbox gate
 
-Status: passed on fresh Windows 11 Enterprise 24H2 x64 Sandboxes, build `26100.9168`.
+Status: targeted replacement gate passed on a fresh Windows 11 Enterprise 24H2 x64 Sandbox, build `26100.9168`.
 
-The mapped formal artifacts independently matched source commit
-`7273165234a418d1334fc2075adc7e876db89db2`, the archive and installer digests recorded above, ProductVersion
+The mapped final formal artifacts independently matched source commit
+`a773fac983728f5d4b2d8cbe40bfad9d1c016737`, the archive and installer digests recorded above, ProductVersion
 `0.3.0`, FileVersion `0.3.0.0` and Authenticode `NotSigned`. The self-contained single-file portable payload launched
 without installing .NET, and a second launch retained one process.
 
-Public predecessor identity was checked against the GitHub asset digests before copying it into Sandbox. Public
-portable `v0.2.0` wrote `English`, `Light`, a 17-second Recovery timeout and disabled login startup. Installing stable
-preserved all four values and valid settings/state JSON. Per-user Setup completed without UAC; its payload matched the
-manifest, Start Menu and Installed apps registration existed, and a second clean Sandbox visibly returned Media Lock
-as the best Windows Search application result.
-
-The automated installer transactions passed with these exact results:
+The replacement automated installer transactions passed with these exact results:
 
 - default login startup remained disabled;
 - uninstall removed the owned startup value but preserved an unrelated portable startup value;
@@ -139,9 +146,13 @@ The automated installer transactions passed with these exact results:
   `0ec8c554e7eb7ceb9e7857e07ed1388babc7b70ff42ca1e24684b064c740d2c3` upgraded to stable with exit code 0;
 - same-version stable repair returned exit code 0 and preserved payload, registration, shortcut, settings, state and
   startup command;
-- stable-to-RC1 downgrade was blocked with exit code 7 and every captured transaction invariant stayed unchanged; and
-- cancelling stable on the Ready to Install page returned exit code 2 and left the installed RC1 payload,
-  registration, shortcut, startup, settings and state unchanged.
+- stable-to-RC1 downgrade was blocked with exit code 7 and every captured transaction invariant stayed unchanged.
+
+The broader superseded `7273165` Sandbox matrix additionally checked public portable `v0.2.0` data compatibility,
+Windows Search, Ready-page cancellation and Edge GSMTC behavior. Public `v0.2.0` wrote `English`, `Light`, a 17-second
+Recovery timeout and disabled login startup; its stable install preserved all four values and valid settings/state.
+Cancellation returned exit code 2 without changing the RC1 installation. A second clean Sandbox visibly returned
+Media Lock as the best Windows Search application result.
 
 Edge exposed one `MSEdge` session with title, artwork and timeline. Lock session, Pause and Play each succeeded once.
 The advertisement correctly rejected Seek and produced a dismissible actionable notice; after skipping it, one
@@ -149,9 +160,11 @@ release-only Seek moved the actual song from approximately `0:18` to `2:25`. Fin
 processes, no installed payload, shortcut, Installed apps entry or startup value. Settings/state remained valid, and
 the one JSONL log contained zero invalid lines and zero Error/Critical entries.
 
-Real sign-out/sign-in remains a host-only lifecycle row because Sandbox destroys its environment on sign-out. The
-installer and application startup ownership contracts passed here; final stable publication must not claim a new
-exact-artifact sign-in result unless that host row is also executed or explicitly accepted as inherited risk.
+The replacement Sandbox additionally installed the exact final Setup, wrote a valid enabled schema-v7 setting and
+replaced its Run value with `"C:\DoesNotExist\MediaLock.exe" --startup`. Launching the installed primary repaired the
+value to its own executable, retained one matching process and produced no competing owner. Final uninstall returned
+zero, removed the installed payload and removed the now-owned startup value. Real sign-out/sign-in remains host-only
+because Sandbox destroys its environment on sign-out; that exact host row passed as recorded above.
 
 ## Integration and publication
 
