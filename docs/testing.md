@@ -519,7 +519,8 @@ Record stable `0.3.0` evidence independently in
 ### Phase 16A browser-direct Probe
 
 Phase 16A remains outside production packaging. Run its C# framing／protocol tests and dependency-free Node Extension
-tests explicitly, then syntax-check every executable Extension script. The fixed public manifest key／Extension ID,
+tests explicitly, run its PowerShell registration contract test under Windows PowerShell 5.1, then syntax-check every
+executable Extension script. The fixed public manifest key／Extension ID,
 least-privilege permissions and exact Native Host `allowed_origins` are test contracts. A failure is a Prototype
 blocker rather than permission to weaken the origin or site allowlists.
 
@@ -531,6 +532,17 @@ The named Chrome／Brave／Brave YouTube Music PWA matrix must distinguish comma
 record duplicate count, reload／navigation target continuity, Native Host disconnect and competing-source isolation.
 Timeout or an unknown outcome must not retry a mutating command. See the
 [Phase 16A Probe plan](phase-16/browser-direct-probe-plan.md).
+
+The Extension protocol test also owns the initial-handshake readiness gate: a command may wait for negotiation only
+before dispatch, must proceed once after readiness, and must fail on bounded timeout or disconnect. It may never use
+that gate to retry a command already posted to the Host.
+
+On Windows, the Probe's Chrome and Brave registration commands share one Chrome-compatible current-user Native
+Messaging registry seam. The PowerShell contract test must invoke both public scripts against an isolated registry
+root, require the same manifest／registry identity, migrate only an exact legacy Probe-owned value and preserve a
+foreign value. It must also remove an exact obsolete Brave-specific Probe value without claiming or deleting a
+foreign value at that location. Manual Brave evidence additionally verifies that the launched Host's process
+ancestry reaches `brave.exe`; a matching unused Brave-specific registry value is not acceptance evidence.
 
 Every future production integration gate also runs two independent compatibility lanes:
 

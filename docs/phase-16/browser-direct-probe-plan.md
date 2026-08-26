@@ -49,9 +49,10 @@ The first slice provides:
 - strict protocol version, session UUID, monotonic sequence, request UUID, bounded dedupe cache, target origin,
   top-frame and command allowlist validation;
 - a Popup whose Play／Pause／Seek request makes a complete Extension → Host → Extension → content-script round trip;
+- a 1.5-second bounded wait for the initial Host handshake before the first command is dispatched;
 - one result for one pending request, with no mutating-command retry after timeout;
 - `play()` Promise observation, bounded Seek and explicit rejection when the media element or target is unavailable;
-- per-browser current-user registration and ownership-safe unregister scripts.
+- one Chrome-compatible current-user registration shared by Chrome and Brave, plus ownership-safe unregister scripts.
 
 Only `play`, `pause` and `seek` are enabled. `toggle`, `next`, `previous` and `stop` remain unavailable until a later
 site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesses.
@@ -66,6 +67,7 @@ site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesse
 - Unknown fields, schema versions, sessions, sequences, request IDs, origins, frames and commands fail closed.
 - A Native Host disconnect, command timeout or target mismatch reports failure／outcome unknown and does not reroute
   to Windows Current Session.
+- Initial handshake waiting occurs only before dispatch. A command already posted to the Host is never retried.
 - `stdout` contains only framed protocol messages; diagnostics use `stderr`.
 - Same-user replacement of the unsigned HKCU registration, manifest, host or unpacked Extension is an explicit
   Prototype limitation. Custom encryption would not repair a replaced endpoint or make the unsigned files trusted.
@@ -75,6 +77,9 @@ site-Adapter slice proves exact behavior without brittle or ambiguous DOM guesse
 ```powershell
 dotnet test '.\tests\Phase16A.BrowserDirectProbe.Tests\Phase16A.BrowserDirectProbe.Tests.csproj' `
     --configuration Release
+
+& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+    -File '.\tests\Phase16A.BrowserDirectProbe.Tests\NativeMessagingRegistration.Tests.ps1'
 
 node --test '.\experiments\Phase16A.BrowserDirectProbe\extension\tests\*.test.mjs'
 node --check '.\experiments\Phase16A.BrowserDirectProbe\extension\service-worker.mjs'
@@ -87,8 +92,10 @@ change the `MediaLock.exe` payload.
 
 ## Registration and loading
 
-Do not run both browser registrations blindly. Validate one browser at a time and unregister it before changing the
-Probe files.
+Chrome and Brave on Windows consume the same Chrome-compatible Native Messaging registration in this tested
+environment. Both `-Browser` values therefore publish and report the same shared manifest／registry path; they do not
+create independent Host identities. The parameter records the browser under test rather than selecting a different
+registry namespace.
 
 ```powershell
 $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
@@ -97,12 +104,19 @@ $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
 # Open chrome://extensions, enable Developer mode, then Load unpacked from the reported ExtensionRoot.
 # Reload every already-open YouTube／YouTube Music test tab once so Chrome injects the declarative content script.
 
-& "$probeRoot\Unregister-Phase16AProbe.ps1" -Browser Chrome
+& "$probeRoot\Register-Phase16AProbe.ps1" -Browser Brave
+# The second registration must report the same NativeHostManifest and RegistryPath.
+
+& "$probeRoot\Unregister-Phase16AProbe.ps1" -Browser Brave
 ```
 
-For Brave, repeat with `-Browser Brave` and `brave://extensions`. Chrome documents its Windows registry path; the
-Brave-specific registry lookup is an empirical Probe input and must be recorded with the exact Brave version. A Brave
-failure does not authorize adding a wildcard origin, a second Extension ID or a localhost listener.
+For Brave, load the Extension from `brave://extensions`. The shared Windows lookup is an empirical compatibility
+result and must be recorded with the exact Brave version and the launched Host's browser parent process. A Brave
+failure does not authorize adding a wildcard origin, a second Extension ID or a localhost listener. Register safely
+migrates only the Probe's exact legacy browser-specific manifest paths; it rejects any foreign value. Unregister
+removes only the exact shared or legacy Probe-owned value, so calling it for either browser disconnects both browser
+test lanes. Both scripts also remove the obsolete Brave-specific key only when it still points to an exact
+Probe-owned manifest; a foreign value at that location is preserved.
 
 Phase 16A deliberately uses a declarative fixed-site content script. Loading or reloading an unpacked Extension does
 not retrofit that script into documents that were already open; those stale documents reject with

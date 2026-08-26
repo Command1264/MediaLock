@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createNativeHostReadinessGate,
   createReplayGuard,
   validateHelloAck,
   validateNativeCommand,
@@ -47,6 +48,33 @@ test('accepts only the matching hello acknowledgement', () => {
     type: 'helloAck',
     sessionId: crypto.randomUUID(),
   }, sessionId), /session/i);
+});
+
+test('waits for initial Native Host negotiation before allowing one command', async () => {
+  const gate = createNativeHostReadinessGate(100);
+  let dispatchCount = 0;
+  const waiting = gate.waitUntilReady().then((ready) => {
+    if (ready) {
+      dispatchCount += 1;
+    }
+    return ready;
+  });
+
+  gate.markReady();
+
+  assert.equal(await waiting, true);
+  assert.equal(dispatchCount, 1);
+  assert.equal(await gate.waitUntilReady(), true);
+});
+
+test('fails a pre-dispatch readiness wait on timeout or disconnect', async () => {
+  const timeoutGate = createNativeHostReadinessGate(1);
+  assert.equal(await timeoutGate.waitUntilReady(), false);
+
+  const disconnectedGate = createNativeHostReadinessGate(100);
+  const waiting = disconnectedGate.waitUntilReady();
+  disconnectedGate.reset();
+  assert.equal(await waiting, false);
 });
 
 test('rejects replayed request IDs in one native-host session', () => {

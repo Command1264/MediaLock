@@ -1,4 +1,5 @@
 import {
+  createNativeHostReadinessGate,
   createReplayGuard,
   validateHelloAck,
   validateHostHello,
@@ -11,6 +12,7 @@ const ALLOWED_PAGE_ORIGINS = new Set([
   'https://music.youtube.com',
 ]);
 const COMMAND_TIMEOUT_MILLISECONDS = 5000;
+const INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS = 1500;
 
 let nativePort;
 let activeSessionId;
@@ -18,6 +20,9 @@ let replayGuard;
 let negotiated = false;
 let outboundSequence = 0;
 const pendingRequests = new Map();
+const nativeHostReadiness = createNativeHostReadinessGate(
+  INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS,
+);
 
 connectNativeHost();
 
@@ -45,6 +50,7 @@ function connectNativeHost() {
 }
 
 function resetConnectionState(errorCode) {
+  nativeHostReadiness.reset();
   activeSessionId = undefined;
   replayGuard = undefined;
   negotiated = false;
@@ -58,6 +64,12 @@ function resetConnectionState(errorCode) {
 
 async function queueProbeRequest(message) {
   const command = validatePopupCommand(message);
+  if (!nativePort) {
+    return { accepted: false, errorCode: 'native-host-unavailable' };
+  }
+  if (!negotiated && !await nativeHostReadiness.waitUntilReady()) {
+    return { accepted: false, errorCode: 'native-host-unavailable' };
+  }
   if (!negotiated || !nativePort || !activeSessionId) {
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
@@ -115,6 +127,7 @@ async function handleNativeMessage(message) {
     if (!negotiated) {
       validateHelloAck(message, activeSessionId);
       negotiated = true;
+      nativeHostReadiness.markReady();
       return;
     }
 

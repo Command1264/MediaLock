@@ -2,7 +2,14 @@
 param(
     [Parameter(Mandatory)]
     [ValidateSet('Chrome', 'Brave')]
-    [string] $Browser
+    [string] $Browser,
+
+    [Parameter(DontShow)]
+    [string] $RegistryRoot = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts',
+
+    [Parameter(DontShow)]
+    [string] $ObsoleteBraveRegistryRoot =
+        'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,20 +19,29 @@ $hostName = 'com.command1264.medialock.phase16a'
 $extensionId = 'kggfkkiifnclhhmibdglkbdfbacakemn'
 $projectPath = Join-Path $PSScriptRoot 'Phase16A.BrowserDirectProbe.csproj'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$outputRoot = Join-Path $repositoryRoot "artifacts\phase16a-browser-direct\$($Browser.ToLowerInvariant())"
+$artifactRoot = Join-Path $repositoryRoot 'artifacts\phase16a-browser-direct'
+$outputRoot = Join-Path $artifactRoot 'chromium'
 $publishRoot = Join-Path $outputRoot 'native-host'
 $manifestPath = Join-Path $outputRoot 'native-host-manifest.json'
-
-$registryRoot = switch ($Browser) {
-    'Chrome' { 'HKCU:\Software\Google\Chrome\NativeMessagingHosts' }
-    'Brave' { 'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts' }
-}
 $registryPath = Join-Path $registryRoot $hostName
+$obsoleteBraveRegistryPath = Join-Path $ObsoleteBraveRegistryRoot $hostName
+$legacyOwnedManifests = @(
+    (Join-Path $artifactRoot 'chrome\native-host-manifest.json'),
+    (Join-Path $artifactRoot 'brave\native-host-manifest.json')
+)
+$legacyRegistrationMigrated = $false
 
 if (Test-Path -LiteralPath $registryPath) {
     $existingManifest = [string](Get-Item -LiteralPath $registryPath).GetValue('')
     if (![string]::Equals($existingManifest, $manifestPath, [StringComparison]::Ordinal)) {
-        throw "The Native Messaging host name is already registered to a different manifest: $existingManifest"
+        $isLegacyOwnedManifest = $legacyOwnedManifests | Where-Object {
+            [string]::Equals($existingManifest, $_, [StringComparison]::Ordinal)
+        }
+        if ($null -eq $isLegacyOwnedManifest) {
+            throw "The Native Messaging host name is already registered to a different manifest: $existingManifest"
+        }
+
+        $legacyRegistrationMigrated = $true
     }
 }
 
@@ -33,7 +49,8 @@ dotnet publish $projectPath `
     --configuration Release `
     --runtime win-x64 `
     --self-contained false `
-    --output $publishRoot
+    --output $publishRoot |
+    Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "Phase 16A Native Host publish failed with exit code $LASTEXITCODE."
 }
@@ -61,6 +78,23 @@ if (![string]::Equals($registeredManifest, $manifestPath, [StringComparison]::Or
     throw 'The Native Messaging registry value did not round-trip exactly.'
 }
 
+$obsoleteBraveRegistrationRemoved = $false
+$obsoleteBraveRegistrationPreserved = $false
+if (Test-Path -LiteralPath $obsoleteBraveRegistryPath) {
+    $obsoleteManifest = [string](Get-Item -LiteralPath $obsoleteBraveRegistryPath).GetValue('')
+    $obsoleteOwnedManifests = @($manifestPath) + $legacyOwnedManifests
+    $isObsoleteOwnedManifest = $obsoleteOwnedManifests | Where-Object {
+        [string]::Equals($obsoleteManifest, $_, [StringComparison]::Ordinal)
+    }
+    if ($null -ne $isObsoleteOwnedManifest) {
+        Remove-Item -LiteralPath $obsoleteBraveRegistryPath
+        $obsoleteBraveRegistrationRemoved = $true
+    }
+    else {
+        $obsoleteBraveRegistrationPreserved = $true
+    }
+}
+
 [pscustomobject]@{
     Browser = $Browser
     ExtensionId = $extensionId
@@ -69,5 +103,9 @@ if (![string]::Equals($registeredManifest, $manifestPath, [StringComparison]::Or
     NativeHostManifest = $manifestPath
     RegistryPath = $registryPath
     RegistrationMatches = $true
+    SharedChromiumRegistration = $true
+    LegacyRegistrationMigrated = $legacyRegistrationMigrated
+    ObsoleteBraveRegistrationRemoved = $obsoleteBraveRegistrationRemoved
+    ObsoleteBraveRegistrationPreserved = $obsoleteBraveRegistrationPreserved
     UnsignedPrototype = $true
 }

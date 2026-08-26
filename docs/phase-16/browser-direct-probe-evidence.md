@@ -10,8 +10,9 @@ Date: 2026-08-26
 | Probe implementation commit | `ca58e5c` |
 | Windows | Windows 11 Pro 25H2, build `26200.9168`, 64-bit |
 | Chrome | `151.0.7922.174` |
+| Brave | `151.1.93.138` |
 | Extension ID | `kggfkkiifnclhhmibdglkbdfbacakemn` |
-| Native Host registration | Current-user Chrome registry; exact Probe manifest matched |
+| Native Host registration | Current-user Chrome-compatible registry shared by Chrome／Brave; exact Probe manifest matched |
 | Authorized target origin | `https://music.youtube.com` |
 | Competing／disallowed origin | Non-YouTube HTTPS page; exact URL intentionally not recorded |
 | Signature／distribution | Unsigned, unpacked disposable Probe |
@@ -39,16 +40,42 @@ The Host registration still matched the Probe-owned manifest after the forced pr
 explicit Extension reload in this first slice; Phase 16B requires user-triggered, bounded lazy reconnect rather than an
 unbounded background retry loop.
 
+## Brave Gate A observations
+
+| Scenario | Popup result | Observed media result | Verdict |
+| --- | --- | --- | --- |
+| Ordinary Brave YouTube Pause | Accepted once | Ordinary YouTube paused | Pass |
+| Ordinary Brave YouTube Play | Accepted once | Ordinary YouTube played | Pass |
+| Ordinary Brave YouTube Seek to 80 seconds | Accepted once | Jumped to approximately 80 seconds | Pass |
+| Brave YouTube Music PWA Pause／Play | Accepted once for each command | PWA paused, then played | Pass, Extension available in installed PWA |
+| PWA Pause while ordinary Brave YouTube also plays | Accepted once | PWA paused; ordinary YouTube continued | Pass, exact-page isolation |
+| Ordinary Brave YouTube Pause while PWA also plays | Accepted once | Ordinary YouTube paused; PWA continued | Pass, reverse isolation |
+| Reload PWA document, then Pause | Accepted once | PWA paused; ordinary YouTube unchanged | Pass |
+| Force-stop every exact disposable Host, then PWA Play | `native-host-unavailable` | PWA remained paused; ordinary YouTube unchanged | Pass, fail closed |
+| Reload Extension and PWA, then Play | Accepted once | PWA played; ordinary YouTube unchanged | Pass |
+
+Initial registration exposed a false browser-specific assumption: the old Brave registry value matched what the
+script wrote, but `brave.exe` launched the Host referenced by the Chrome-compatible registry instead. The process
+chain was Probe Host → `cmd.exe` → `brave.exe`, proving the browser owner independently of the identical Extension
+origin. The corrected contract uses one shared manifest／registration for both browsers and tests legacy-owned
+migration plus foreign-value preservation at the public Register／Unregister seam.
+
+After migrating to that shared registration, the first PWA command immediately following an Extension reload returned
+`native-host-unavailable`; the next command was accepted once. Process ancestry showed separate shared-manifest Host
+instances owned by `chrome.exe` and `brave.exe`, so registration was healthy. Inspection identified an initial
+handshake race: the Popup could submit before `helloAck`. The corrected Extension waits up to 1.5 seconds before the
+first dispatch, fails closed on timeout／disconnect and still never retries a command after posting it to the Host.
+After reloading the corrected Extension and PWA, the first Pause was accepted once, paused only the PWA and left
+ordinary Brave YouTube unchanged. The bounded pre-dispatch wait therefore passes its live Brave first-click check.
+
 ## Current conclusion
 
-Chrome fixed-site Play, Pause, Seek, same-browser exact-page isolation, disallowed-origin isolation, document reload,
-Host-loss safety and explicit reconnect pass the first manual slice. This is **not** complete Phase 16A Gate A
-evidence. It does not yet prove:
+Chrome and Brave fixed-site Play, Pause, Seek, same-browser exact-page isolation, document reload, Host-loss safety
+and explicit reconnect pass the first manual slices. Chrome additionally passed disallowed-origin isolation. This is
+**not** complete Phase 16A Gate A evidence. It does not yet prove:
 
 - stale iframe, closed-tab or timeout behavior at the live browser seam;
 - full Chrome process restart and target reacquisition;
-- ordinary Brave registration／control;
-- installed Brave YouTube Music PWA Extension availability／control;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
 Automated protocol tests cover malformed／oversized frames, exact Extension origin, stale session, sequence and request

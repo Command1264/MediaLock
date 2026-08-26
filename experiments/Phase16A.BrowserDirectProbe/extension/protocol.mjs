@@ -6,6 +6,51 @@ const ALLOWED_PAGE_ORIGINS = new Set([
 const ALLOWED_COMMANDS = new Set(['play', 'pause', 'seek']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export function createNativeHostReadinessGate(timeoutMilliseconds) {
+  if (!Number.isSafeInteger(timeoutMilliseconds)
+      || timeoutMilliseconds < 1
+      || timeoutMilliseconds > 10000) {
+    throw new TypeError('Native Host readiness timeout must be an integer from 1 through 10000.');
+  }
+
+  let ready = false;
+  const waiters = new Set();
+
+  function settle(waiter, result) {
+    if (!waiters.delete(waiter)) {
+      return;
+    }
+    clearTimeout(waiter.timeoutId);
+    waiter.resolve(result);
+  }
+
+  return Object.freeze({
+    waitUntilReady() {
+      if (ready) {
+        return Promise.resolve(true);
+      }
+
+      return new Promise((resolve) => {
+        const waiter = { resolve, timeoutId: undefined };
+        waiters.add(waiter);
+        waiter.timeoutId = setTimeout(() => settle(waiter, false), timeoutMilliseconds);
+      });
+    },
+    markReady() {
+      ready = true;
+      for (const waiter of [...waiters]) {
+        settle(waiter, true);
+      }
+    },
+    reset() {
+      ready = false;
+      for (const waiter of [...waiters]) {
+        settle(waiter, false);
+      }
+    },
+  });
+}
+
 export function createReplayGuard(capacity) {
   if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 4096) {
     throw new TypeError('Replay guard capacity must be an integer from 1 through 4096.');
