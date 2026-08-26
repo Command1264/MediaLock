@@ -337,6 +337,27 @@ clean-Windows upgrade, rollback and uninstall evidence passes. The installer per
 but blocks a complete release version older than the registered installation with an actionable message so it cannot
 silently expose persisted settings to an older schema.
 
+#### Future direct browser integration
+
+A later optional integration may control supported YouTube and YouTube Music pages through a browser extension and
+Native Messaging rather than using the browser's GSMTC Session as the command transport. It may provide exact
+browser/profile/tab or installed-PWA identity, URL-aware Recovery, human-readable source names and direct playback
+state, metadata, timeline and command exchange. The existing GSMTC path remains available whenever the integration is
+absent, unsupported, disconnected or denied permission.
+
+Direct browser control, source-native GSMTC suppression and Windows media-surface projection are separate product
+capabilities. Media Lock does not claim that direct control can hide another process's GSMTC Session. Public Windows
+APIs do not allow Media Lock to disable another application's SMTC publication or force its own mirror to remain
+Windows Current Session. A browser-specific mechanism that voluntarily disables native media integration must be
+documented, reversible and independently verified before any "only Media Lock" presentation can be described for that
+exact browser configuration.
+
+Production integration requires an explicit neutral target identity and adapter contract so browser targets and GSMTC
+Sessions can share routing behavior without treating a URL, title or DOM object as a GSMTC Session Fingerprint. It must
+preserve existing App Lock, Session Lock, Priority Rules, Recovery, expected-target capture and exactly-once command
+semantics. Site DOM or private JavaScript dependencies remain isolated behind site-specific adapters and must fail
+closed rather than route to another tab when the page changes.
+
 ### v1.0
 
 Stabilized Session Lock, App Lock, rules, browser integration, tray control, recovery, startup, logging and settings

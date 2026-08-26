@@ -642,3 +642,57 @@ Exit criteria:
   ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
 
 Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.
+
+## Phase 16 — Direct browser integration
+
+Add an optional, support-bounded browser-control path for YouTube and YouTube Music that can address an exact browser
+tab or installed PWA without using that source's GSMTC Session as the command transport. The existing GSMTC adapter
+remains the universal fallback for unsupported sites, browsers and desktop media applications. This phase does not
+promise to replace Windows GSMTC, suppress Sessions owned by other processes or force Media Lock to remain Windows
+Current Session.
+
+The intended shape is a peer browser adapter behind a neutral media-target seam, not browser-specific behavior inside
+the existing GSMTC adapter:
+
+```text
+YouTube／YouTube Music ──▶ browser extension ──▶ native messaging ──▶ browser adapter
+GSMTC applications ────────────────────────────────────────────────▶ GSMTC adapter
+                                                                       │
+                                                                       ▼
+                                                         existing routing semantics
+                                                                       │
+                                                                       ├─▶ physical media keys
+                                                                       └─▶ optional Media Lock SMTC mirror
+```
+
+The work is divided into three independent evidence gates. Passing direct control does not imply that Chromium's own
+SMTC publication was suppressed, and neither result implies that Windows will select the Media Lock mirror:
+
+1. **Direct-control gate** — identify and control the intended YouTube／YouTube Music tab, observe metadata, playback
+   state and timeline, and survive navigation, reload, browser restart and native-host reconnect without duplicate
+   commands.
+2. **Source-publication gate** — determine whether each supported browser can voluntarily disable its own Windows
+   media integration through a documented, user-reversible mechanism. Chromium feature flags may be measured as an
+   experimental controlled-browser option, but are not a stable cross-browser product contract.
+3. **Windows-projection gate** — separately evaluate a best-effort Media Lock-owned SMTC mirror. Phase 11B's Limit
+   decision remains authoritative: public Windows APIs cannot guarantee that the mirror is Current or the only card.
+
+Exit criteria:
+
+- A disposable extension/native-host prototype passes Chrome, ordinary Brave and installed Brave YouTube Music PWA
+  tests before production architecture or packaging is approved.
+- Play, Pause and Seek use stable web media primitives where available; site-specific Next／Previous behavior is
+  isolated, version-detected and fails closed when the page contract changes.
+- Browser messages validate extension origin, site origin, target identity, schema, size and a command allowlist;
+  native-host access is limited to approved extension identities.
+- Direct targets have explicit identity, capability and Recovery semantics that do not silently rebind existing
+  GSMTC App Lock, Session Lock or Priority Rules.
+- Extension absence, permission denial, unsupported pages, disconnects and adapter failures fall back safely to the
+  established GSMTC-only operation without claiming that a command succeeded.
+- No process injection, Windows component replacement, undocumented Current Session setter or system-wide Session
+  suppression enters production scope.
+- User-facing documentation distinguishes "Media Lock controls the selected browser target directly" from
+  "Windows shows only Media Lock"; the latter is never promised without separate source-by-source evidence.
+
+Status: planned after Phase 15. See
+[`research/direct-browser-integration-and-gsmtc-limits.md`](research/direct-browser-integration-and-gsmtc-limits.md).
