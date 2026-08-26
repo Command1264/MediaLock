@@ -7,6 +7,9 @@ freezes scope and evidence requirements only. Phase 14B performs the version/doc
 formal artifact build and exact-artifact validation after separate approval. Integration and public release remain
 later approval boundaries.
 
+Status: complete and published on 2026-08-26. The retained `release/0.3` baseline and GPG-signed annotated `v0.3.0`
+tag identify exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`; the GitHub Release is Stable／Latest.
+
 Stable work starts from `develop` after this plan is integrated. The public `v0.2.0` Release, its immutable assets and
 the retained `release/0.2` hotfix Worktree/branch remain untouched throughout Phase 14. A verified `release/0.3`
 baseline is created only from the accepted stable source commit; Phase 14 does not delete `release/0.2` afterward.

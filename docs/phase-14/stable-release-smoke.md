@@ -168,13 +168,15 @@ because Sandbox destroys its environment on sign-out; that exact host row passed
 
 ## Integration and publication
 
-Status: integration complete; publication not started and still requires separate approval.
+Status: integration and publication complete on 2026-08-26.
 
 PR #46 merged the reviewed stable source and evidence into `develop` as
 `06aafe39fc16940f5d7c9e8ac453f6e1d6ae875d`. PR #47 then synchronized `develop` into `main` as
 `966dce2f2ef0389fc372d39189bc718ec0cace4e`. The retained `release/0.3` hotfix baseline points to exact artifact
 source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`; the existing `release/0.2` branch and Worktree remain retained.
 
-No `v0.3.0` tag, GitHub Stable／Latest Release or public ZIP/Setup upload has been created. Record the signed annotated
-tag, public assets and independently downloaded GitHub digests only after those separately authorized operations occur.
-Never alter the historical `v0.2.0` or `v0.3.0-rc.1` assets.
+The separately approved publication created GPG-signed annotated tag `v0.3.0`, which verifies successfully and peels
+to exact artifact source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`. The public
+[GitHub Release](https://github.com/Command1264/MediaLock/releases/tag/v0.3.0) is Stable／Latest, not Draft or
+Prerelease, and contains only the verified ZIP and Setup. GitHub's asset digests, sizes and independently downloaded
+copies match the recorded SHA-256 values above. Historical `v0.2.0`／`v0.3.0-rc.1` assets remain unchanged.

@@ -2,13 +2,13 @@
 
 ## Scope and release status
 
-The current source targets an unpublished stable `0.3.0` candidate for `win-x64` as a compressed self-contained
+The current source has produced the published stable `0.3.0` release for `win-x64` as a compressed self-contained
 single-file WPF application. It promotes the published `0.3.0-rc.1` feature set without adding another product
 feature. Volume, customizable shortcuts, Windows Media Surface Mirror production integration and browser integration
 remain outside this release.
 
-The published `v0.2.0` assets remain frozen and portable-only, and `v0.2.0` remains Stable／Latest until separately
-approved stable publication. Public `v0.3.0-rc.1` assets also remain immutable. Re-running the command with a published
+The published `v0.2.0` assets remain frozen and portable-only; public `v0.3.0-rc.1` assets also remain immutable.
+`v0.3.0` is now Stable／Latest. Re-running the command with a published
 version is development evidence only and must not mutate or be attached to an existing GitHub Release.
 
 The release is unsigned. Its manifest records `signed: false`; Windows may therefore show reputation or
@@ -172,11 +172,11 @@ be backward compatible. Use the currently installed version or a newer installer
 routine rollback. If login startup was enabled, disable it from the running release before changing distribution mode,
 or remove only the exact current-user `MediaLock` startup entry after confirming its target.
 
-Publishing a tag, GitHub Release, signed package or public artifact is a separate remote operation requiring explicit
-approval after all release gates pass. No stable `v0.3.0` tag or Release exists yet. The approved RC1 publication
-created `v0.3.0-rc.1` on 2026-08-26 with only ZIP and Setup and listed both SHA-256 values in its body. Manifest and
-standalone checksum files remain trusted local provenance evidence. Published stable `v0.2.0` and its retained
-`release/0.2` hotfix baseline remain unchanged during Phase 14.
+The separately approved publication created GPG-signed annotated tag `v0.3.0` at exact artifact source
+`a773fac983728f5d4b2d8cbe40bfad9d1c016737` and published a GitHub Stable／Latest Release on 2026-08-26. Its only
+assets are the independently verified ZIP and Setup. Manifest and standalone checksum files remain trusted local
+provenance evidence. Published `v0.2.0`／`v0.3.0-rc.1` assets and the retained `release/0.2` hotfix baseline remain
+unchanged.
 
 Historical `0.2.0-rc.1` host-side and clean-environment evidence is recorded in
 [Phase 6 packaged validation](phase-6/host-smoke.md), and `0.2.0-rc.2` evidence is preserved in
