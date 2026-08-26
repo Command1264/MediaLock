@@ -168,8 +168,13 @@ because Sandbox destroys its environment on sign-out; that exact host row passed
 
 ## Integration and publication
 
-Status: not started; requires separate approval after every gate above passes.
+Status: integration complete; publication not started and still requires separate approval.
 
-Record the retained `release/0.3` baseline, PRs into `develop` and `main`, signed annotated tag, public Stable／Latest
-Release, public ZIP/Setup assets and independently downloaded GitHub digests only after those operations occur. Never
-alter the historical `v0.2.0` or `v0.3.0-rc.1` assets, and retain `release/0.2` throughout Phase 14.
+PR #46 merged the reviewed stable source and evidence into `develop` as
+`06aafe39fc16940f5d7c9e8ac453f6e1d6ae875d`. PR #47 then synchronized `develop` into `main` as
+`966dce2f2ef0389fc372d39189bc718ec0cace4e`. The retained `release/0.3` hotfix baseline points to exact artifact
+source `a773fac983728f5d4b2d8cbe40bfad9d1c016737`; the existing `release/0.2` branch and Worktree remain retained.
+
+No `v0.3.0` tag, GitHub Stable／Latest Release or public ZIP/Setup upload has been created. Record the signed annotated
+tag, public assets and independently downloaded GitHub digests only after those separately authorized operations occur.
+Never alter the historical `v0.2.0` or `v0.3.0-rc.1` assets.
