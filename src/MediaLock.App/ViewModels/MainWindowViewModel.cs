@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.Application;
 using MediaLock.Core.Media;
 using MediaLock.Core.Playback;
@@ -26,6 +27,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncCommand[] mediaCommands;
     private readonly TimeProvider timeProvider;
     private readonly IPlaybackStateLockFeedback? playbackStateLockFeedback;
+    private readonly ISourceApplicationMetadataResolver? sourceApplicationMetadataResolver;
     private readonly TimeSpan playbackStateLockNoticeDuration;
     private SessionItemViewModel? selectedSession;
     private RouterState routerState = RouterState.Initial;
@@ -55,13 +57,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         IDesktopSupportActions? desktopSupportActions = null,
         Func<bool>? isMediaInputRunning = null,
         IPlaybackStateLockFeedback? playbackStateLockFeedback = null,
-        TimeSpan? playbackStateLockNoticeDuration = null)
+        TimeSpan? playbackStateLockNoticeDuration = null,
+        ISourceApplicationMetadataResolver? sourceApplicationMetadataResolver = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
         this.synchronizationContext = synchronizationContext;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         this.playbackStateLockFeedback = playbackStateLockFeedback;
+        this.sourceApplicationMetadataResolver = sourceApplicationMetadataResolver;
         this.playbackStateLockNoticeDuration = playbackStateLockNoticeDuration ??
             DefaultPlaybackStateLockNoticeDuration;
         Settings = new SettingsViewModel(
@@ -72,7 +76,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             applyTheme,
             environmentInfoProvider,
             desktopSupportActions,
-            isMediaInputRunning);
+            isMediaInputRunning,
+            sourceApplicationMetadataResolver);
         SettingsCommand = new AsyncCommand(_ =>
         {
             showSettings?.Invoke();
@@ -257,9 +262,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                     : routerState.Mode == RoutingMode.PriorityRules
                         ? UiText.Get("Target_RulesUnavailable")
                         : UiText.Get("Target_LockedUnavailable")
-                : $"{target.SourceApplication} — {target.Title}";
+                : $"{target.SourceApplicationDisplayName} — {target.Title}";
         }
     }
+
+    public string CurrentTargetSourceDetails =>
+        ResolveTarget()?.SourceApplicationDetails ?? string.Empty;
 
     public string NowPlayingTitle => ResolveTarget()?.Title ?? string.Empty;
 
@@ -625,13 +633,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void RefreshLocalizedProjection()
     {
+        var presentations = SourceApplicationPresentationCatalog.Resolve(
+            routerState.Sessions.Select(session => session.SourceAppUserModelId),
+            sourceApplicationMetadataResolver);
         projectingSelection = true;
         try
         {
             Sessions.Clear();
             foreach (var session in routerState.Sessions)
             {
-                Sessions.Add(SessionItemViewModel.From(session));
+                Sessions.Add(SessionItemViewModel.From(
+                    session,
+                    presentations[session.SourceAppUserModelId]));
             }
 
             var nextSelection = ResolveSelection();
@@ -658,6 +671,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(IsPlaybackStateLockFailed));
         OnPropertyChanged(nameof(PlaybackStateLockNotice));
         OnPropertyChanged(nameof(TargetDescription));
+        OnPropertyChanged(nameof(CurrentTargetSourceDetails));
         OnPropertyChanged(nameof(NowPlayingTitle));
         OnPropertyChanged(nameof(NowPlayingArtist));
         OnPropertyChanged(nameof(NowPlayingArtwork));

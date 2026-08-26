@@ -1134,6 +1134,39 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task FriendlySourceNameNeverChangesTheAppLockIdentity()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave._crx_music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-26T00:00:00Z"),
+            Metadata: new MediaMetadata("Song", "Artist", null, null));
+        var application = new FakeApplication(StateWith(session));
+        var metadata = new Dictionary<string, SourceApplicationMetadata>
+        {
+            [session.SourceAppUserModelId] = new("YouTube Music", "Brave Browser"),
+        };
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            sourceApplicationMetadataResolver: new FakeSourceApplicationMetadataResolver(metadata));
+
+        var presented = Assert.Single(viewModel.Sessions);
+        Assert.Equal("Brave._crx_music", presented.SourceApplication);
+        Assert.Equal("YouTube Music — Brave Browser", presented.SourceApplicationDisplayName);
+        Assert.Equal("Brave._crx_music", presented.SourceApplicationDetails);
+        Assert.Equal("YouTube Music — Brave Browser — Song", viewModel.TargetDescription);
+
+        await viewModel.AppLockCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.LockApplication>(
+            Assert.Single(application.Intents));
+        Assert.Equal("Brave._crx_music", intent.SourceAppUserModelId);
+    }
+
+    [Fact]
     public void ApplicationFailureIsPresentedAsAnActionableErrorState()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
@@ -1267,5 +1300,13 @@ public sealed class MainWindowViewModelTests
         public int PlayCount { get; private set; }
 
         public void PlayOverrideReleasedSound() => PlayCount++;
+    }
+
+    private sealed class FakeSourceApplicationMetadataResolver(
+        IReadOnlyDictionary<string, SourceApplicationMetadata> metadata)
+        : ISourceApplicationMetadataResolver
+    {
+        public SourceApplicationMetadata? TryResolve(string sourceAppUserModelId) =>
+            metadata.GetValueOrDefault(sourceAppUserModelId);
     }
 }

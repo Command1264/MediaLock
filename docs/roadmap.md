@@ -641,7 +641,10 @@ Exit criteria:
 - Unit tests cover resolver precedence, collisions, fallback and localization; a named Brave YouTube Music PWA plus
   ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
 
-Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.
+Status: implementation candidate in progress after the `0.3.0` stable release. The candidate uses exact Windows
+AppsFolder AUMID/display-name metadata with raw-ID fallback and does not alter routing identity. Automated and named
+Brave PWA／ordinary Brave desktop evidence remain exit gates; it is not part of the current stable artifact. See
+[`phase-15/human-readable-source-identities.md`](phase-15/human-readable-source-identities.md).
 
 ## Phase 16 — Direct browser integration
 

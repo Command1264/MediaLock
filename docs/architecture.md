@@ -251,6 +251,29 @@ after settings load and before any ViewModel, window or tray surface is created.
 one App-layer culture change that refreshes existing WPF bindings, ViewModel projections and notification-area menu
 labels without restarting routing, GSMTC discovery or input interception. A failed save does not change culture.
 
+Phase 15 adds a presentation-only source-application metadata Seam. The Application project owns the small
+`ISourceApplicationMetadataResolver` Interface; the Windows Adapter enumerates the current user's AppsFolder and maps
+exact `System.AppUserModel.ID` values to Shell display names plus a distinct executable product name when available.
+The App presentation Module combines that metadata with the complete set of visible source identities, adds the host
+qualifier only when it contributes information, disambiguates friendly-name collisions with the exact raw identity,
+and otherwise falls back to that raw identity.
+
+```text
+GSMTC SourceAppUserModelId ──▶ Windows AppsFolder metadata Adapter
+              │                              │
+              └──────────────────────────────┤
+                                             ▼
+                             App presentation catalog
+                                             │
+                                             ├─▶ Main Session／target labels
+                                             └─▶ Settings Priority Rules／choices
+```
+
+The presentation never enters Core, settings or runtime state. App Lock, Session Lock, Priority Rules, Recovery,
+selection bookmarks and routed commands continue comparing and persisting the original `SourceAppUserModelId`.
+Tooltips and accessibility help retain that raw identity even when the visible label is friendly. Missing Shell
+metadata is a normal fallback result and cannot remove a Session or interrupt routing.
+
 Phase 7B advances settings to schema v5 with a neutral App-owned theme preference; schema v1-v4 documents migrate
 to Windows theme while preserving every previously supported setting. `UiTheme` resolves Windows, Light and Dark
 preferences and swaps one palette resource dictionary beneath a stable shared control-style dictionary. Views consume

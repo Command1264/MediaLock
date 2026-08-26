@@ -127,7 +127,9 @@ public partial class App : System.Windows.Application
                 environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
                 desktopSupportActions: new DesktopSupportActions(),
                 isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
-                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback());
+                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback(),
+                sourceApplicationMetadataResolver:
+                    new WindowsSourceApplicationMetadataResolver());
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;

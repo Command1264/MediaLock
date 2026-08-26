@@ -20,6 +20,35 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowContractTests
 {
     [Fact]
+    public void SourceIdentityPresentationKeepsRawDetailsAccessible()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "MediaLock.App",
+            "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+        var sessionSource = Assert.Single(
+            xaml.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") ==
+                "{Binding SourceApplicationDisplayName}");
+        Assert.Equal(
+            "{Binding SourceApplicationDetails}",
+            (string?)sessionSource.Attribute("ToolTip"));
+        Assert.Equal(
+            "{Binding SourceApplicationDetails}",
+            (string?)sessionSource.Attribute("AutomationProperties.HelpText"));
+
+        var target = Assert.Single(
+            xaml.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding TargetDescription}");
+        Assert.Equal(
+            "{Binding CurrentTargetSourceDetails}",
+            (string?)target.Attribute("AutomationProperties.HelpText"));
+    }
+
+    [Fact]
     public void PlaybackStateLockUsesTwoContentSizedSelectionControlsOnTheCurrentTargetSurface()
     {
         var xaml = XDocument.Load(Path.Combine(

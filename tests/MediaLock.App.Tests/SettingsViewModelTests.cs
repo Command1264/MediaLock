@@ -520,6 +520,51 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task PriorityRulePresentationUsesFriendlyNamesButPersistsRawIdentity()
+    {
+        var state = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Sessions =
+                [
+                    Session("music", "Brave._crx_music"),
+                    Session("video", "Brave"),
+                ],
+            },
+            Settings = MediaLockSettings.Default with
+            {
+                DefaultRoutingMode = RoutingMode.PriorityRules,
+                PriorityRules = [new PriorityRule("Brave")],
+            },
+        };
+        var metadata = new Dictionary<string, SourceApplicationMetadata>
+        {
+            ["Brave._crx_music"] = new("YouTube Music", "Brave Browser"),
+            ["Brave"] = new("Brave"),
+        };
+        var application = new FakeApplication(state);
+        using var viewModel = new SettingsViewModel(
+            application,
+            sourceApplicationMetadataResolver: new FakeSourceApplicationMetadataResolver(metadata));
+
+        var available = Assert.Single(viewModel.AvailableApplications);
+        Assert.Equal("Brave._crx_music", available.SourceAppUserModelId);
+        Assert.Equal("YouTube Music — Brave Browser", available.DisplayName);
+        Assert.Equal("Brave", Assert.Single(viewModel.PriorityRules).DisplayName);
+
+        viewModel.SelectedAvailableApplication = available.SourceAppUserModelId;
+        await viewModel.AddPriorityRuleCommand.ExecuteAsync(null);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.UpdateSettings>(
+            Assert.Single(application.Intents));
+        Assert.Equal(
+            ["Brave", "Brave._crx_music"],
+            intent.Settings.PriorityRules.Select(rule => rule.SourceAppUserModelId));
+    }
+
+    [Fact]
     public void CatalogRefreshWithTheSameApplicationsDoesNotResetTheAvailableList()
     {
         var state = MediaLockApplicationState.Initial with
@@ -615,5 +660,13 @@ public sealed class SettingsViewModelTests
             Requests.Add(request);
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FakeSourceApplicationMetadataResolver(
+        IReadOnlyDictionary<string, SourceApplicationMetadata> metadata)
+        : ISourceApplicationMetadataResolver
+    {
+        public SourceApplicationMetadata? TryResolve(string sourceAppUserModelId) =>
+            metadata.GetValueOrDefault(sourceAppUserModelId);
     }
 }
