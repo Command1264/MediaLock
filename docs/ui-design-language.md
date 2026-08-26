@@ -36,6 +36,11 @@ labels retain standard height and move as whole controls on narrower rows. Copy 
 adapter failures use the existing Settings `DangerBrush` error surface, and neither state changes control geometry.
 Every action has a descriptive automation name; the confirmation is a polite live region.
 
+Human-readable source labels use ordinary text hierarchy rather than new chrome. Main Session rows, the current-target
+surface and Settings Priority Rules show one shared friendly presentation. The exact raw identity remains available as
+a tooltip and accessibility help text; duplicate friendly labels receive a visible raw-ID qualifier. Friendly-name
+fallback or refresh must not resize surrounding controls or change the selected／routed identity.
+
 Transient success or informational feedback clears after five seconds and immediately when its owning surface closes.
 A newer message replaces the previous message and its pending timeout. Visible localized feedback refreshes when the UI
 language changes. Actionable errors are not transient: keep them visible until the user dismisses them or the

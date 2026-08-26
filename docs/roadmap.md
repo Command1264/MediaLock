@@ -621,7 +621,7 @@ provenance remain unchanged.
 Replace raw source-application identifiers in user-facing Session and Priority Rules surfaces with a trustworthy,
 human-readable presentation while preserving the exact GSMTC identity used by routing. For example, an installed
 YouTube Music PWA currently exposed as `Brave._crx_cinhimbnkkghhklpknlkffjgod` may display as
-`YouTube Music — Brave Web App` when Windows application metadata can verify both parts.
+`YouTube Music — Brave` when Windows application metadata can verify both parts.
 
 This is a presentation resolver, not browser URL detection and not an identity migration. App Lock, Priority Rules,
 Recovery and persisted state continue comparing the complete `SourceAppUserModelId`; the friendly name may change
@@ -641,7 +641,13 @@ Exit criteria:
 - Unit tests cover resolver precedence, collisions, fallback and localization; a named Brave YouTube Music PWA plus
   ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
 
-Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.
+Status: implementation and named desktop acceptance complete on 2026-08-26 after the `0.3.0` stable release. The
+candidate uses exact Windows AppsFolder AUMID/display-name metadata with raw-ID fallback and does not alter routing
+identity. All 383 automated tests, Release build, formatting, packaging regression and two-axis review passed. A named
+Brave YouTube Music PWA／ordinary Brave YouTube smoke confirmed shared Main／Settings presentation, raw-ID details,
+physical Play／Pause isolation and Session Lock Recovery without rebinding. It is not part of the current stable
+artifact. See
+[`phase-15/human-readable-source-identities.md`](phase-15/human-readable-source-identities.md).
 
 ## Phase 16 — Direct browser integration
 

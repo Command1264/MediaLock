@@ -39,6 +39,8 @@ public partial class App : System.Windows.Application
     private string activeThemePreference = UiThemePreference.System;
     private bool systemThemeSubscribed;
     private bool mediaInputFaultReported;
+    private readonly object sourceMetadataDiagnosticGate = new();
+    private readonly HashSet<Task> sourceMetadataDiagnosticTasks = [];
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -127,7 +129,10 @@ public partial class App : System.Windows.Application
                 environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
                 desktopSupportActions: new DesktopSupportActions(),
                 isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
-                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback());
+                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback(),
+                sourceApplicationMetadataResolver:
+                    new WindowsSourceApplicationMetadataResolver(
+                        QueueSourceMetadataDiagnostic));
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -383,6 +388,51 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private void QueueSourceMetadataDiagnostic(DiagnosticEvent diagnosticEvent)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticEvent);
+        Task diagnosticTask;
+        lock (sourceMetadataDiagnosticGate)
+        {
+            if (shutdownStarted)
+            {
+                return;
+            }
+
+            diagnosticTask = Task.Run(async () =>
+            {
+                try
+                {
+                    if (diagnosticLog is not null)
+                    {
+                        await diagnosticLog.WriteAsync(
+                            diagnosticEvent,
+                            CancellationToken.None).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
+                    System.Diagnostics.Trace.TraceError(
+                        $"Source metadata diagnostic write failed: {exceptionType}.");
+                }
+            });
+            sourceMetadataDiagnosticTasks.Add(diagnosticTask);
+        }
+
+        _ = diagnosticTask.ContinueWith(
+            completedTask =>
+            {
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    sourceMetadataDiagnosticTasks.Remove(completedTask);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
     internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
         IDiagnosticLog diagnosticLog,
         bool enabled)
@@ -407,12 +457,15 @@ public partial class App : System.Windows.Application
 
     private async ValueTask ShutdownAsync()
     {
-        if (shutdownStarted)
+        lock (sourceMetadataDiagnosticGate)
         {
-            return;
-        }
+            if (shutdownStarted)
+            {
+                return;
+            }
 
-        shutdownStarted = true;
+            shutdownStarted = true;
+        }
         if (systemThemeSubscribed)
         {
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
@@ -499,6 +552,14 @@ public partial class App : System.Windows.Application
         {
             try
             {
+                Task[] pendingSourceMetadataDiagnostics;
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    pendingSourceMetadataDiagnostics =
+                        sourceMetadataDiagnosticTasks.ToArray();
+                }
+
+                await Task.WhenAll(pendingSourceMetadataDiagnostics);
                 await diagnosticLog.DisposeAsync();
             }
             catch (Exception exception)

@@ -14,6 +14,45 @@ namespace MediaLock.App.Tests;
 public sealed class SettingsWindowContractTests
 {
     [Fact]
+    public void PriorityRuleSourceNamesKeepRawIdentityAsAccessibleDetails()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "MediaLock.App",
+            "SettingsWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+        var available = Assert.Single(
+            xaml.Descendants(presentation + "ComboBox"),
+            element => (string?)element.Attribute("ItemsSource") ==
+                "{Binding AvailableApplications}");
+        Assert.Equal(
+            "SourceAppUserModelId",
+            (string?)available.Attribute("SelectedValuePath"));
+        Assert.Equal(
+            "{Binding SelectedAvailableApplication}",
+            (string?)available.Attribute("SelectedValue"));
+
+        var availableSource = Assert.Single(
+            available.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding DisplayName}");
+        Assert.Equal("{Binding Details}", (string?)availableSource.Attribute("ToolTip"));
+        Assert.Equal(
+            "{Binding Details}",
+            (string?)availableSource.Attribute("AutomationProperties.HelpText"));
+
+        var ruleSource = Assert.Single(
+            xaml.Descendants(presentation + "TextBlock"),
+            element => element != availableSource &&
+                (string?)element.Attribute("Text") == "{Binding DisplayName}");
+        Assert.Equal("{Binding Details}", (string?)ruleSource.Attribute("ToolTip"));
+        Assert.Equal(
+            "{Binding Details}",
+            (string?)ruleSource.Attribute("AutomationProperties.HelpText"));
+    }
+
+    [Fact]
     public void SettingsCardsFollowTheRequestedTopToBottomOrder()
     {
         var xaml = XDocument.Load(Path.Combine(

@@ -724,6 +724,7 @@ public sealed class MainWindowViewModelTests
         Assert.Null(viewModel.SelectedSession);
         Assert.False(viewModel.LockCommand.CanExecute(null));
         Assert.False(viewModel.AppLockCommand.CanExecute(null));
+        Assert.Equal("Brave._crx_music", viewModel.CurrentTargetSourceDetails);
 
         var recovered = music with { Key = new SessionKey("music-new") };
         application.Publish(application.State with
@@ -1134,6 +1135,73 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task FriendlySourceNameNeverChangesTheAppLockIdentity()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("music"),
+            "Brave._crx_music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-26T00:00:00Z"),
+            Metadata: new MediaMetadata("Song", "Artist", null, null));
+        var application = new FakeApplication(StateWith(session));
+        var metadata = new Dictionary<string, SourceApplicationMetadata>
+        {
+            [session.SourceAppUserModelId] = new("YouTube Music", "Brave Browser"),
+        };
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            sourceApplicationMetadataResolver: new FakeSourceApplicationMetadataResolver(metadata));
+
+        var presented = Assert.Single(viewModel.Sessions);
+        Assert.Equal("Brave._crx_music", presented.SourceApplication);
+        Assert.Equal("YouTube Music — Brave Browser", presented.SourceApplicationDisplayName);
+        Assert.Equal("Brave._crx_music", presented.SourceApplicationDetails);
+        Assert.Equal("YouTube Music — Brave Browser — Song", viewModel.TargetDescription);
+
+        await viewModel.AppLockCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.LockApplication>(
+            Assert.Single(application.Intents));
+        Assert.Equal("Brave._crx_music", intent.SourceAppUserModelId);
+    }
+
+    [Fact]
+    public void MainAndSettingsUsePersistedRulesToDisambiguateFriendlyNames()
+    {
+        var session = new MediaSessionSnapshot(
+            new SessionKey("active-player"),
+            "Player.Alpha",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-26T00:00:00Z"));
+        var state = StateWith(session) with
+        {
+            Settings = MediaLockSettings.Default with
+            {
+                PriorityRules = [new PriorityRule("Player.Beta")],
+            },
+        };
+        var metadata = new Dictionary<string, SourceApplicationMetadata>
+        {
+            ["Player.Alpha"] = new("Player"),
+            ["Player.Beta"] = new("Player"),
+        };
+        using var viewModel = new MainWindowViewModel(
+            new FakeApplication(state),
+            synchronizationContext: null,
+            sourceApplicationMetadataResolver: new FakeSourceApplicationMetadataResolver(metadata));
+
+        Assert.Equal(
+            "Player — Player.Alpha",
+            Assert.Single(viewModel.Sessions).SourceApplicationDisplayName);
+        Assert.Equal(
+            "Player — Player.Beta",
+            Assert.Single(viewModel.Settings.PriorityRules).DisplayName);
+    }
+
+    [Fact]
     public void ApplicationFailureIsPresentedAsAnActionableErrorState()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
@@ -1268,4 +1336,5 @@ public sealed class MainWindowViewModelTests
 
         public void PlayOverrideReleasedSound() => PlayCount++;
     }
+
 }

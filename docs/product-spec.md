@@ -358,6 +358,18 @@ preserve existing App Lock, Session Lock, Priority Rules, Recovery, expected-tar
 semantics. Site DOM or private JavaScript dependencies remain isolated behind site-specific adapters and must fail
 closed rather than route to another tab when the page changes.
 
+#### Human-readable source identities
+
+User-facing Session and Priority Rule surfaces resolve an exact `SourceAppUserModelId` through authoritative Windows
+Shell application metadata. A trusted display name may replace the raw identifier visually, and a distinct executable
+product name may qualify hosted applications such as an installed Chromium web app. Missing or unusable metadata
+falls back to the exact identifier. Duplicate friendly names append that identifier so they remain distinguishable.
+
+The raw identity remains available through details／accessibility text and remains the only value used by App Lock,
+Session Lock, Priority Rules, Recovery and persistence. A friendly-name change, application reinstall or metadata
+failure must never silently rebind a saved rule or Locked Target. Song title, artist, URL and hard-coded PWA IDs are
+not application-name evidence.
+
 ### v1.0
 
 Stabilized Session Lock, App Lock, rules, browser integration, tray control, recovery, startup, logging and settings

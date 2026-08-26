@@ -64,6 +64,13 @@ Saving reordered, enabled, disabled or removed Priority Rules while Priority Rul
 recalculate the routed target through `IMediaLockApplication`; restarting or reselecting the Routing Mode is not part
 of acceptance.
 
+Phase 15 tests the source-name Module through its presentation Interface. Coverage proves trusted display/host
+composition, raw-ID fallback, deterministic collision disambiguation, Main and Settings projection, accessible raw
+details and preservation of the exact identity in App Lock and saved Priority Rules. Windows Adapter tests replace
+AppsFolder enumeration with deterministic metadata and prove exact, case-sensitive lookup, one-time loading and safe
+catalog failure. Named desktop evidence separately verifies the real Brave YouTube Music PWA and ordinary Brave／Chrome
+entries because a fake cannot prove Shell registration.
+
 Settings tests maintain a runtime-consumer matrix. Recovery and Priority Rules must reach the Router immediately,
 including cancellation and replacement of an active Recovery deadline when its timeout changes. Login startup must
 match the owned Run value and repair an external overwrite after initial synchronization without deleting a
@@ -354,6 +361,20 @@ Record results in [Phase 5A manual smoke](phase-5/manual-smoke.md).
    receives one command and Media Lock remains in `Priority Rules`.
 
 Record results in [Phase 5B manual smoke](phase-5/priority-rules-smoke.md).
+
+### Phase 15 human-readable source identity smoke test
+
+1. Run the Phase 15 candidate with ordinary Brave YouTube and the installed Brave YouTube Music PWA both publishing
+   Sessions. Verify the Main list and current target use distinct friendly names while raw IDs remain available as
+   details.
+2. Open Settings and verify the add-rule choice and existing Priority Rules use the same names. Add／reorder／save the
+   YouTube Music rule and confirm the exact raw ID remains in `settings.json`.
+3. Activate each Routing Mode, route Play/Pause once and verify the intended source changes once while the competing
+   source remains unchanged. Refresh the PWA and verify Recovery still follows the original identity.
+4. Repeat the presentation check in English／Traditional Chinese, Light／Dark and the supported minimum main-window
+   size. Missing metadata must visibly fall back to the raw ID without error or routing loss.
+
+Record results in [Phase 15 source identity evidence](phase-15/human-readable-source-identities.md).
 
 ## 4. Compatibility matrix
 

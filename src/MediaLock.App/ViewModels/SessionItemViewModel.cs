@@ -1,4 +1,5 @@
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.Core.Media;
 
 namespace MediaLock.App.ViewModels;
@@ -6,6 +7,8 @@ namespace MediaLock.App.ViewModels;
 public sealed record SessionItemViewModel(
     SessionKey Key,
     string SourceApplication,
+    string SourceApplicationDisplayName,
+    string SourceApplicationDetails,
     string Title,
     string Artist,
     string PlaybackStatus,
@@ -14,9 +17,13 @@ public sealed record SessionItemViewModel(
     MediaTimeline? Timeline,
     MediaArtwork? Artwork)
 {
-    internal static SessionItemViewModel From(MediaSessionSnapshot session) => new(
+    internal static SessionItemViewModel From(
+        MediaSessionSnapshot session,
+        SourceApplicationPresentation presentation) => new(
         session.Key,
         session.SourceAppUserModelId,
+        presentation.DisplayName,
+        presentation.Details,
         session.Metadata?.Title ?? UiText.Get("Media_UnknownTitle"),
         session.Metadata?.Artist ?? UiText.Get("Media_UnknownArtist"),
         UiDescriptions.DescribePlaybackStatus(session.PlaybackStatus),
