@@ -523,6 +523,10 @@ tests explicitly, then syntax-check every executable Extension script. The fixed
 least-privilege permissions and exact Native Host `allowed_origins` are test contracts. A failure is a Prototype
 blocker rather than permission to weaken the origin or site allowlists.
 
+After first loading or reloading the unpacked Phase 16A Extension, an eligible page that predates that load must first
+reject as `target-unavailable`; reload the page once, then require the next command to be accepted exactly once. This
+documents Chrome's declarative content-script lifecycle and must not be hidden by retrying a mutating command.
+
 The named Chrome／Brave／Brave YouTube Music PWA matrix must distinguish command acceptance from observed movement and
 record duplicate count, reload／navigation target continuity, Native Host disconnect and competing-source isolation.
 Timeout or an unknown outcome must not retry a mutating command. See the

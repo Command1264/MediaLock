@@ -95,6 +95,7 @@ $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
 
 & "$probeRoot\Register-Phase16AProbe.ps1" -Browser Chrome
 # Open chrome://extensions, enable Developer mode, then Load unpacked from the reported ExtensionRoot.
+# Reload every already-open YouTube／YouTube Music test tab once so Chrome injects the declarative content script.
 
 & "$probeRoot\Unregister-Phase16AProbe.ps1" -Browser Chrome
 ```
@@ -102,6 +103,11 @@ $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
 For Brave, repeat with `-Browser Brave` and `brave://extensions`. Chrome documents its Windows registry path; the
 Brave-specific registry lookup is an empirical Probe input and must be recorded with the exact Brave version. A Brave
 failure does not authorize adding a wildcard origin, a second Extension ID or a localhost listener.
+
+Phase 16A deliberately uses a declarative fixed-site content script. Loading or reloading an unpacked Extension does
+not retrofit that script into documents that were already open; those stale documents reject with
+`target-unavailable` until refreshed. Record this lifecycle result rather than adding an unsafe command retry. Phase
+16B's separately gated `activeTab + scripting` design owns on-demand injection for the generic Adapter.
 
 ## Manual Gate A
 
