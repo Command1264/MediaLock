@@ -38,13 +38,11 @@ connectNativeHost();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'registerDocument') {
-    try {
-      const binding = documentRegistry.register(sender);
-      sendResponse({ accepted: true, documentId: binding.documentId });
-    } catch {
-      sendResponse({ accepted: false, errorCode: 'unauthorized-command' });
-    }
-    return false;
+    registerDocument(sender).then(
+      (binding) => sendResponse({ accepted: true, documentId: binding.documentId }),
+      () => sendResponse({ accepted: false, errorCode: 'unauthorized-command' }),
+    );
+    return true;
   }
 
   if (sender.id !== chrome.runtime.id
@@ -58,6 +56,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   });
   return true;
 });
+
+async function registerDocument(sender) {
+  if (!Number.isSafeInteger(sender?.tab?.id)) {
+    throw new Error('Document sender does not identify a browser tab.');
+  }
+  const currentTab = await chrome.tabs.get(sender.tab.id);
+  return documentRegistry.register(sender, currentTab);
+}
 
 function connectNativeHost() {
   nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);

@@ -11,9 +11,12 @@ export function createDocumentRegistry(extensionId) {
 
   const bindings = new Map();
   return Object.freeze({
-    register(sender) {
+    register(sender, currentTab) {
       if (sender?.id !== extensionId || !Number.isSafeInteger(sender?.tab?.id)) {
         throw new Error('Document sender is not authorized.');
+      }
+      if (currentTab?.id !== sender.tab.id) {
+        throw new Error('Document tab identity does not match the sender.');
       }
       if (sender.frameId !== 0) {
         throw new Error('Only the top frame can register a document.');
@@ -30,8 +33,8 @@ export function createDocumentRegistry(extensionId) {
       if (typeof sender.url !== 'string' || new URL(sender.url).origin !== sender.origin) {
         throw new Error('Document URL does not match its origin.');
       }
-      if (typeof sender.tab.url !== 'string'
-          || new URL(sender.tab.url).origin !== sender.origin) {
+      if (typeof currentTab.url !== 'string'
+          || new URL(currentTab.url).origin !== sender.origin) {
         throw new Error('Document tab URL does not match its origin.');
       }
 

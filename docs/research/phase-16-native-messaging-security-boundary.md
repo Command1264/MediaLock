@@ -93,9 +93,11 @@ inheritance][handle-inheritance] 因此一般網路 MITM、localhost port scan �
 
 ### 2.4 Extension-side sender identity
 
-Chrome 的 `MessageSender` 提供 `id`、`origin`、`url`、`tab`、`frameId`、`documentId` 與 document lifecycle。
-`origin` 可能和 URL 不同或是不透明 origin；iframe 的 `url` 是 iframe 自己而不是 top-level page。
-[chrome.runtime MessageSender][runtime-sender]
+Chrome 的 `MessageSender` 可提供 `id`、`origin`、`url`、`tab`、`frameId`、`documentId` 與 document
+lifecycle，但這些欄位多數是 optional。`origin` 可能和 URL 不同或是不透明 origin；iframe 的 `url` 是
+iframe 自己而不是 top-level page。即使 Extension 有 `tabs`／host permission，Chrome 151 實機仍不能把
+`sender.tab.url` 當成 registration-time 必有欄位；service worker 應以 `sender.tab.id` 呼叫 `tabs.get()`，
+取得 browser-owned current top-level URL。[chrome.runtime MessageSender][runtime-sender] [chrome.tabs][tabs-api]
 
 Chrome 自己明確要求把 content script 視為低信任來源：惡意頁面可能危及 renderer，所有輸入都要驗證與
 清理；傳給 content script 的資料也可能洩漏給網頁，且 content script 可觸發的 privileged actions 必須限縮。
@@ -107,7 +109,8 @@ Chrome 自己明確要求把 content script 視為低信任來源：惡意頁面
 - `sender.id === chrome.runtime.id`；
 - `frameId === 0`；
 - exact HTTPS origin 為 `https://www.youtube.com` 或 `https://music.youtube.com`；
-- `sender.tab.id` 存在，且 `sender.tab.url`／`sender.url` 符合相同 allowlist；
+- `sender.tab.id` 存在，`tabs.get(sender.tab.id)` 回傳相同 tab ID，且其 current URL、`sender.url` 與
+  `sender.origin` 符合相同 exact allowlist；
 - `documentId` 與 service worker 目前登記的 top-level document 相同；
 - navigation、reload、tab replacement、Port disconnect 後舊 document binding 立即失效。
 
@@ -287,6 +290,7 @@ Prototype 只有在下列條件全數有證據時才可進入產品 ADR：
 [manifest-key]: https://developer.chrome.com/docs/extensions/reference/manifest/key
 [extension-distribution]: https://developer.chrome.com/docs/extensions/how-to/distribute
 [runtime-sender]: https://developer.chrome.com/docs/extensions/reference/api/runtime#type-MessageSender
+[tabs-api]: https://developer.chrome.com/docs/extensions/reference/api/tabs
 [messaging-security]: https://developer.chrome.com/docs/extensions/develop/concepts/messaging#security-considerations
 [brave-source]: https://github.com/brave/brave-core/blob/master/app/brave_main_delegate.cc
 [windows-ipc]: https://learn.microsoft.com/en-us/windows/win32/ipc/interprocess-communications

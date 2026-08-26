@@ -28,7 +28,7 @@ Revision ownership is intentionally split rather than assigning every observatio
 - shared Chrome-compatible registration migration used `e505dfb`;
 - five-second cold-start negotiation and the no-Extension fallback observation used `920b997`;
 - stale-document races used `fb43393`;
-- `e9e799b` owns the final closed-tab, full-lifecycle timeout, `sender.tab.url` and content-addressed registration
+- `e9e799b` owns the closed-tab, full-lifecycle timeout, initial sender-tab URL and content-addressed registration
   hardening. Its affected live rows remain pending below until rerun against this exact implementation revision.
 
 ## Chrome Gate A observations
