@@ -12,7 +12,7 @@ const ALLOWED_PAGE_ORIGINS = new Set([
   'https://music.youtube.com',
 ]);
 const COMMAND_TIMEOUT_MILLISECONDS = 5000;
-const INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS = 1500;
+const INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS = 5000;
 
 let nativePort;
 let activeSessionId;

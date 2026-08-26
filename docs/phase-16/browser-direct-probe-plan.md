@@ -49,7 +49,7 @@ The first slice provides:
 - strict protocol version, session UUID, monotonic sequence, request UUID, bounded dedupe cache, target origin,
   top-frame and command allowlist validation;
 - a Popup whose Play／Pause／Seek request makes a complete Extension → Host → Extension → content-script round trip;
-- a 1.5-second bounded wait for the initial Host handshake before the first command is dispatched;
+- a 5-second bounded wait for the initial Host handshake before the first command is dispatched;
 - one result for one pending request, with no mutating-command retry after timeout;
 - `play()` Promise observation, bounded Seek and explicit rejection when the media element or target is unavailable;
 - one Chrome-compatible current-user registration shared by Chrome and Brave, plus ownership-safe unregister scripts.

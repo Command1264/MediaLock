@@ -63,19 +63,45 @@ migration plus foreign-value preservation at the public Register／Unregister se
 After migrating to that shared registration, the first PWA command immediately following an Extension reload returned
 `native-host-unavailable`; the next command was accepted once. Process ancestry showed separate shared-manifest Host
 instances owned by `chrome.exe` and `brave.exe`, so registration was healthy. Inspection identified an initial
-handshake race: the Popup could submit before `helloAck`. The corrected Extension waits up to 1.5 seconds before the
-first dispatch, fails closed on timeout／disconnect and still never retries a command after posting it to the Host.
+handshake race: the Popup could submit before `helloAck`. The corrected Extension initially waited up to 1.5 seconds
+before the first dispatch, fails closed on timeout／disconnect and still never retries a command after posting it to
+the Host.
 After reloading the corrected Extension and PWA, the first Pause was accepted once, paused only the PWA and left
-ordinary Brave YouTube unchanged. The bounded pre-dispatch wait therefore passes its live Brave first-click check.
+ordinary Brave YouTube unchanged. The bounded pre-dispatch wait therefore passed its reload-only first-click check.
+
+A later complete Brave process restart provided a slower cold-start boundary: the first PWA Pause exceeded the
+1.5-second readiness limit and failed closed, while the second Pause was accepted once after the same Brave-owned Host
+finished negotiation. The bounded pre-dispatch limit is therefore 5 seconds for cold startup; live confirmation after
+another complete Brave restart accepted the first Pause once, paused only the PWA and left ordinary Brave YouTube
+unchanged. A complete Chrome process restart with the same 5-second build also preserved the Extension and accepted
+the first YouTube Music Pause once without changing ordinary Chrome YouTube.
+
+Invoking Pause from an active ordinary HTTPS page in Brave returned `target-unavailable`; ordinary Brave YouTube
+continued playing and the already-paused PWA remained unchanged. This proves current-active-page fail-closed behavior,
+not persisted closed-target Recovery: Phase 16A has no Page Binding that can name a previously closed tab.
+
+## No-Extension compatibility lane
+
+Both unpacked Extensions were disabled while retaining the shared registration. The Probe Host count reached zero,
+then installed stable Media Lock `0.3.0` was started without an Extension prompt or browser-integration dependency.
+With Session Lock targeting Brave YouTube Music PWA and ordinary Brave YouTube in the foreground:
+
+- the first physical Play/Pause paused the PWA while ordinary YouTube continued;
+- the second physical Play/Pause resumed the PWA exactly once while ordinary YouTube remained unchanged;
+- refreshing the PWA entered Recovering, reacquired the same PWA and routed the next physical Play/Pause exactly once;
+- no Unavailable terminal state, error or crash occurred.
+
+This passes the named host's no-Extension GSMTC compatibility lane. It does not imply that direct page identity or
+commands remain available after the Extension is disabled; those capabilities are intentionally absent.
 
 ## Current conclusion
 
 Chrome and Brave fixed-site Play, Pause, Seek, same-browser exact-page isolation, document reload, Host-loss safety
-and explicit reconnect pass the first manual slices. Chrome additionally passed disallowed-origin isolation. This is
-**not** complete Phase 16A Gate A evidence. It does not yet prove:
+and explicit reconnect pass the first manual slices. Both browsers passed full process restart with a first command,
+Brave passed active non-target-page isolation, Chrome passed a separate disallowed-origin check, and the no-Extension
+stable GSMTC lane passed. This is **not** complete Phase 16A Gate A evidence. It does not yet prove:
 
 - stale iframe, closed-tab or timeout behavior at the live browser seam;
-- full Chrome process restart and target reacquisition;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
 Automated protocol tests cover malformed／oversized frames, exact Extension origin, stale session, sequence and request
