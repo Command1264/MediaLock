@@ -32,6 +32,12 @@ The protocol Module is deliberately deep: callers do not learn framing, Extensio
 replay bookkeeping or site allowlists. The production seam remains deferred until Chrome, Brave and the installed
 Brave YouTube Music PWA prove that a second Adapter is real rather than hypothetical.
 
+The future production composition treats this Adapter as optional capability discovery. It must be possible to omit
+the browser Adapter entirely and construct the same Router graph shipped in `0.3.0`; no Core state or existing GSMTC
+identity may require an Extension-derived field. An installed Extension may enrich a supported target with exact
+browser identity and direct commands, but it must not replace or mutate the GSMTC representation used by unsupported
+targets.
+
 ## First slice
 
 The first slice provides:
@@ -108,6 +114,8 @@ count and Native Host／Extension errors for every row:
 4. Active disallowed page, iframe, stale tab and closed tab: command rejected without controlling another target.
 5. Ctrl+R, navigation, Extension reload, Native Host disconnect and browser restart: old request cannot dispatch.
 6. Timeout／disconnect: no automatic retry and no duplicate media change.
+7. A clean Chrome profile without the Extension: the published `0.3.0` GSMTC workflow remains fully usable and no
+   Extension installation prompt blocks Media Lock.
 
 Gate A is not complete until the Extension can rediscover and bind the same logical target after reload without using
 media title or artist as identity. Passing Gate A does not imply Chromium stopped publishing GSMTC or that Media Lock

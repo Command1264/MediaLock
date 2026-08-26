@@ -345,6 +345,17 @@ browser/profile/tab or installed-PWA identity, URL-aware Recovery, human-readabl
 state, metadata, timeline and command exchange. The existing GSMTC path remains available whenever the integration is
 absent, unsupported, disconnected or denied permission.
 
+The Extension is an optional enhancement, not a prerequisite or replacement installation path. A user who never
+installs it must retain the complete `0.3.0` GSMTC experience: Session discovery, all four routing modes, Recovery,
+global media-key interception, playback-state lock, controls, Seek, Settings, tray and startup continue through the
+existing adapters. Media Lock must not show a blocking installation prompt or silently disable a supported GSMTC
+capability merely because browser-direct capability is unavailable.
+
+Provider absence and an active-provider failure are different states. If no compatible Extension is installed, target
+discovery and routing remain GSMTC-only from the outset. If an already-bound direct target disconnects or becomes
+stale, Media Lock must preserve that logical target and enter explicit Recovery／Unavailable handling; it must not
+reinterpret "fallback" as permission to control Windows Current Session or another competing source.
+
 Direct browser control, source-native GSMTC suppression and Windows media-surface projection are separate product
 capabilities. Media Lock does not claim that direct control can hide another process's GSMTC Session. Public Windows
 APIs do not allow Media Lock to disable another application's SMTC publication or force its own mirror to remain

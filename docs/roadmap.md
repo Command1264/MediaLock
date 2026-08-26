@@ -695,6 +695,11 @@ Exit criteria:
   GSMTC App Lock, Session Lock or Priority Rules.
 - Extension absence, permission denial, unsupported pages, disconnects and adapter failures fall back safely to the
   established GSMTC-only operation without claiming that a command succeeded.
+- A clean profile with no Media Lock Extension installed passes the complete `0.3.0` regression matrix without an
+  installation prompt, disabled GSMTC feature or settings migration. Installing the Extension only adds finer browser
+  identity and direct capabilities for explicitly supported targets.
+- Tests distinguish provider absence from loss of an already-bound direct target: absence starts and remains
+  GSMTC-only, while bound-target loss preserves identity and follows Recovery without rerouting to a competitor.
 - No process injection, Windows component replacement, undocumented Current Session setter or system-wide Session
   suppression enters production scope.
 - User-facing documentation distinguishes "Media Lock controls the selected browser target directly" from

@@ -528,6 +528,17 @@ record duplicate count, reload／navigation target continuity, Native Host disco
 Timeout or an unknown outcome must not retry a mutating command. See the
 [Phase 16A Probe plan](phase-16/browser-direct-probe-plan.md).
 
+Every future production integration gate also runs two independent compatibility lanes:
+
+1. **No Extension installed** — the complete stable `0.3.0` regression suite remains available through GSMTC, with no
+   blocking prompt or browser-integration dependency.
+2. **Extension available** — supported browser targets gain exact identity and direct capabilities, while unsupported
+   targets and applications retain their existing GSMTC behavior.
+
+Removing or disabling an Extension before startup must behave like provider absence. Disconnecting it after a direct
+target was bound must instead exercise explicit target-preserving Recovery and prove that no competing Session is
+controlled.
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected
