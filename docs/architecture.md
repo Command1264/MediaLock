@@ -405,7 +405,8 @@ undocumented API calls or move routing policy into the Windows project.
 
 ### Future browser target seam
 
-Phase 16A／16B evidence may justify a neutral media-target seam only after both the existing GSMTC Adapter and a proven
+Per [ADR 0005](adr/0005-use-page-bindings-for-browser-media-targets.md), Phase 16A／16B evidence may justify a neutral
+media-target seam only after both the existing GSMTC Adapter and a proven
 Browser Adapter exist. The Router-facing interface exposes immutable target identity, capabilities, observations and
 one-shot command results; it does not expose Extension IDs, Chrome tab IDs, frame IDs, document IDs, DOM selectors,
 site permissions or Native Messaging envelopes. Those facts remain inside one deep Browser Adapter Module.

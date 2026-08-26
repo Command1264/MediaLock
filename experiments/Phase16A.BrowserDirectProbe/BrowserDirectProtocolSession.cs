@@ -195,15 +195,41 @@ public sealed class BrowserDirectProtocolSession
         }
 
         var target = RequireObject(root, "target");
-        RequireExactProperties(target, "tabId", "frameId", "documentId", "pageOrigin");
+        var isGenericTarget = target.TryGetProperty("bindingId", out _)
+            || target.TryGetProperty("endpointId", out _);
+        if (isGenericTarget)
+        {
+            RequireExactProperties(
+                target,
+                "bindingId",
+                "endpointId",
+                "scope",
+                "tabId",
+                "frameId",
+                "documentId",
+                "pageOrigin");
+        }
+        else
+        {
+            RequireExactProperties(target, "tabId", "frameId", "documentId", "pageOrigin");
+        }
         var tabId = RequireInt32(target, "tabId");
         var frameId = RequireInt32(target, "frameId");
         var documentId = RequireOpaqueDocumentId(target, "documentId");
         var pageOrigin = RequireString(target, "pageOrigin");
-        if (tabId < 0 || frameId != 0 || !AllowedPageOrigins.Contains(pageOrigin))
+        var bindingId = isGenericTarget ? RequireOpaqueTargetId(target, "bindingId") : null;
+        var endpointId = isGenericTarget ? RequireOpaqueTargetId(target, "endpointId") : null;
+        var scope = isGenericTarget ? RequireString(target, "scope") : null;
+        if (tabId < 0
+            || frameId != 0
+            || (isGenericTarget && scope is not ("temporary" or "site"))
+            || (isGenericTarget ? !IsExactHttpsOrigin(pageOrigin) : !AllowedPageOrigins.Contains(pageOrigin)))
         {
             throw new UnauthorizedAccessException("The requested browser target is not authorized.");
         }
+        object responseTarget = isGenericTarget
+            ? new { bindingId, endpointId, scope, tabId, frameId, documentId, pageOrigin }
+            : new { tabId, frameId, documentId, pageOrigin };
 
         var command = RequireObject(root, "command");
         var commandName = RequireString(command, "name");
@@ -243,7 +269,7 @@ public sealed class BrowserDirectProtocolSession
                 connectionId,
                 sequence = outboundSequence,
                 requestId,
-                target = new { tabId, frameId, documentId, pageOrigin },
+                target = responseTarget,
                 command = new { name = commandName },
             }
             : null;
@@ -259,7 +285,7 @@ public sealed class BrowserDirectProtocolSession
             connectionId,
             sequence = outboundSequence,
             requestId,
-            target = new { tabId, frameId, documentId, pageOrigin },
+            target = responseTarget,
             command = new { name = commandName, positionSeconds = positionSeconds!.Value },
         });
     }
@@ -434,6 +460,27 @@ public sealed class BrowserDirectProtocolSession
         }
 
         return documentId;
+    }
+
+    private static string RequireOpaqueTargetId(JsonElement value, string propertyName)
+    {
+        var targetId = RequireString(value, propertyName);
+        if (targetId.Length is < 1 or > 128
+            || targetId.Any(character => character is < '\u0021' or > '\u007e'))
+        {
+            throw new InvalidDataException(
+                $"Protocol field '{propertyName}' must be a bounded opaque identifier.");
+        }
+
+        return targetId;
+    }
+
+    private static bool IsExactHttpsOrigin(string value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
+            && string.IsNullOrEmpty(uri.UserInfo)
+            && string.Equals(uri.GetLeftPart(UriPartial.Authority), value, StringComparison.Ordinal);
     }
 
     private static int RequireInt32(JsonElement value, string propertyName)

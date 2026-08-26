@@ -67,7 +67,9 @@ them as Browser Media Targets.
 
 ## Generic Adapter behavior
 
-- Enumerate bounded candidate `HTMLMediaElement` endpoints in every authorized frame.
+- Enumerate bounded candidate `HTMLMediaElement` endpoints in an authorized frame. The first disposable Probe binds
+  only the browser-owned top-level frame; nested-frame selection requires a later explicit frame-authorization design
+  and otherwise fails closed to GSMTC.
 - Prefer no endpoint implicitly when multiple candidates remain plausible; ask the user to bind one.
 - Advertise only observed capabilities. The first generic command set is Play, Pause and Seek.
 - Dispatch exactly once to the bound document／frame／endpoint and wait for an explicit result.

@@ -3,13 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Media Lock Phase 16A Probe</title>
+    <title>Media Lock Phase 16B Probe</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
-      <h1>Browser Direct Probe</h1>
-      <p>Commands target only the active YouTube or YouTube Music top-level tab.</p>
+      <h1>Generic Web Media Probe</h1>
+      <p>Authorize this HTTPS page once, always allow its exact site, or use a fixed YouTube adapter.</p>
+      <button id="authorize-temporary" type="button">Authorize this page</button>
+      <button id="authorize-site" type="button">Always allow this site</button>
       <div class="actions">
         <button type="button" data-command="play">Play</button>
         <button type="button" data-command="pause">Pause</button>

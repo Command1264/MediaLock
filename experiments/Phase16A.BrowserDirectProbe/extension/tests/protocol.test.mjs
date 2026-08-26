@@ -48,6 +48,35 @@ test('accepts one exact top-frame YouTube Music command', () => {
   assert.equal(command.command.name, 'pause');
 });
 
+test('accepts one explicitly bound generic HTTPS Endpoint command', () => {
+  const command = validateNativeCommand(
+    validCommand({
+      target: {
+        bindingId: 'binding-0123456789abcdef',
+        endpointId: 'endpoint-0123456789abcdef',
+        scope: 'temporary',
+        tabId: 42,
+        frameId: 0,
+        documentId,
+        pageOrigin: 'https://media.example.test',
+      },
+    }),
+    connectionId,
+    createReplayGuard(32),
+    capabilities,
+  );
+
+  assert.deepEqual(command.target, {
+    bindingId: 'binding-0123456789abcdef',
+    endpointId: 'endpoint-0123456789abcdef',
+    scope: 'temporary',
+    tabId: 42,
+    frameId: 0,
+    documentId,
+    pageOrigin: 'https://media.example.test',
+  });
+});
+
 test('rejects a command that was not negotiated for this connection', () => {
   assert.throws(() => validateNativeCommand(
     validCommand({ command: { name: 'play' } }),

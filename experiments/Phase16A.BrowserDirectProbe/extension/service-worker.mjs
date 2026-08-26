@@ -9,6 +9,8 @@ import { createDocumentRegistry } from './document-binding.mjs';
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createPendingRequestRegistry } from './pending-request-registry.mjs';
 import { completePendingRequest } from './request-completion.mjs';
+import { createBrowserAuthorizationModule } from './browser-authorization.mjs';
+import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 
 const NATIVE_HOST_NAME = 'com.command1264.medialock.phase16a';
 const ALLOWED_PAGE_ORIGINS = new Set([
@@ -30,6 +32,15 @@ const pendingRequests = createPendingRequestRegistry(
   () => nativePort?.disconnect(),
 );
 const documentRegistry = createDocumentRegistry(chrome.runtime.id);
+const browserAuthorization = createBrowserAuthorizationModule({
+  tabs: chrome.tabs,
+  scripting: chrome.scripting,
+  permissions: chrome.permissions,
+});
+const genericTargetRegistry = createBrowserMediaTargetRegistry({
+  authorization: browserAuthorization,
+  tabs: chrome.tabs,
+});
 const nativeHostReadiness = createNativeHostReadinessGate(
   INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS,
 );
@@ -52,6 +63,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       || sender.url !== chrome.runtime.getURL('popup.html')) {
     sendResponse({ accepted: false, errorCode: 'unauthorized-command' });
     return false;
+  }
+
+  if (message?.type === 'authorizeGenericTarget'
+      && (message.scope === 'temporary' || message.scope === 'site')) {
+    genericTargetRegistry.bindActiveTarget({ scope: message.scope }).then(sendResponse, () => {
+      sendResponse({ accepted: false, errorCode: 'target-unavailable' });
+    });
+    return true;
   }
 
   queueProbeRequest(message).then(sendResponse, () => {
@@ -117,30 +136,39 @@ async function queueProbeRequest(message) {
     return { accepted: false, errorCode: 'target-unavailable' };
   }
   const pageOrigin = new URL(tabs[0].url).origin;
-  if (!ALLOWED_PAGE_ORIGINS.has(pageOrigin)) {
-    return { accepted: false, errorCode: 'target-unavailable' };
-  }
-  let registration;
-  try {
-    registration = await chrome.tabs.sendMessage(
-      tabs[0].id,
-      { type: 'requestDocumentRegistration' },
-      { frameId: 0 },
-    );
-  } catch {
-    return { accepted: false, errorCode: 'target-unavailable' };
-  }
-  const target = documentRegistry.get(tabs[0].id);
-  if (registration?.accepted !== true
-      || !target
-      || target.documentId !== registration.documentId
-      || target.pageOrigin !== pageOrigin) {
-    return {
-      accepted: false,
-      errorCode: registration?.accepted === false
-        ? registration.errorCode ?? 'registration-rejected'
-        : 'target-unavailable',
-    };
+  let target = genericTargetRegistry.get(tabs[0].id);
+  if (target) {
+    if (target.pageOrigin !== pageOrigin
+        || !genericTargetRegistry.matches(target)
+        || !genericTargetRegistry.supports(target, command.name)) {
+      return { accepted: false, errorCode: 'target-unavailable' };
+    }
+  } else {
+    if (!ALLOWED_PAGE_ORIGINS.has(pageOrigin)) {
+      return { accepted: false, errorCode: 'target-unavailable' };
+    }
+    let registration;
+    try {
+      registration = await chrome.tabs.sendMessage(
+        tabs[0].id,
+        { type: 'requestDocumentRegistration' },
+        { frameId: 0 },
+      );
+    } catch {
+      return { accepted: false, errorCode: 'target-unavailable' };
+    }
+    target = documentRegistry.get(tabs[0].id);
+    if (registration?.accepted !== true
+        || !target
+        || target.documentId !== registration.documentId
+        || target.pageOrigin !== pageOrigin) {
+      return {
+        accepted: false,
+        errorCode: registration?.accepted === false
+          ? registration.errorCode ?? 'registration-rejected'
+          : 'target-unavailable',
+      };
+    }
   }
 
   const requestId = crypto.randomUUID();
@@ -215,6 +243,7 @@ async function handleNativeMessage(message) {
     const result = await dispatchBoundCommand({
       tabs: chrome.tabs,
       documentRegistry,
+      genericTargetRegistry,
       request,
     });
     completeRequest(
@@ -228,14 +257,30 @@ async function handleNativeMessage(message) {
   }
 }
 
-chrome.tabs.onRemoved.addListener((tabId) => documentRegistry.clear(tabId));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  documentRegistry.clear(tabId);
+  genericTargetRegistry.clearTab(tabId);
+});
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
   documentRegistry.clear(removedTabId);
   documentRegistry.clear(addedTabId);
+  genericTargetRegistry.clearTab(removedTabId);
+  genericTargetRegistry.clearTab(addedTabId);
 });
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading') {
     documentRegistry.clear(tabId);
+    genericTargetRegistry.suspendTab(tabId);
+  }
+  if (changeInfo.status === 'complete') {
+    genericTargetRegistry.rebindTab(tabId).then(
+      (result) => {
+        if (result.accepted !== true) {
+          genericTargetRegistry.suspendTab(tabId);
+        }
+      },
+      () => genericTargetRegistry.suspendTab(tabId),
+    );
   }
 });
 

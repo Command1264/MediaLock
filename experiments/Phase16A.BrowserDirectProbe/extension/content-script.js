@@ -16,6 +16,10 @@
   void registerDocument();
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type !== 'requestDocumentRegistration' && message?.type !== 'command') {
+      return false;
+    }
+
     if (message?.type === 'requestDocumentRegistration'
         && sender.id === chrome.runtime.id
         && sender.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`)) {
