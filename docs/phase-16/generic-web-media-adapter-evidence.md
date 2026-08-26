@@ -89,17 +89,30 @@ Observed on Chrome with the MDN single-video sample:
 
 ## Final manual Gate B3
 
-Pending against the final disposable Probe candidate. The remaining browser checks cover behavior that the isolated
-JavaScript tests cannot prove against Chrome's real permission, document-generation and media-element implementation:
+Passed on Chrome against final code candidate `fd2d530`:
 
-1. Temporary authorization: Pause, Play and Seek execute once on one HTTPS media page; another playing page is
-   unchanged.
-2. Exact-site authorization: the browser grants only that origin; reload recovers the same Page Binding without a
-   second authorization gesture; cross-origin navigation does not inherit the binding.
-3. Revocation: removing site access immediately rejects the direct command and leaves media unchanged.
-4. Ambiguity and unsupported pages: zero or multiple top-level media elements fail closed without controlling another
-   source; nested-frame-only media remains GSMTC-only in this Probe.
-5. Lifecycle: tab close, Extension reload, browser restart and Native Host interruption never replay or silently
-   redirect an old command. A new explicit binding is required where continuity cannot be proved.
-6. Compatibility: the fixed YouTube Adapter still controls its exact page once, while disabling the Extension leaves
-   Media Lock's existing GSMTC routing functional.
+1. Temporary authorization bound the MDN single-video HTTPS page. Pause and Play each executed once; Seek to four
+   seconds executed once, while an out-of-range ten-second Seek returned `seek-out-of-range` without mutation. A
+   concurrently playing ordinary YouTube page never changed.
+2. `Always allow this site` displayed Chrome's exact-site confirmation. Reload recovered the same MDN Page Binding
+   without another authorization gesture. Navigating the tab to `example.com` returned `target-unavailable`; returning
+   to the authorized MDN origin recovered the binding without controlling the competitor.
+3. Revoking MDN site access immediately changed Pause to `target-unavailable` while both media sources retained their
+   states. A new temporary user gesture restored direct control.
+4. Two top-level media elements returned `ambiguous-media-elements`; the following command returned
+   `target-unavailable` and selected neither element. A W3Schools nested-iframe-only video returned
+   `media-element-unavailable`, stayed playing and did not alter ordinary YouTube.
+5. The fixed YouTube Adapter accepted Pause and Play once before generic authorization. After generic authorization,
+   the same page again accepted each command once, proving the two listeners no longer race a response.
+6. Extension reload and complete Chrome restart invalidated the temporary Page Binding. Pause returned
+   `target-unavailable` until a new explicit authorization; the replacement binding then accepted Pause and Play once.
+7. Force-stopping Native Host PID 40260 caused Chrome to start successor PID 29896 before the next command. The
+   recovered Host accepted Pause once, with no delayed／duplicate operation or competitor change. Isolated automated
+   tests retain coverage of the unavailable branch.
+8. With the Phase 16B Extension disabled, the stable Media Lock GSMTC path still listed the Chrome Session and two
+   physical Play／Pause presses paused and resumed it exactly once each. No install／authorization prompt, error or
+   crash appeared; the Extension was re-enabled after the check.
+
+This Gate proves the bounded top-level generic scope. A provider-specific cloud-drive player was not separately
+qualified; a standard top-level `HTMLMediaElement` follows the same tested Adapter path, while a private／DRM／nested
+frame implementation remains an explicitly unsupported GSMTC fallback rather than a false direct capability.
