@@ -39,6 +39,8 @@ public partial class App : System.Windows.Application
     private string activeThemePreference = UiThemePreference.System;
     private bool systemThemeSubscribed;
     private bool mediaInputFaultReported;
+    private readonly object sourceMetadataDiagnosticGate = new();
+    private readonly HashSet<Task> sourceMetadataDiagnosticTasks = [];
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -389,24 +391,46 @@ public partial class App : System.Windows.Application
     private void QueueSourceMetadataDiagnostic(DiagnosticEvent diagnosticEvent)
     {
         ArgumentNullException.ThrowIfNull(diagnosticEvent);
-        _ = Task.Run(async () =>
+        Task diagnosticTask;
+        lock (sourceMetadataDiagnosticGate)
         {
-            try
+            if (shutdownStarted)
             {
-                if (diagnosticLog is not null)
+                return;
+            }
+
+            diagnosticTask = Task.Run(async () =>
+            {
+                try
                 {
-                    await diagnosticLog.WriteAsync(
-                        diagnosticEvent,
-                        CancellationToken.None).ConfigureAwait(false);
+                    if (diagnosticLog is not null)
+                    {
+                        await diagnosticLog.WriteAsync(
+                            diagnosticEvent,
+                            CancellationToken.None).ConfigureAwait(false);
+                    }
                 }
-            }
-            catch (Exception exception) when (exception is not OutOfMemoryException)
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
+                    System.Diagnostics.Trace.TraceError(
+                        $"Source metadata diagnostic write failed: {exceptionType}.");
+                }
+            });
+            sourceMetadataDiagnosticTasks.Add(diagnosticTask);
+        }
+
+        _ = diagnosticTask.ContinueWith(
+            completedTask =>
             {
-                var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
-                System.Diagnostics.Trace.TraceError(
-                    $"Source metadata diagnostic write failed: {exceptionType}.");
-            }
-        });
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    sourceMetadataDiagnosticTasks.Remove(completedTask);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
@@ -433,12 +457,15 @@ public partial class App : System.Windows.Application
 
     private async ValueTask ShutdownAsync()
     {
-        if (shutdownStarted)
+        lock (sourceMetadataDiagnosticGate)
         {
-            return;
-        }
+            if (shutdownStarted)
+            {
+                return;
+            }
 
-        shutdownStarted = true;
+            shutdownStarted = true;
+        }
         if (systemThemeSubscribed)
         {
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
@@ -525,6 +552,14 @@ public partial class App : System.Windows.Application
         {
             try
             {
+                Task[] pendingSourceMetadataDiagnostics;
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    pendingSourceMetadataDiagnostics =
+                        sourceMetadataDiagnosticTasks.ToArray();
+                }
+
+                await Task.WhenAll(pendingSourceMetadataDiagnostics);
                 await diagnosticLog.DisposeAsync();
             }
             catch (Exception exception)

@@ -10,6 +10,8 @@ public sealed class WindowsSourceApplicationMetadataResolver
     : ISourceApplicationMetadataResolver
 {
     private readonly Action<DiagnosticEvent>? reportDiagnostic;
+    private readonly object failureGate = new();
+    private readonly HashSet<string> reportedFailureStages = new(StringComparer.Ordinal);
     private readonly Lazy<IReadOnlyDictionary<string, SourceApplicationMetadata>> metadata;
 
     public WindowsSourceApplicationMetadataResolver(
@@ -195,6 +197,14 @@ public sealed class WindowsSourceApplicationMetadataResolver
 
     private void ReportFailure(string stage, Exception exception)
     {
+        lock (failureGate)
+        {
+            if (!reportedFailureStages.Add(stage))
+            {
+                return;
+            }
+        }
+
         var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
         System.Diagnostics.Trace.TraceError(
             $"Source application metadata lookup failed at {stage}: {exceptionType}.");

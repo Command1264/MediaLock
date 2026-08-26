@@ -83,13 +83,19 @@ public sealed class WindowsSourceApplicationMetadataResolverTests
     [Fact]
     public void DiagnosticReporterFailureCannotInterruptRawIdentityFallback()
     {
+        var reports = 0;
         var resolver = new WindowsSourceApplicationMetadataResolver(
             () => throw new InvalidOperationException("Shell catalog unavailable."),
-            _ => throw new IOException("Diagnostic destination unavailable."));
+            _ =>
+            {
+                reports++;
+                throw new IOException("Diagnostic destination unavailable.");
+            });
 
         var exception = Record.Exception(() => resolver.TryResolve("Unknown.Source"));
 
         Assert.Null(exception);
         Assert.Null(resolver.TryResolve("Unknown.Source"));
+        Assert.Equal(1, reports);
     }
 }
