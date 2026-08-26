@@ -103,7 +103,9 @@ change the `MediaLock.exe` payload.
 Chrome and Brave on Windows consume the same Chrome-compatible Native Messaging registration in this tested
 environment. Both `-Browser` values therefore publish and report the same shared manifest／registry path; they do not
 create independent Host identities. The parameter records the browser under test rather than selecting a different
-registry namespace.
+registry namespace. Native Host binaries live below a content-derived build-fingerprint directory. Re-registering an
+unchanged build reuses its complete output; registering a changed build writes a new directory and switches the shared
+manifest without overwriting a Host executable that Chrome／Brave may still be running.
 
 ```powershell
 $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
@@ -114,6 +116,7 @@ $probeRoot = '.\experiments\Phase16A.BrowserDirectProbe'
 
 & "$probeRoot\Register-Phase16AProbe.ps1" -Browser Brave
 # The second registration must report the same NativeHostManifest and RegistryPath.
+# It must also report NativeHostPublishReused while the first Host remains active.
 
 & "$probeRoot\Unregister-Phase16AProbe.ps1" -Browser Brave
 ```

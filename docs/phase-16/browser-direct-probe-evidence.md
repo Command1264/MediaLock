@@ -7,7 +7,8 @@ Date: 2026-08-26
 | Field | Observed value |
 | --- | --- |
 | Branch | `codex/feat/phase-16a-browser-direct-probe` |
-| Probe implementation commit | `ca58e5c` |
+| Initial Probe implementation commit | `ca58e5c` |
+| Final hardening implementation commit | `e9e799b` |
 | Windows | Windows 11 Pro 25H2, build `26200.9168`, 64-bit |
 | Chrome | `151.0.7922.174` |
 | Brave | `151.1.93.138` |
@@ -20,6 +21,15 @@ Date: 2026-08-26
 The evidence intentionally omits page／media URL queries, media title, artist, profile path and complete protocol
 payloads. Acceptance means both the Popup result and an independently observed `HTMLMediaElement` state agreed unless
 the row explicitly says the user supplied the visible result.
+
+Revision ownership is intentionally split rather than assigning every observation to the latest document commit:
+
+- initial fixed-site Chrome／Brave／PWA commands and isolation used `ca58e5c`;
+- shared Chrome-compatible registration migration used `e505dfb`;
+- five-second cold-start negotiation and the no-Extension fallback observation used `920b997`;
+- stale-document races used `fb43393`;
+- `e9e799b` owns the final closed-tab, full-lifecycle timeout, `sender.tab.url` and content-addressed registration
+  hardening. Its affected live rows remain pending below until rerun against this exact implementation revision.
 
 ## Chrome Gate A observations
 
@@ -82,7 +92,7 @@ Invoking Pause from an active ordinary HTTPS page in Brave returned `target-unav
 continued playing and the already-paused PWA remained unchanged. This proves current-active-page fail-closed behavior,
 not persisted closed-target Recovery: Phase 16A has no Page Binding that can name a previously closed tab.
 
-## No-Extension compatibility lane
+## Disabled-Extension compatibility lane
 
 Both unpacked Extensions were disabled while retaining the shared registration. The Probe Host count reached zero,
 then installed stable Media Lock `0.3.0` was started without an Extension prompt or browser-integration dependency.
@@ -93,8 +103,9 @@ With Session Lock targeting Brave YouTube Music PWA and ordinary Brave YouTube i
 - refreshing the PWA entered Recovering, reacquired the same PWA and routed the next physical Play/Pause exactly once;
 - no Unavailable terminal state, error or crash occurred.
 
-This passes the named host's no-Extension GSMTC compatibility lane. It does not imply that direct page identity or
-commands remain available after the Extension is disabled; those capabilities are intentionally absent.
+This passes the disabled-Extension GSMTC fallback observation. It does not prove the separately required clean Chrome
+profile／never-installed Extension lane, nor imply that direct page identity or commands remain available after the
+Extension is disabled; those capabilities are intentionally absent.
 
 ## Remaining-boundary automated evidence
 
@@ -116,16 +127,18 @@ observations remain explicit Gate A rows to execute rather than inferred evidenc
 Chrome and Brave fixed-site Play, Pause, Seek, same-browser exact-page isolation, document reload, Host-loss safety
 and explicit reconnect pass the first manual slices. Both browsers passed full process restart with a first command,
 Brave passed active non-target-page isolation, Chrome passed a separate disallowed-origin check, and the no-Extension
-stable GSMTC lane passed. This is **not** complete Phase 16A Gate A evidence. It does not yet prove:
+stable GSMTC fallback observation passed. This is **not** complete Phase 16A Gate A evidence. It does not yet prove:
 
-- stale iframe, closed-tab or command-timeout behavior at the live browser seam;
+- iframe, closed-tab or command-timeout behavior at the live browser seam on `e9e799b`;
+- Brave ordinary YouTube isolation from simultaneously playing Chrome YouTube Music;
+- a clean Chrome profile in which the Extension was never installed;
 - generic web media or page-level persisted identity planned for Phase 16B.
 
 The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
 binding rejection; a Host／Extension fixed-vector connection ID derived from two nonces, browser family and negotiated
 capabilities plus per-command capability enforcement; a 64-command pending ceiling; a single post-first-byte frame
 completion timeout; finite duration／`seekable`-range Seek checks; and fail-closed closed-tab／full-lifecycle command
-deadline seams. The complete Extension suite contains 24 passing tests and the complete .NET solution contains 417
+deadline seams. The complete Extension suite contains 25 passing tests and the complete .NET solution contains 417
 passing tests. Manual Chrome／Brave stale-document evidence
 passed three rounds per browser: every old command was rejected as `target-unavailable`, no replacement document
 received the old command, every round made at most one media change and each competing ordinary YouTube source was

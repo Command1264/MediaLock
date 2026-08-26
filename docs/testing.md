@@ -541,8 +541,11 @@ On Windows, the Probe's Chrome and Brave registration commands share one Chrome-
 Messaging registry seam. The PowerShell contract test must invoke both public scripts against an isolated registry
 root, require the same manifest／registry identity, migrate only an exact legacy Probe-owned value and preserve a
 foreign value. It must also remove an exact obsolete Brave-specific Probe value without claiming or deleting a
-foreign value at that location. Manual Brave evidence additionally verifies that the launched Host's process
-ancestry reaches `brave.exe`; a matching unused Brave-specific registry value is not acceptance evidence.
+foreign value at that location. Registration output is content-addressed: the contract must keep one Host process
+running while an unchanged registration reuses its output, then switch a simulated new build to a different
+executable path without stopping or overwriting the running Host. Manual Brave evidence additionally verifies that
+the launched Host's process ancestry reaches `brave.exe`; a matching unused Brave-specific registry value is not
+acceptance evidence.
 
 Every future production integration gate also runs two independent compatibility lanes:
 
