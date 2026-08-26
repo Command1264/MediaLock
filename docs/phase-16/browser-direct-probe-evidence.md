@@ -96,6 +96,21 @@ With Session Lock targeting Brave YouTube Music PWA and ordinary Brave YouTube i
 This passes the named host's no-Extension GSMTC compatibility lane. It does not imply that direct page identity or
 commands remain available after the Extension is disabled; those capabilities are intentionally absent.
 
+## Remaining-boundary automated evidence
+
+The final Gate A hardening adds three deterministic seams without treating them as substitutes for live-browser
+observations:
+
+- closed-tab dispatch keeps the browser-owned `documentId` on `tabs.sendMessage`; a missing／closed tab is mapped to
+  `target-unavailable` and cannot fall through to another tab;
+- a claimed request retains its original five-second deadline through browser dispatch. Timeout resolves the Popup
+  once as `outcome-unknown`, disconnects the protocol session and rejects any late Host result instead of retrying;
+- nested frames remain excluded twice: the declarative content script has `all_frames: false`, and sender registration
+  independently rejects every nonzero `frameId`.
+
+These seams pass in the dependency-free Extension suite. Live iframe, closed-tab and deliberately suspended Host
+observations remain explicit Gate A rows to execute rather than inferred evidence.
+
 ## Current conclusion
 
 Chrome and Brave fixed-site Play, Pause, Seek, same-browser exact-page isolation, document reload, Host-loss safety
@@ -109,8 +124,9 @@ stable GSMTC lane passed. This is **not** complete Phase 16A Gate A evidence. It
 The code-review hardening candidate adds automated coverage for browser-owned `documentId` replacement and stale
 binding rejection; a Host／Extension fixed-vector connection ID derived from two nonces, browser family and negotiated
 capabilities plus per-command capability enforcement; a 64-command pending ceiling; a single post-first-byte frame
-completion timeout; and finite duration／`seekable`-range Seek checks. The complete Extension suite contains 21
-passing tests and the complete .NET solution contains 417 passing tests. Manual Chrome／Brave stale-document evidence
+completion timeout; finite duration／`seekable`-range Seek checks; and fail-closed closed-tab／full-lifecycle command
+deadline seams. The complete Extension suite contains 24 passing tests and the complete .NET solution contains 417
+passing tests. Manual Chrome／Brave stale-document evidence
 passed three rounds per browser: every old command was rejected as `target-unavailable`, no replacement document
 received the old command, every round made at most one media change and each competing ordinary YouTube source was
 unchanged.

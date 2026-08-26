@@ -6,6 +6,8 @@ import {
   validateNativeCommand,
 } from './protocol.mjs';
 import { createDocumentRegistry } from './document-binding.mjs';
+import { dispatchBoundCommand } from './browser-dispatch.mjs';
+import { createPendingRequestRegistry } from './pending-request-registry.mjs';
 
 const NATIVE_HOST_NAME = 'com.command1264.medialock.phase16a';
 const ALLOWED_PAGE_ORIGINS = new Set([
@@ -21,7 +23,11 @@ let activeConnection;
 let replayGuard;
 let negotiated = false;
 let outboundSequence = 0;
-const pendingRequests = new Map();
+const pendingRequests = createPendingRequestRegistry(
+  MAXIMUM_PENDING_REQUESTS,
+  COMMAND_TIMEOUT_MILLISECONDS,
+  () => nativePort?.disconnect(),
+);
 const documentRegistry = createDocumentRegistry(chrome.runtime.id);
 const nativeHostReadiness = createNativeHostReadinessGate(
   INITIAL_NEGOTIATION_TIMEOUT_MILLISECONDS,
@@ -68,11 +74,7 @@ function resetConnectionState(errorCode) {
   replayGuard = undefined;
   negotiated = false;
   outboundSequence = 0;
-  for (const pending of pendingRequests.values()) {
-    clearTimeout(pending.timeoutId);
-    pending.resolve({ accepted: false, errorCode });
-  }
-  pendingRequests.clear();
+  pendingRequests.reset({ accepted: false, errorCode });
 }
 
 async function queueProbeRequest(message) {
@@ -117,13 +119,7 @@ async function queueProbeRequest(message) {
   if (pendingRequests.size >= MAXIMUM_PENDING_REQUESTS) {
     return { accepted: false, errorCode: 'outcome-unknown' };
   }
-  const result = new Promise((resolve) => {
-    const timeoutId = setTimeout(() => {
-      pendingRequests.delete(requestId);
-      resolve({ accepted: false, errorCode: 'outcome-unknown' });
-    }, COMMAND_TIMEOUT_MILLISECONDS);
-    pendingRequests.set(requestId, { resolve, timeoutId });
-  });
+  const result = pendingRequests.add(requestId);
 
   outboundSequence += 1;
   nativePort.postMessage({
@@ -184,25 +180,18 @@ async function handleNativeMessage(message) {
       replayGuard,
       activeConnection.capabilities,
     );
-    const pending = pendingRequests.get(request.requestId);
-    if (!pending) {
+    if (!pendingRequests.claim(request.requestId)) {
       throw new Error('Native Host returned a stale or unknown request.');
     }
 
-    if (!documentRegistry.matches(request.target)) {
-      completeRequest(request, pending, false, 'target-unavailable');
+    const result = await dispatchBoundCommand({
+      tabs: chrome.tabs,
+      documentRegistry,
+      request,
+    });
+    const pending = pendingRequests.take(request.requestId);
+    if (!pending) {
       return;
-    }
-
-    let result;
-    try {
-      result = await chrome.tabs.sendMessage(
-        request.target.tabId,
-        request,
-        { documentId: request.target.documentId },
-      );
-    } catch {
-      result = { accepted: false, errorCode: 'target-unavailable' };
     }
     completeRequest(
       request,
@@ -228,8 +217,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 function completeRequest(request, pending, accepted, errorCode) {
-  pendingRequests.delete(request.requestId);
-  clearTimeout(pending.timeoutId);
   outboundSequence += 1;
   nativePort.postMessage({
     protocolVersion: 1,
