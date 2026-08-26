@@ -700,5 +700,9 @@ Exit criteria:
 - User-facing documentation distinguishes "Media Lock controls the selected browser target directly" from
   "Windows shows only Media Lock"; the latter is never promised without separate source-by-source evidence.
 
-Status: planned after Phase 15. See
-[`research/direct-browser-integration-and-gsmtc-limits.md`](research/direct-browser-integration-and-gsmtc-limits.md).
+Status: Phase 16A security-first disposable Probe in progress after Phase 15. The first slice keeps the production
+Router and release payload unchanged while validating a fixed-ID Extension, bounded Native Messaging protocol and
+explicitly authorized YouTube targets. See the
+[`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
+[`Native Messaging security boundary`](research/phase-16-native-messaging-security-boundary.md) and
+[`direct-browser integration limits`](research/direct-browser-integration-and-gsmtc-limits.md).

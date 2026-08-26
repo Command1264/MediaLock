@@ -516,6 +516,18 @@ Record stable `0.2.0` evidence independently in
 Record stable `0.3.0` evidence independently in
 [Phase 14 packaged validation](phase-14/stable-release-smoke.md).
 
+### Phase 16A browser-direct Probe
+
+Phase 16A remains outside production packaging. Run its C# framing／protocol tests and dependency-free Node Extension
+tests explicitly, then syntax-check every executable Extension script. The fixed public manifest key／Extension ID,
+least-privilege permissions and exact Native Host `allowed_origins` are test contracts. A failure is a Prototype
+blocker rather than permission to weaken the origin or site allowlists.
+
+The named Chrome／Brave／Brave YouTube Music PWA matrix must distinguish command acceptance from observed movement and
+record duplicate count, reload／navigation target continuity, Native Host disconnect and competing-source isolation.
+Timeout or an unknown outcome must not retry a mutating command. See the
+[Phase 16A Probe plan](phase-16/browser-direct-probe-plan.md).
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected

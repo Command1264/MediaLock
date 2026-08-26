@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Media Lock Phase 16A Browser Direct Probe",
+  "version": "0.0.1",
+  "description": "Disposable direct-control probe for explicitly authorized YouTube targets.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu5G10+eeZVX2wxZ1Z4wTrCNYcgWIth4uMVsq043rOaXyA7fpgeDwQ09xaadSau7pVJu4RSlxZ4tLyzgZ3YY1umJ47Zu2o3OGjens4MXY/8yVFLxGSVdtDQdWKountrLigp65DKxivHsb5fyJWXpdzvyCwg47tb0DsTQxWjor/e65AaVI/vjQsZQk15Wy5EMUWe41e9jwZO+QGJNqfg3X/7pZ/oUh3Y6iKR1DBTPYZil01wSP/65owZiWUP8QVpo4vbz3jTlrHatUR/tc+QRYBe/sKqFgqhsYMcAnpINhNOv9oyoIfpKDG80KHgm5JqyMAEu4poELs+IfCqgwCi9YzQIDAQAB",
+  "permissions": [
+    "nativeMessaging",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://music.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.mjs",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Media Lock Phase 16A Probe",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "all_frames": false,
+      "run_at": "document_idle"
+    }
+  ]
+}
