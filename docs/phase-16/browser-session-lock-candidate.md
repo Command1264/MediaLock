@@ -48,7 +48,8 @@ one Play or Pause; it never retries an unknown result.
 Browser-specific regression tests additionally require same-tab reauthorization to remove the prior binding before
 publishing its replacement, any tab reload to remove temporary and exact-site targets without automatic rebind,
 stale document observations to be ignored, page-originated Play／Pause to refresh the desktop snapshot, and non-1×
-playback rate to reach WPF timeline interpolation.
+playback rate to reach WPF timeline interpolation. Native port disconnect handling must consume Chromium's
+`runtime.lastError` and must not disconnect the already-closed port again.
 The Application gate also proves that the runtime-only Browser lock never enters the GSMTC runtime-state repository,
 whose Windows adapter rejects an invalid Session Lock document before writing.
 
@@ -85,7 +86,7 @@ isolation. Temporary Browser Session Lock then passed one Pause, Play and in-ran
 Music remained unaffected. Reload removed the temporary target, preserved the unavailable locked identity and
 disabled commands without falling through. Explicit reauthorization correctly required a new lock.
 
-That run and the corrective restarts exposed six candidate blockers before the remaining lanes:
+That run and the corrective restarts exposed seven candidate blockers before the remaining lanes:
 
 - authorizing the same tab repeatedly accumulated old opaque bindings in the desktop catalog;
 - page-originated Pause was not republished, leaving Browser playback state stale;
@@ -95,8 +96,10 @@ That run and the corrective restarts exposed six candidate blockers before the r
 - after safe startup fallback, the already-selected Windows Auto action remained disabled while a stale startup lock
   choice remained durable, and dismissing its warning allowed ordinary state refreshes to display it again; and
 - the Browser target omitted Toggle Play／Pause, leaving the UI toggle disabled and causing the provider-neutral
-  physical Play／Pause key to pass through instead of routing to the exact Page Binding.
+  physical Play／Pause key to pass through instead of routing to the exact Page Binding; and
+- Extension reload／Host disconnect left Chromium's Native Messaging `runtime.lastError` unchecked and attempted to
+  disconnect the already-closed port again, polluting the Extension error surface.
 
-The corrective implementation now has automated regression coverage for all six findings and the stricter
+The corrective implementation now has automated regression coverage for all seven findings and the stricter
 reload-removes-all-bindings policy. Manual validation must restart from a rebuilt Extension／desktop candidate; these
 pre-fix observations do not qualify the corrective commit.

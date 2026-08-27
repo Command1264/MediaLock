@@ -2,6 +2,7 @@ import { createBrowserAuthorizationModule } from './browser-authorization.mjs';
 import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.mjs';
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
+import { handleNativePortDisconnect } from './native-connection-lifecycle.mjs';
 import {
   createInboundCommandGuard,
   validateHelloAck,
@@ -102,7 +103,9 @@ async function ensureNativeConnection() {
     nativePort.onMessage.addListener((message) => {
       handleNativeMessage(message).catch(disconnectNative);
     });
-    nativePort.onDisconnect.addListener(() => disconnectNative());
+    nativePort.onDisconnect.addListener(() => {
+      handleNativePortDisconnect(chrome.runtime, disconnectNative);
+    });
   } catch {
     disconnectNative();
     return false;
@@ -359,11 +362,13 @@ function nextOutboundSequence() {
   return outboundSequence;
 }
 
-function disconnectNative() {
-  try {
-    nativePort?.disconnect();
-  } catch {
-    nativePort = undefined;
+function disconnectNative({ disconnectPort = true } = {}) {
+  if (disconnectPort) {
+    try {
+      nativePort?.disconnect();
+    } catch {
+      nativePort = undefined;
+    }
   }
   nativePort = undefined;
   connectionId = undefined;

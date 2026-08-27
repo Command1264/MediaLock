@@ -28,7 +28,9 @@ Browser presentation snapshots include bounded playback rate and are republished
 `play`／`pause`／`ratechange`／timeline events. High-frequency timeline events are coalesced. The service worker accepts
 an observation only when its browser-owned tab, top-level frame, document and current Page Binding／Endpoint all
 match. Reauthorizing a tab removes the prior binding before publishing its replacement; reload removes that tab's
-bindings and does not automatically rebind them.
+bindings and does not automatically rebind them. Native port disconnect consumes Chromium's scoped
+`runtime.lastError`, resets connection state without disconnecting the already-closed port again and still reports an
+unavailable Host through the Popup authorization result.
 
 The candidate registration script writes only the exact current-user Chrome-compatible Native Messaging value and
 uses a content-addressed Host output. Unregistration removes only a value that still points to its exact owned

@@ -606,6 +606,8 @@ Every production candidate runs two independent compositions:
    its exact Page Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never
    controls a competing page or GSMTC Session. Provider-neutral input coverage proves a supported physical Toggle is
    consumed and dispatched with the exact captured Browser target rather than being passed through to Windows.
+   Extension lifecycle coverage proves Native Messaging disconnect consumes Chromium's scoped last error and never
+   calls `disconnect()` on the already-closed port.
 
 App Lock, Priority Rules and Windows Auto each require a later two-page routing-mode matrix before enablement.
 Settings migration, authorization UI, Native Host ownership, Extension update/removal and packaged upgrade／repair／
