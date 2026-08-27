@@ -6,9 +6,9 @@ suspend/resume reacquisition.
 
 ## Module interfaces
 
-- `IMediaSessionCatalog.WatchAsync` publishes an initial immutable catalog snapshot followed by manager and Session
-  changes. `GsmtcMediaAdapter` is the production Windows adapter and also implements `IMediaController`; the same
-  ephemeral `SessionKey` therefore resolves discovery and control without exposing live WinRT objects.
+- Phase 2 originally used `IMediaSessionCatalog`／`IMediaController`. Phase 16C supersedes those ports with
+  `IMediaTargetCatalog`／`IMediaTargetController`; `GsmtcMediaAdapter` still uses the same ephemeral `SessionKey`
+  internally for discovery and control without exposing live WinRT objects.
 - `IMediaLockApplication` owns catalog consumption, the Core router and Recovery deadline effects. UI callers start
   it once, submit one `ApplicationIntent` at a time and observe immutable `MediaLockApplicationState` notifications.
   It serializes dispatch with result/effect publication and turns a terminal catalog into an empty snapshot plus an

@@ -2148,6 +2148,7 @@ public sealed class MediaLockApplicationTests
         Assert.Equal("Media Session catalog stopped unexpectedly.", failed.ErrorMessage);
         Assert.Equal(MediaSessionCatalogStatus.Unavailable, failed.CatalogStatus);
         Assert.Empty(failed.Router.Sessions);
+        Assert.Empty(failed.Targets);
         Assert.Equal(RouterStatus.Recovering, failed.Router.Status);
         Assert.Equal(
             PlaybackStateLockMode.KeepPlaying,

@@ -251,7 +251,7 @@ public sealed class MainWindowViewModelTests
                 RouteDecisionKind.Routed,
                 RouteReason.WindowsCurrentSession,
                 Target: session.Key,
-                ControlResult: MediaControlResult.Succeeded),
+                ControlOutcome: MediaCommandOutcome.Succeeded),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
 
@@ -286,7 +286,7 @@ public sealed class MainWindowViewModelTests
                 RouteDecisionKind.Routed,
                 RouteReason.WindowsCurrentSession,
                 Target: session.Key,
-                ControlResult: MediaControlResult.Succeeded),
+                ControlOutcome: MediaCommandOutcome.Succeeded),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         viewModel.BeginSeekPreview();
@@ -353,7 +353,7 @@ public sealed class MainWindowViewModelTests
                 RouteDecisionKind.Routed,
                 RouteReason.WindowsCurrentSession,
                 Target: session.Key,
-                ControlResult: MediaControlResult.Succeeded),
+                ControlOutcome: MediaCommandOutcome.Succeeded),
         };
         using var viewModel = new MainWindowViewModel(
             application,
@@ -405,7 +405,7 @@ public sealed class MainWindowViewModelTests
                 RouteDecisionKind.Routed,
                 RouteReason.WindowsCurrentSession,
                 Target: routed.Key,
-                ControlResult: MediaControlResult.Succeeded),
+                ControlOutcome: MediaCommandOutcome.Succeeded),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         viewModel.SelectedSession = Assert.Single(
@@ -481,7 +481,7 @@ public sealed class MainWindowViewModelTests
                 RouteReason.ControlRejected,
                 MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75)),
                 session.Key,
-                MediaControlResult.Rejected),
+                MediaCommandOutcome.Rejected),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         viewModel.BeginSeekPreview();
@@ -554,7 +554,7 @@ public sealed class MainWindowViewModelTests
                 RouteDecisionKind.Routed,
                 RouteReason.WindowsCurrentSession,
                 Target: original.Key,
-                ControlResult: MediaControlResult.Succeeded),
+                ControlOutcome: MediaCommandOutcome.Succeeded),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         viewModel.BeginSeekPreview();

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for Phase 16C production-integration review.
+Accepted for the Phase 16C provider-neutral Core／Application seam on 2026-08-27.
 
 ## Context
 
@@ -13,7 +13,7 @@ second browser-only Router path would duplicate Routing Mode, Recovery, capabili
 
 ## Decision
 
-If Phase 16C is accepted, Core and Application will route through one provider-neutral Media Target seam. The GSMTC
+Core and Application route through one provider-neutral Media Target seam. The GSMTC
 Adapter and Browser Adapter are peer implementations. The seam exposes provider-qualified immutable identity,
 capabilities and observation, target availability changes and a one-shot Media Command result; provider transport
 handles and permission details remain inside their Adapter Modules.
@@ -27,17 +27,24 @@ Provider absence adds no direct targets and leaves Media Lock GSMTC-only. Loss o
 preserves that target and enters Recovery／Unavailable; it does not authorize routing to a competing GSMTC Session or
 page. A mutating command crosses the selected Adapter once and is never retried after an unknown outcome.
 
+Visible-target reconciliation suppresses a GSMTC target only when a present direct target carries authoritative,
+exact correlation to that exact GSMTC identity. Browser executable, title, URL, origin similarity, tab order and track
+metadata never establish that relation. Uncorrelated Brave or other browser GSMTC targets remain visible and
+controllable as fallback.
+
 ## Considered options
 
 - **Synthetic GSMTC Session:** rejected because it conflates Page Binding and Session Fingerprint identity and leaks
   browser lifecycle semantics into existing GSMTC recovery.
 - **Separate browser Router:** rejected because policy and safety behavior would diverge across providers.
-- **Provider-neutral Media Target seam:** proposed because two proven Adapters justify one real seam while keeping
+- **Provider-neutral Media Target seam:** selected because two proven Adapters justify one real seam while keeping
   provider-specific complexity local.
 
 ## Consequences
 
-The existing GSMTC types must be adapted incrementally behind the new seam before Browser production code is added.
-The first accepted slice is Session Lock with Play, Pause and bounded Seek. App Lock, Priority Rules, Windows Auto,
-settings migration, authorization UI and packaging remain separate gates. The complete GSMTC-only composition remains
-supported and independently tested when no Extension is installed.
+The existing GSMTC adapter is exposed through `IMediaTargetCatalog` and `IMediaTargetController`; Core／Application
+state, expected-target capture, route decisions and Playback State Lock use provider-qualified identity while the
+current UI retains an explicit GSMTC Session projection. This accepted seam ships no Browser Adapter, Extension, UI,
+settings migration or package integration. Browser Session Lock with Play, Pause and bounded Seek is the next
+independent slice; other Routing Modes, persistence, authorization UI and packaging remain later gates. The complete
+GSMTC-only composition remains supported and independently tested when no Extension is installed.

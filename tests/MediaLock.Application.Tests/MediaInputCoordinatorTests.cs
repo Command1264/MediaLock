@@ -25,7 +25,7 @@ public sealed class MediaInputCoordinatorTests
         Assert.True(consumed);
         var route = Assert.IsType<ApplicationIntent.Route>(intent);
         Assert.Equal(MediaCommand.TogglePlayPause, route.Command);
-        Assert.Equal(target.Key, route.ExpectedTarget);
+        Assert.Equal(MediaTargetId.FromGsmtc(target.Key), route.ExpectedTarget);
     }
 
     [Fact]
