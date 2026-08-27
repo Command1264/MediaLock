@@ -23,7 +23,7 @@ public abstract record ApplicationIntent
 
     public sealed record Route(
         MediaCommand Command,
-        SessionKey? ExpectedTarget = null) : ApplicationIntent;
+        MediaTargetId? ExpectedTarget = null) : ApplicationIntent;
 
     public sealed record SetPlaybackStateLock(
         PlaybackStateLockMode Mode) : ApplicationIntent;

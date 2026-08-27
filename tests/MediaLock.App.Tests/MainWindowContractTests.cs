@@ -436,7 +436,7 @@ public sealed class MainWindowContractTests
                     RouteDecisionKind.Routed,
                     RouteReason.WindowsCurrentSession,
                     Target: session.Key,
-                    ControlResult: MediaControlResult.Succeeded));
+                    ControlOutcome: MediaCommandOutcome.Succeeded));
             using var viewModel = new MainWindowViewModel(
                 application,
                 synchronizationContext: null);
@@ -496,7 +496,7 @@ public sealed class MainWindowContractTests
                     RouteDecisionKind.Routed,
                     RouteReason.WindowsCurrentSession,
                     Target: session.Key,
-                    ControlResult: MediaControlResult.Succeeded));
+                    ControlOutcome: MediaCommandOutcome.Succeeded));
             using var viewModel = new MainWindowViewModel(
                 application,
                 synchronizationContext: null);
@@ -581,7 +581,7 @@ public sealed class MainWindowContractTests
                     RouteDecisionKind.Routed,
                     RouteReason.WindowsCurrentSession,
                     Target: session.Key,
-                    ControlResult: MediaControlResult.Succeeded));
+                    ControlOutcome: MediaCommandOutcome.Succeeded));
             using var viewModel = new MainWindowViewModel(
                 application,
                 synchronizationContext: null);

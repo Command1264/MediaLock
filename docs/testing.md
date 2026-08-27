@@ -23,7 +23,7 @@ Cover:
 
 Use a fake clock and immutable fixtures. Every state transition should assert both new state and requested effects.
 
-Phase 1 tests the router through `IMediaRouter.DispatchAsync` with an in-memory `IMediaController` adapter. The
+Phase 1 tests the router through `IMediaRouter.DispatchAsync` with an in-memory `IMediaTargetController` Adapter. The
 suite covers Windows Auto, App Lock and Session Lock decisions; unique and ambiguous recovery; all Fallback Policy
 values; stable Recovery epochs and stale deadlines; fingerprint confidence ranking; idempotent immutable catalog
 refreshes; unsupported commands and failed controls; submission ordering, maximum concurrency and queued
@@ -31,8 +31,8 @@ cancellation. Tests do not call reducer helpers or inspect the router's internal
 
 Phase 2 tests application coordination through `IMediaLockApplication`: catalog snapshots enter the real router,
 UI intents lock and route, and Recovery deadline effects apply fallback without ViewModel coordination. ViewModel
-tests use only public binding properties and async commands. Windows adapter tests cross `IMediaSessionCatalog` and
-`IMediaController`, replacing only the external WinRT manager/Session boundary. Regression coverage also verifies
+tests use only public binding properties and async commands. Windows Adapter tests cross `IMediaTargetCatalog` and
+`IMediaTargetController`, replacing only the external WinRT manager/Session boundary. Regression coverage also verifies
 ordered application projection under concurrent dispatch, stale-target removal after terminal catalog failure and
 capacity-one coalescing of burst GSMTC events, including cancellation of a blocked refresh during disposal.
 
@@ -582,6 +582,11 @@ observable target snapshots and command results. They cover provider-qualified i
 capability enforcement, expected-target capture, stale Endpoint rejection, permission revocation, ambiguity,
 provider absence, bound-target loss and unknown outcomes without retry. Browser transport identifiers and permission
 state remain internal to the Browser Adapter Module and are not test inputs to Router policy.
+
+The Core／Application seam slice additionally proves that an authoritative exact correlation suppresses only its
+named GSMTC duplicate, while same-title pages and uncorrelated Brave GSMTC targets remain distinct. Capability and
+expected-target rejection perform zero Adapter calls; every returned outcome performs exactly one call and Outcome
+Unknown is never retried. These are deterministic seam tests, not evidence that a production Browser Adapter exists.
 
 Every production candidate runs two independent compositions:
 

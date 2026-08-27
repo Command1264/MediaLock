@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
 using MediaLock.Core.Playback;
@@ -12,6 +13,8 @@ public sealed record MediaLockApplicationState(
     MediaSessionCatalogStatus CatalogStatus = MediaSessionCatalogStatus.Available,
     string? CatalogStatusMessage = null)
 {
+    public ImmutableArray<MediaTargetSnapshot> Targets { get; init; } = [];
+
     public PlaybackStateLockState PlaybackStateLock { get; init; } =
         PlaybackStateLockState.Off;
 
@@ -40,7 +43,7 @@ public enum PlaybackStateLockStatus
 public sealed record PlaybackStateLockState(
     PlaybackStateLockMode Mode,
     PlaybackStateLockStatus Status,
-    SessionKey? ArmedTarget,
+    MediaTargetId? ArmedTarget,
     string? Message = null)
 {
     public static PlaybackStateLockState Off { get; } = new(

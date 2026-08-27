@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Lifecycle;
@@ -10,7 +11,7 @@ namespace MediaLock.Application;
 public sealed class MediaLockApplication : IMediaLockApplication
 {
     private const int MaximumPlaybackStateCorrectionAttempts = 2;
-    private readonly IMediaSessionCatalog catalog;
+    private readonly IMediaTargetCatalog catalog;
     private readonly IMediaRouter router;
     private readonly ISettingsRepository? settingsRepository;
     private readonly ILoginStartupManager? loginStartupManager;
@@ -34,6 +35,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private RouterIntent? startupRestoreIntent;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private string? catalogStatusMessage;
+    private ImmutableArray<MediaTargetSnapshot> visibleTargets = [];
     private SessionFingerprint? playbackStateLockRecoveryFingerprint;
     private int playbackStateCorrectionAttempts;
     private int workstationLocked;
@@ -44,7 +46,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private PlaybackStatus? lastArmedPlaybackStatus;
 
     public MediaLockApplication(
-        IMediaSessionCatalog catalog,
+        IMediaTargetCatalog catalog,
         IMediaRouter router)
         : this(
             catalog,
@@ -59,7 +61,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     }
 
     public MediaLockApplication(
-        IMediaSessionCatalog catalog,
+        IMediaTargetCatalog catalog,
         IMediaRouter router,
         ISettingsRepository? settingsRepository,
         ILoginStartupManager? loginStartupManager,
@@ -118,6 +120,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 catalogStatusMessage)
             {
                 PlaybackStateLock = State.PlaybackStateLock,
+                Targets = visibleTargets,
             };
             if (loginStartupManager is not null &&
                 await loginStartupManager.IsEnabledAsync(cancellationToken) !=
@@ -624,14 +627,26 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var firstSnapshot = true;
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
+                var nextVisibleTargets = snapshot.Targets;
+                var sessions = nextVisibleTargets
+                    .Where(target => target.GsmtcSession is not null)
+                    .Select(target => target.GsmtcSession!)
+                    .ToImmutableArray();
+                var windowsCurrentSession = snapshot.WindowsCurrentTarget is
+                { Provider: var provider, Value: var value } &&
+                    provider == MediaTargetProviderId.Gsmtc &&
+                    nextVisibleTargets.Any(target => target.Id == snapshot.WindowsCurrentTarget)
+                        ? new SessionKey(value)
+                        : (SessionKey?)null;
                 await DispatchRouterAsync(
                     new RouterIntent.CatalogUpdated(
-                        snapshot.Sessions,
-                        snapshot.WindowsCurrentSession),
+                        sessions,
+                        windowsCurrentSession),
                     cancellationToken,
                     persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
                     nextCatalogStatus: snapshot.Status,
-                    nextCatalogStatusMessage: snapshot.StatusMessage);
+                    nextCatalogStatusMessage: snapshot.StatusMessage,
+                    nextVisibleTargets: nextVisibleTargets);
                 if (firstSnapshot && startupRestoreIntent is { } restoreIntent)
                 {
                     await DispatchRouterAsync(
@@ -678,7 +693,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
         RoutingMode? startupRoutingMode = null,
         bool suppressRuntimeStatePersistence = false,
         bool resumeRuntimeStatePersistence = false,
-        bool clearPlaybackStateLock = false)
+        bool clearPlaybackStateLock = false,
+        ImmutableArray<MediaTargetSnapshot>? nextVisibleTargets = null)
     {
         using var dispatchCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -705,6 +721,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
 
             var result = await router.DispatchAsync(intent, dispatchCancellation.Token);
+            if (nextVisibleTargets is { } targets)
+            {
+                visibleTargets = targets;
+            }
+
             Apply(result);
             if (intent is RouterIntent.CatalogUpdated)
             {
@@ -1152,6 +1173,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             catalogStatusMessage)
         {
             PlaybackStateLock = State.PlaybackStateLock,
+            Targets = visibleTargets,
         };
         StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
         await TryWriteDiagnosticAsync(
@@ -1169,7 +1191,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new RouterIntent.CatalogUpdated([], null),
                 cancellationToken,
                 nextCatalogStatus: MediaSessionCatalogStatus.Unavailable,
-                nextCatalogStatusMessage: message);
+                nextCatalogStatusMessage: message,
+                nextVisibleTargets: []);
             PublishError(message);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1265,6 +1288,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             catalogStatusMessage)
         {
             PlaybackStateLock = playbackStateLock,
+            Targets = visibleTargets,
         };
         StateChanged?.Invoke(
             this,

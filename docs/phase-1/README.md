@@ -16,8 +16,9 @@ ValueTask<RouterResult> DispatchAsync(
 The returned `RouterResult` contains the immutable state after that intent, one explicit `RouteDecision`, and any
 deadline effects that the application layer must execute.
 Callers do not retain live GSMTC objects, rank candidates, apply fallback policy, or coordinate concurrent work.
-The Windows layer implements `IMediaController`, which receives a resolved ephemeral `SessionKey` only after Core
-has checked routing state and command capability.
+The original Phase 1 Windows layer implemented `IMediaController`. Phase 16C supersedes that port with
+`IMediaTargetController`, which receives a provider-qualified `MediaTargetId` only after Core has checked routing state
+and command capability; GSMTC still resolves its opaque value to the same ephemeral `SessionKey` internally.
 
 ## State and identity
 

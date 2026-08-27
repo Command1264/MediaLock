@@ -81,6 +81,7 @@ public enum RouteReason
     SeekOutOfRange,
     ControlRejected,
     ControlFailed,
+    ControlOutcomeUnknown,
     InputTargetChanged,
 }
 
@@ -88,8 +89,8 @@ public sealed record RouteDecision(
     RouteDecisionKind Kind,
     RouteReason Reason,
     MediaCommand? Command = null,
-    SessionKey? Target = null,
-    MediaControlResult? ControlResult = null,
+    MediaTargetId? Target = null,
+    MediaCommandOutcome? ControlOutcome = null,
     string? Error = null)
 {
     public static RouteDecision StateUpdated { get; } = new(
@@ -108,7 +109,7 @@ public sealed record RouterState(
     long Revision,
     SessionKey? PriorityTarget)
 {
-    public SessionKey? ActiveTarget => Status == RouterStatus.Fallback &&
+    public SessionKey? ActiveSession => Status == RouterStatus.Fallback &&
         ActiveFallback == FallbackPolicy.WindowsCurrentSession
             ? WindowsCurrentSession
             : Mode == RoutingMode.PriorityRules
@@ -116,6 +117,10 @@ public sealed record RouterState(
             : Mode is RoutingMode.SessionLock or RoutingMode.AppLock
                 ? LockedTarget?.ResolvedSession
                 : WindowsCurrentSession;
+
+    public MediaTargetId? ActiveTarget => ActiveSession is { } session
+        ? MediaTargetId.FromGsmtc(session)
+        : null;
 
     public static RouterState Initial { get; } = new(
         RoutingMode.WindowsAuto,
@@ -176,7 +181,7 @@ public abstract record RouterIntent
 
     public sealed record Route(
         MediaCommand Command,
-        SessionKey? ExpectedTarget = null) : RouterIntent;
+        MediaTargetId? ExpectedTarget = null) : RouterIntent;
 
     public sealed record LockSession(SessionKey Session) : RouterIntent;
 

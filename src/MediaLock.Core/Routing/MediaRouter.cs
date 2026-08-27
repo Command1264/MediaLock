@@ -7,14 +7,14 @@ namespace MediaLock.Core.Routing;
 
 public sealed class MediaRouter : IMediaRouter
 {
-    private readonly IMediaController controller;
+    private readonly IMediaTargetController controller;
     private RouterOptions options;
     private readonly Channel<PendingIntent> intents;
     private readonly CancellationTokenSource shutdown = new();
     private readonly Task worker;
     private RouterState state = RouterState.Initial;
 
-    public MediaRouter(IMediaController controller, RouterOptions? options = null)
+    public MediaRouter(IMediaTargetController controller, RouterOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
         this.controller = controller;
@@ -635,7 +635,7 @@ public sealed class MediaRouter : IMediaRouter
 
     private async ValueTask<RouterResult> RouteAsync(
         MediaCommand command,
-        SessionKey? expectedTarget,
+        MediaTargetId? expectedTarget,
         CancellationToken cancellationToken)
     {
         if (state.Mode is RoutingMode.SessionLock or RoutingMode.AppLock)
@@ -654,8 +654,11 @@ public sealed class MediaRouter : IMediaRouter
             }
         }
 
-        var targetKey = state.ActiveTarget;
-        if (expectedTarget is not null && targetKey != expectedTarget)
+        var targetKey = state.ActiveSession;
+        var targetId = targetKey is { } activeSession
+            ? MediaTargetId.FromGsmtc(activeSession)
+            : (MediaTargetId?)null;
+        if (expectedTarget is not null && targetId != expectedTarget)
         {
             return Skipped(command, RouteReason.InputTargetChanged, targetKey);
         }
@@ -690,10 +693,10 @@ public sealed class MediaRouter : IMediaRouter
             }
         }
 
-        MediaControlResult controlResult;
+        MediaCommandOutcome controlOutcome;
         try
         {
-            controlResult = await controller.TryExecuteAsync(target.Key, command, cancellationToken);
+            controlOutcome = await controller.TryExecuteAsync(targetId!.Value, command, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -723,23 +726,29 @@ public sealed class MediaRouter : IMediaRouter
             RoutingMode.PriorityRules => RouteReason.PriorityRulesWindowsCurrentSession,
             _ => RouteReason.WindowsCurrentSession,
         };
-        var (kind, reason) = controlResult switch
+        var (kind, reason) = controlOutcome switch
         {
-            MediaControlResult.Succeeded => (RouteDecisionKind.Routed, successfulReason),
-            MediaControlResult.Rejected => (RouteDecisionKind.Skipped, RouteReason.ControlRejected),
-            MediaControlResult.Failed => (RouteDecisionKind.Failed, RouteReason.ControlFailed),
-            _ => throw new ArgumentOutOfRangeException(nameof(controlResult)),
+            MediaCommandOutcome.Succeeded => (RouteDecisionKind.Routed, successfulReason),
+            MediaCommandOutcome.Unsupported => (RouteDecisionKind.Skipped, RouteReason.UnsupportedCommand),
+            MediaCommandOutcome.Rejected => (RouteDecisionKind.Skipped, RouteReason.ControlRejected),
+            MediaCommandOutcome.Failed => (RouteDecisionKind.Failed, RouteReason.ControlFailed),
+            MediaCommandOutcome.OutcomeUnknown => (RouteDecisionKind.Failed, RouteReason.ControlOutcomeUnknown),
+            _ => throw new ArgumentOutOfRangeException(nameof(controlOutcome)),
         };
-
         return new RouterResult(
             state,
-            new RouteDecision(kind, reason, command, target.Key, controlResult));
+            new RouteDecision(
+                kind,
+                reason,
+                command,
+                target.Key,
+                controlOutcome));
     }
 
     private RouterResult Skipped(
         MediaCommand command,
         RouteReason reason,
-        SessionKey? target = null) => new(
+        MediaTargetId? target = null) => new(
             state,
             new RouteDecision(RouteDecisionKind.Skipped, reason, command, target));
 

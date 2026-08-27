@@ -731,9 +731,9 @@ Define and review the provider-neutral production seam, close or explicitly narr
 compatibility rows, and stage Session Lock before any Browser Direct code enters production routing, persistence, UI
 or packaging.
 
-Status: gate definition proposed under
-[GitHub Issue #58](https://github.com/Command1264/MediaLock/issues/58). Production implementation remains blocked
-until the [Phase 16C plan](phase-16/production-integration-plan.md) and
-[ADR 0006](adr/0006-use-provider-neutral-media-targets-in-production-routing.md) are accepted. The first proposed code
-slice preserves the no-Extension GSMTC composition and adds only exact-Page-Binding Session Lock with Play, Pause and
-bounded Seek; other Routing Modes, schema migration and packaging remain later independent gates.
+Status: the gate definition was accepted through PR #59 and the provider-neutral Core／Application seam is tracked by
+[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). That seam preserves the no-Extension GSMTC
+composition, adds provider-qualified identity／catalog／controller outcomes and defines exact duplicate reconciliation;
+it ships no production Browser Adapter, Extension, UI or settings migration. The next code slice adds only
+exact-Page-Binding Session Lock with Play, Pause and bounded Seek; other Routing Modes, schema migration and packaging
+remain later independent gates.

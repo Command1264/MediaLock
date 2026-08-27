@@ -237,5 +237,5 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
     private sealed record PendingInput(
         long Sequence,
         MediaCommand Command,
-        SessionKey ExpectedTarget);
+        MediaTargetId ExpectedTarget);
 }

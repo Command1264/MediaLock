@@ -176,14 +176,31 @@ public sealed class GsmtcMediaAdapterTests
         var snapshot = snapshots.Current;
         var observed = Assert.Single(snapshot.Sessions);
         var result = await adapter.TryExecuteAsync(
-            observed.Key,
+            MediaTargetId.FromGsmtc(observed.Key),
             MediaCommand.Next,
             cancellation.Token);
 
         Assert.Equal("Brave", observed.SourceAppUserModelId);
         Assert.Equal(observed.Key, snapshot.WindowsCurrentSession);
-        Assert.Equal(MediaControlResult.Succeeded, result);
+        Assert.Equal(MediaCommandOutcome.Succeeded, result);
         Assert.Equal([MediaCommand.Next], session.Commands);
+    }
+
+    [Fact]
+    public async Task BrowserTargetIsUnsupportedWithoutCallingAnyGsmtcSession()
+    {
+        var session = new FakeSession("Brave", MediaControlResult.Succeeded);
+        await using var adapter = new GsmtcMediaAdapter(
+            new FakeManagerFactory(new FakeManager(session)),
+            TimeProvider.System);
+
+        var result = await adapter.TryExecuteAsync(
+            MediaTargetId.FromBrowserPageBinding("page-binding"),
+            MediaCommand.Play,
+            CancellationToken.None);
+
+        Assert.Equal(MediaCommandOutcome.Unsupported, result);
+        Assert.Empty(session.Commands);
     }
 
     [Fact]
@@ -221,9 +238,12 @@ public sealed class GsmtcMediaAdapterTests
         var target = Assert.Single(snapshots.Current.Sessions).Key;
         var command = MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(75));
 
-        var result = await adapter.TryExecuteAsync(target, command, cancellation.Token);
+        var result = await adapter.TryExecuteAsync(
+            MediaTargetId.FromGsmtc(target),
+            command,
+            cancellation.Token);
 
-        Assert.Equal(MediaControlResult.Succeeded, result);
+        Assert.Equal(MediaCommandOutcome.Succeeded, result);
         Assert.Equal([command], session.Commands);
     }
 

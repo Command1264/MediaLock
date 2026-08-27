@@ -7,9 +7,9 @@ complete `0.3.0` GSMTC path independent. Phase 16C freezes the production seam, 
 implementation slices. It does not connect the disposable Probe to the production Router, change settings or ship an
 Extension.
 
-Status: gate definition proposed under [GitHub Issue #58](https://github.com/Command1264/MediaLock/issues/58).
-Production code, persistence, packaging and support claims remain blocked until this plan and
-[ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md) are reviewed and accepted.
+Status: gate definition accepted through PR #59. The provider-neutral Core／Application seam is the Issue #60
+candidate; production Browser Adapter code, persistence, packaging and support claims remain separately gated by this
+plan and [ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md).
 
 ## Entry evidence and unresolved claims
 
@@ -58,6 +58,10 @@ Existing persisted GSMTC selectors retain their exact `SourceAppUserModelId` and
 schema adds an explicit provider and selector kind; migration never guesses a Browser Media Target from an existing
 browser AUMID, friendly name, title or URL.
 
+Visible-target reconciliation requires an authoritative exact link from a present direct target to one present GSMTC
+target. Only that GSMTC duplicate is suppressed. Browser executable, title, URL, origin similarity, tab order and
+track metadata are never correlation evidence; uncorrelated Brave GSMTC targets remain visible and controllable.
+
 ## Provider and Recovery states
 
 Provider absence and loss of a bound target are different state transitions:
@@ -99,10 +103,14 @@ browser restart unless continuity is proved. Exact-site permission does not itse
 
 ### 2. Provider-neutral Core／Application seam
 
+Status: implemented as the Issue #60 candidate; merge remains separately gated.
+
 - Start with failing tests for distinct GSMTC and Browser identities, two same-title pages, capability checks,
   expected-target capture and one-shot outcomes.
 - Adapt the existing GSMTC catalog and controller without changing observable routing behavior.
 - Prove the no-Extension composition is behaviorally equivalent before adding a production Browser Adapter.
+- Expose reconciled Media Targets while retaining an explicit GSMTC Sessions projection for the unchanged UI and
+  persistence behavior.
 
 ### 3. Browser Session Lock vertical slice
 

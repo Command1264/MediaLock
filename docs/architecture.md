@@ -64,8 +64,8 @@ outer projects, and Application never depends on WPF or Windows implementations.
 Names may evolve during implementation, but responsibilities remain separate:
 
 ```csharp
-public interface IMediaSessionCatalog;
-public interface IMediaController;
+public interface IMediaTargetCatalog;
+public interface IMediaTargetController;
 public interface IMediaInputSource;
 public interface ISettingsRepository;
 public interface IRuntimeStateRepository;
@@ -73,19 +73,22 @@ public interface IClock;
 public interface ISystemLifecycle;
 ```
 
-`IMediaSessionCatalog` publishes immutable snapshots and change notifications. `IMediaController` attempts a Media
-Command against a resolved handle and reports supported, succeeded or failed. `IMediaInputSource` emits a command
+`IMediaTargetCatalog` publishes immutable provider-qualified observations and change notifications.
+`IMediaTargetController` dispatches a Media Command once to an exact target and distinguishes Succeeded, Unsupported,
+Rejected, Failed and Outcome Unknown. `IMediaInputSource` emits a command
 only after its backend has determined whether the underlying input was consumed.
 
 Phase 1 exposes routing through the deliberately small `IMediaRouter.DispatchAsync(RouterIntent,
 CancellationToken)` interface. A result contains the new immutable `RouterState`, one `RouteDecision`, and explicit
 deadline effects; callers execute those effects but do not decide when to schedule or cancel Recovery. They also do
 not rank candidates, retain live Session objects, execute recovery policy, or coordinate concurrent intents.
-`IMediaController` is the platform adapter seam used by the router after it has resolved exactly one target.
+`IMediaTargetController` is the platform Adapter seam used by the Router after it has resolved exactly one target.
 
-Phase 2 uses `IMediaSessionCatalog.WatchAsync` as the catalog seam. The production `GsmtcMediaAdapter` implements
-both this interface and `IMediaController`, keeping the ephemeral-key-to-live-Session map local to one deep Windows
-module. The application module is the sole owner of that adapter and of `IMediaRouter` disposal.
+Phase 16C replaces the production catalog／control seam with `IMediaTargetCatalog.WatchAsync` and
+`IMediaTargetController`. The production `GsmtcMediaAdapter` implements both, keeping the
+provider-qualified-target-to-live-Session map local to one deep Windows Module. Application exposes reconciled Media
+Targets plus an explicit GSMTC Sessions projection for the unchanged `0.3.0` UI and persistence behavior. The
+application module is the sole owner of that Adapter and of `IMediaRouter` disposal.
 
 ## 4. State model
 
@@ -317,7 +320,7 @@ absolute position against the selected live Session's current timeline before th
 separate facts. No parameterized command crosses into Core, Application, production Windows adapters or WPF.
 
 Phase 8B deepens the existing Media Command value instead of adding a parallel Seek interface. Transport actions and
-absolute Seek share `ApplicationIntent.Route`, `RouterIntent.Route` and `IMediaController.TryExecuteAsync`, so target
+absolute Seek share `ApplicationIntent.Route`, `RouterIntent.Route` and `IMediaTargetController.TryExecuteAsync`, so target
 resolution, Recovery, capability checks, serialization and Route Decision semantics remain local to the Router module.
 Core validates the live timeline and absolute bounds before the Windows adapter translates the position to GSMTC ticks.
 
@@ -403,12 +406,12 @@ it predictably. A production seam is justified only when both a Windows implemen
 by Application tests. Failure to influence Windows' current-session choice is a probe result, not a reason to introduce
 undocumented API calls or move routing policy into the Windows project.
 
-### Proposed production browser target seam
+### Accepted provider-neutral production seam
 
 Phase 16A／16B established a proven disposable Browser Adapter, so the seam is no longer hypothetical. The
 [Phase 16C gate](phase-16/production-integration-plan.md) and
-[ADR 0006](adr/0006-use-provider-neutral-media-targets-in-production-routing.md) propose promoting it beside the
-existing GSMTC Adapter after production review. The Router-facing interface exposes immutable provider-qualified
+[ADR 0006](adr/0006-use-provider-neutral-media-targets-in-production-routing.md) accept the neutral seam before any
+production Browser Adapter is added beside GSMTC. The Router-facing interface exposes immutable provider-qualified
 target identity, capabilities, observations and one-shot command results; it does not expose Extension IDs, Chrome
 tab IDs, frame IDs, document IDs, DOM selectors, site permissions or Native Messaging envelopes. Those facts remain
 inside one deep Browser Adapter Module.
@@ -448,6 +451,11 @@ Routing modes keep their user meaning across providers:
 The generic site implementation uses stable `HTMLMediaElement` primitives after explicit `activeTab` or per-site
 permission. Rich site Adapters may add metadata or commands behind the same Browser Adapter interface. Unsupported,
 DRM-only or ambiguous pages advertise no direct capability and retain the existing GSMTC path.
+
+Target presentation reconciliation is exact and fail-open toward the established GSMTC fallback: a Browser target
+suppresses only the one GSMTC target named by an authoritative correlation while both identities are present. No
+correlation is inferred from Brave／Chrome executable identity, title, URL, origin similarity, tab order or track
+metadata. Therefore installing an Extension does not hide unrelated or uncorrelated Brave GSMTC targets.
 
 ## 10. Composition
 

@@ -133,7 +133,7 @@ public sealed class MediaRouterTests
         Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
         Assert.Equal(current.Key, result.Decision.Target);
         Assert.Equal(RouteReason.WindowsCurrentSession, result.Decision.Reason);
-        Assert.Equal(MediaControlResult.Succeeded, result.Decision.ControlResult);
+        Assert.Equal(MediaCommandOutcome.Succeeded, result.Decision.ControlOutcome);
     }
 
     [Fact]
@@ -149,6 +149,27 @@ public sealed class MediaRouterTests
 
         var result = await router.DispatchAsync(
             new RouterIntent.Route(MediaCommand.TogglePlayPause, captured.Key),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
+        Assert.Equal(RouteReason.InputTargetChanged, result.Decision.Reason);
+        Assert.Empty(controller.Commands);
+    }
+
+    [Fact]
+    public async Task CapturedBrowserTargetDoesNotMatchGsmtcTargetWithTheSameOpaqueValue()
+    {
+        var controller = new RecordingMediaController(MediaControlResult.Succeeded);
+        await using var router = new MediaRouter(controller);
+        var current = Session("shared-value", "browser");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(
+                MediaCommand.TogglePlayPause,
+                MediaTargetId.FromBrowserPageBinding("shared-value")),
             CancellationToken.None);
 
         Assert.Equal(RouteDecisionKind.Skipped, result.Decision.Kind);
@@ -720,7 +741,63 @@ public sealed class MediaRouterTests
 
         Assert.Equal(RouteDecisionKind.Failed, result.Decision.Kind);
         Assert.Equal(RouteReason.ControlFailed, result.Decision.Reason);
-        Assert.Equal(MediaControlResult.Failed, result.Decision.ControlResult);
+        Assert.Equal(MediaCommandOutcome.Failed, result.Decision.ControlOutcome);
+    }
+
+    [Fact]
+    public async Task UnknownControlOutcomeIsObservableAndNeverRetried()
+    {
+        var controller = new RecordingMediaTargetController(MediaCommandOutcome.OutcomeUnknown);
+        await using var router = new MediaRouter(controller);
+        var current = Session("current", "browser");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.Play),
+            CancellationToken.None);
+
+        Assert.Equal(RouteDecisionKind.Failed, result.Decision.Kind);
+        Assert.Equal(RouteReason.ControlOutcomeUnknown, result.Decision.Reason);
+        Assert.Equal(MediaCommandOutcome.OutcomeUnknown, result.Decision.ControlOutcome);
+        Assert.Single(controller.Commands);
+        Assert.Equal(MediaTargetId.FromGsmtc(current.Key), controller.Commands[0].Target);
+    }
+
+    [Theory]
+    [InlineData(
+        MediaCommandOutcome.Unsupported,
+        RouteDecisionKind.Skipped,
+        RouteReason.UnsupportedCommand)]
+    [InlineData(
+        MediaCommandOutcome.Rejected,
+        RouteDecisionKind.Skipped,
+        RouteReason.ControlRejected)]
+    [InlineData(
+        MediaCommandOutcome.Failed,
+        RouteDecisionKind.Failed,
+        RouteReason.ControlFailed)]
+    public async Task AdapterOutcomesAreMappedOnceWithoutRetry(
+        MediaCommandOutcome outcome,
+        RouteDecisionKind expectedKind,
+        RouteReason expectedReason)
+    {
+        var controller = new RecordingMediaTargetController(outcome);
+        await using var router = new MediaRouter(controller);
+        var current = Session("current", "browser");
+        await router.DispatchAsync(
+            new RouterIntent.CatalogUpdated([current], current.Key),
+            CancellationToken.None);
+
+        var result = await router.DispatchAsync(
+            new RouterIntent.Route(MediaCommand.Play),
+            CancellationToken.None);
+
+        Assert.Equal(expectedKind, result.Decision.Kind);
+        Assert.Equal(expectedReason, result.Decision.Reason);
+        Assert.Equal(outcome, result.Decision.ControlOutcome);
+        Assert.Single(controller.Commands);
     }
 
     [Fact]
@@ -1421,6 +1498,20 @@ public sealed class MediaRouterTests
         {
             Commands.Add((target, command));
             return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingMediaTargetController(MediaCommandOutcome outcome) : IMediaTargetController
+    {
+        public List<(MediaTargetId Target, MediaCommand Command)> Commands { get; } = [];
+
+        public ValueTask<MediaCommandOutcome> TryExecuteAsync(
+            MediaTargetId target,
+            MediaCommand command,
+            CancellationToken cancellationToken)
+        {
+            Commands.Add((target, command));
+            return ValueTask.FromResult(outcome);
         }
     }
 

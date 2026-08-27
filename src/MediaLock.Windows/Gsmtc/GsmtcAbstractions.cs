@@ -2,6 +2,13 @@ using MediaLock.Core.Media;
 
 namespace MediaLock.Windows.Gsmtc;
 
+internal enum MediaControlResult
+{
+    Succeeded,
+    Rejected,
+    Failed,
+}
+
 internal interface IGsmtcSessionManagerFactory
 {
     ValueTask<IGsmtcSessionManager> CreateAsync(CancellationToken cancellationToken);
