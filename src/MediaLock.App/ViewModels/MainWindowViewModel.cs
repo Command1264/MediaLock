@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private SessionItemViewModel? selectedSession;
     private BrowserTargetItemViewModel? selectedBrowserTarget;
     private RouterState routerState = RouterState.Initial;
+    private RoutingMode startupRoutingMode = RoutingMode.WindowsAuto;
     private PlaybackStateLockState playbackStateLock = PlaybackStateLockState.Off;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private SeekPreview? seekPreview;
@@ -45,6 +46,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private bool selectionRecoveryPending;
     private bool projectingSelection;
     private string? errorMessage;
+    private string? presentedApplicationError;
+    private string? dismissedApplicationError;
     private bool releasedPlaybackStateLockNoticeVisible;
     private CancellationTokenSource? playbackStateLockNoticeCancellation;
     private bool disposed;
@@ -89,6 +92,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         });
         DismissErrorCommand = new AsyncCommand(_ =>
         {
+            dismissedApplicationError = presentedApplicationError;
+            presentedApplicationError = null;
             errorMessage = null;
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(ErrorMessage));
@@ -111,7 +116,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             _ => routerState.Mode != RoutingMode.PriorityRules);
         windowsAutoCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.UseWindowsAuto()),
-            _ => routerState.Mode != RoutingMode.WindowsAuto);
+            _ => routerState.Mode != RoutingMode.WindowsAuto ||
+                startupRoutingMode != RoutingMode.WindowsAuto);
         playbackStateLockOffCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.SetPlaybackStateLock(
                 PlaybackStateLockMode.Off)),
@@ -556,6 +562,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void SetError(string message)
     {
+        presentedApplicationError = null;
         errorMessage = message;
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));
@@ -602,6 +609,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
 
         routerState = state.Router;
+        startupRoutingMode = state.Settings.DefaultRoutingMode;
         priorityRuleSourceIds = state.Settings.PriorityRules
             .Select(rule => rule.SourceAppUserModelId)
             .ToArray();
@@ -618,10 +626,30 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
         catalogStatus = state.CatalogStatus;
         selectionBookmarkTimeout = state.Settings.Recovery?.Timeout ?? TimeSpan.FromSeconds(15);
-        errorMessage = state.ErrorMessage ??
+        var applicationError = state.ErrorMessage ??
             (state.CatalogStatus == MediaSessionCatalogStatus.Unavailable
                 ? state.CatalogStatusMessage
                 : null);
+        if (applicationError is null)
+        {
+            dismissedApplicationError = null;
+        }
+        else if (dismissedApplicationError is not null &&
+            !string.Equals(
+                dismissedApplicationError,
+                applicationError,
+                StringComparison.Ordinal))
+        {
+            dismissedApplicationError = null;
+        }
+
+        presentedApplicationError = string.Equals(
+            dismissedApplicationError,
+            applicationError,
+            StringComparison.Ordinal)
+                ? null
+                : applicationError;
+        errorMessage = presentedApplicationError;
         RefreshLocalizedProjection();
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));

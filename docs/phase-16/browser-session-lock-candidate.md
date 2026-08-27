@@ -83,14 +83,16 @@ isolation. Temporary Browser Session Lock then passed one Pause, Play and in-ran
 Music remained unaffected. Reload removed the temporary target, preserved the unavailable locked identity and
 disabled commands without falling through. Explicit reauthorization correctly required a new lock.
 
-That run also exposed four candidate blockers before the remaining lanes:
+That run and the first corrective restart exposed five candidate blockers before the remaining lanes:
 
 - authorizing the same tab repeatedly accumulated old opaque bindings in the desktop catalog;
 - page-originated Pause was not republished, leaving Browser playback state stale;
-- non-1× playback omitted its rate, so WPF interpolated at 1×.
+- non-1× playback omitted its rate, so WPF interpolated at 1×;
 - Browser catalog／command updates attempted to persist the runtime-only direct lock through the GSMTC state schema,
-  producing `SessionLock runtime state requires a Locked Target.` and leaving an invalid `state.json`.
+  producing `SessionLock runtime state requires a Locked Target.` and leaving an invalid `state.json`; and
+- after safe startup fallback, the already-selected Windows Auto action remained disabled while a stale startup lock
+  choice remained durable, and dismissing its warning allowed ordinary state refreshes to display it again.
 
-The corrective implementation now has automated regression coverage for all four findings and the stricter
+The corrective implementation now has automated regression coverage for all five findings and the stricter
 reload-removes-all-bindings policy. Manual validation must restart from a rebuilt Extension／desktop candidate; these
 pre-fix observations do not qualify the corrective commit.

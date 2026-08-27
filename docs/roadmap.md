@@ -738,3 +738,24 @@ exact runtime Page Binding, Play／Pause／bounded Seek, explicit authorization�
 bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store distribution, installed
 package ownership and release qualification remain later independent gates. See the
 [candidate runbook](phase-16/browser-session-lock-candidate.md) and [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+## Phase 17 — Localized warnings and stable error codes
+
+Replace user-facing raw warning and error strings with a structured presentation contract. Every semantic warning or
+error receives one stable public code, resolves through the active English or Traditional Chinese UI language and
+uses that same code in the UI, structured logs, privacy-safe diagnostics and support guidance. Raw exception details
+remain bounded technical context rather than the primary user message.
+
+Exit criteria:
+
+- Every known user-facing warning and error has exactly one unique, documented and compatibility-stable code.
+- Main window, Settings and tray surfaces resolve messages from the active UI language without parsing English text.
+- English and Traditional Chinese resource parity, code uniqueness, fallback and immediate language changes have
+  automated coverage.
+- Structured logs and privacy-safe diagnostics carry the same code shown to the user without exposing media metadata,
+  complete target identity, secrets or unrelated full paths.
+- Missing translations and unknown codes fail to a safe, identifiable fallback while routing and recovery behavior
+  remain unchanged.
+
+Status: planned in [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
+telemetry or automatic remote reporting.

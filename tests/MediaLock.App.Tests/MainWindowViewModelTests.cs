@@ -759,6 +759,26 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(mode == RoutingMode.SessionLock, viewModel.IsSessionLockMode);
     }
 
+    [Fact]
+    public async Task WindowsAutoCanPersistAFallbackWhenTheStartupModeDiffers()
+    {
+        var application = new FakeApplication(new MediaLockApplicationState(
+            RouterState.Initial,
+            "Default App Lock target is unavailable.",
+            MediaLockSettings.Default with
+            {
+                DefaultRoutingMode = RoutingMode.AppLock,
+            }));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.True(viewModel.IsWindowsAutoMode);
+        Assert.True(viewModel.WindowsAutoCommand.CanExecute(null));
+
+        await viewModel.WindowsAutoCommand.ExecuteAsync(null);
+
+        Assert.IsType<ApplicationIntent.UseWindowsAuto>(Assert.Single(application.Intents));
+    }
+
     [Theory]
     [InlineData(RoutingMode.AppLock)]
     [InlineData(RoutingMode.SessionLock)]
@@ -1315,6 +1335,37 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.HasError);
         Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task DismissedApplicationErrorDoesNotReturnUntilItClearsAndRecurs()
+    {
+        const string warning = "Default App Lock target is unavailable.";
+        var initial = new MediaLockApplicationState(RouterState.Initial, warning);
+        var application = new FakeApplication(initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        await viewModel.DismissErrorCommand.ExecuteAsync(null);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 1 },
+        });
+
+        Assert.False(viewModel.HasError);
+        Assert.Null(viewModel.ErrorMessage);
+
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 2 },
+            ErrorMessage = null,
+        });
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 3 },
+        });
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal(warning, viewModel.ErrorMessage);
     }
 
     [Fact]

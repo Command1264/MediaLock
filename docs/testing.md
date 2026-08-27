@@ -127,7 +127,10 @@ missing or out-of-range requests. Application coverage proves the exact command 
 Windows adapter coverage proves capability mapping and ticks translation. ViewModel and WPF coverage proves local
 preview, one commit per gesture, asynchronous timeline confirmation, bounded rollback, target-change cancellation,
 disabled states, localization, theme and accessibility without adding a Seek media-key mapping.
-WPF and ViewModel coverage also verifies that the localized error card has an explicit dismiss action.
+WPF and ViewModel coverage also verifies that the localized error card has an explicit dismiss action, that an
+ordinary Application state refresh does not redisplay the same dismissed error, and that the message becomes visible
+again after the underlying condition clears and recurs. A startup-lock fallback also keeps its already-selected mode
+action enabled when the saved startup mode differs, allowing one explicit click to persist the safe fallback.
 Selection-bookmark coverage publishes repeated catalog and Recovery snapshots across all four Routing Modes. It replaces
 the locked Session Key, verifies both lock modes select the Router-resolved successor, and proves explicit selections are
 never overridden. WPF coverage also replaces the ephemeral Key of a still-present, unrelated selected row while another

@@ -157,7 +157,9 @@ Every successful explicit Routing Mode choice on the main window becomes the sta
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
 remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
 Target persistence attempt keeps the prior startup choice and remains observable instead of creating an invalid
-durable lock.
+durable lock. When startup recovery safely falls back to a mode that differs from that prior startup choice, the
+already-selected fallback action remains enabled so the user can explicitly make it durable without selecting an
+unrelated mode first.
 
 At startup, saved Windows Auto ignores any previously saved lock. Saved App Lock restores a valid persisted source
 application and resolves its current candidate with the same deterministic policy used for an interactive App Lock;
@@ -206,7 +208,10 @@ timeline snapshot remains authoritative; rejection, failure, target loss or conf
 position with an actionable error. Seek adds no physical-key binding, setting or persisted state.
 Pressing an empty point on the timeline may continue directly into a captured drag; only release commits the final
 previewed position.
-The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer.
+The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer. An
+explicitly dismissed Application error stays dismissed across ordinary state refreshes while the same underlying
+error remains active. It may appear again after the condition clears and recurs, and a different error remains
+immediately visible.
 
 The desktop settings persist whether Media Lock intercepts global media keys. It defaults to enabled so the installed
 application fulfils its routing promise; disabling it takes effect immediately and passes physical media keys through
