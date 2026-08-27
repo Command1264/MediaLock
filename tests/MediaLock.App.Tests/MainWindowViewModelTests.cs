@@ -90,6 +90,59 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void PlayAndPauseCommandsFollowTheResolvedTargetsPlaybackState()
+    {
+        static MediaTargetSnapshot BrowserTarget(PlaybackStatus playbackStatus) =>
+            MediaTargetSnapshot.FromBrowserPageBinding(
+                "page-binding-transport-state",
+                new MediaTargetPresentation(
+                    "Nuevo Big Buck Bunny",
+                    playbackStatus,
+                    MediaCommandCapabilities.Play |
+                        MediaCommandCapabilities.Pause |
+                        MediaCommandCapabilities.TogglePlayPause,
+                    DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+
+        var target = BrowserTarget(PlaybackStatus.Playing);
+        var initial = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        };
+        var application = new FakeApplication(initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.False(viewModel.PlayCommand.CanExecute(null));
+        Assert.True(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+
+        var paused = BrowserTarget(PlaybackStatus.Paused);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Targets = [paused], Revision = 1 },
+        });
+
+        Assert.True(viewModel.PlayCommand.CanExecute(null));
+        Assert.False(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+
+        var unknown = BrowserTarget(PlaybackStatus.Unknown);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Targets = [unknown], Revision = 2 },
+        });
+
+        Assert.True(viewModel.PlayCommand.CanExecute(null));
+        Assert.True(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task KeepPlayingCanBeEnabledForThePlayingRoutedTarget()
     {
         var session = new MediaSessionSnapshot(

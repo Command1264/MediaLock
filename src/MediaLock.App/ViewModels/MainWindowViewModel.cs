@@ -536,8 +536,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private AsyncCommand MediaCommand(MediaLock.Core.Media.MediaCommand command) => new(
         _ => DispatchAsync(new ApplicationIntent.Route(command)),
-        _ => ResolveTargetSnapshot()?.Presentation.Capabilities.Supports(command) is true &&
-            routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable);
+        _ => CanExecuteMediaCommand(command));
+
+    private bool CanExecuteMediaCommand(MediaLock.Core.Media.MediaCommand command)
+    {
+        var presentation = ResolveTargetSnapshot()?.Presentation;
+        return presentation?.Capabilities.Supports(command) is true &&
+            routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable &&
+            (command.Kind, presentation.PlaybackStatus) is not
+                (MediaCommandKind.Play, PlaybackStatus.Playing) and not
+                (MediaCommandKind.Pause, PlaybackStatus.Paused);
+    }
 
     private async Task<ApplicationResult?> DispatchAsync(ApplicationIntent intent)
     {

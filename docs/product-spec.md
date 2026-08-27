@@ -212,6 +212,9 @@ The main-window error card provides an explicit dismiss action; errors do not di
 explicitly dismissed Application error stays dismissed across ordinary state refreshes while the same underlying
 error remains active. It may appear again after the condition clears and recurs, and a different error remains
 immediately visible.
+Transport controls combine the resolved target's advertised capability with its current presentation state: Play is
+disabled while Playing and Pause is disabled while Paused. Toggle remains available when advertised, while Unknown
+or Changing presentation does not suppress an otherwise supported explicit Play or Pause.
 
 The desktop settings persist whether Media Lock intercepts global media keys. It defaults to enabled so the installed
 application fulfils its routing promise; disabling it takes effect immediately and passes physical media keys through

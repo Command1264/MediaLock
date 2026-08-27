@@ -131,6 +131,8 @@ WPF and ViewModel coverage also verifies that the localized error card has an ex
 ordinary Application state refresh does not redisplay the same dismissed error, and that the message becomes visible
 again after the underlying condition clears and recurs. A startup-lock fallback also keeps its already-selected mode
 action enabled when the saved startup mode differs, allowing one explicit click to persist the safe fallback.
+Resolved-target command coverage keeps Play disabled while Playing, Pause disabled while Paused and Toggle enabled
+when advertised; Unknown presentation falls back to capability-only enablement.
 Selection-bookmark coverage publishes repeated catalog and Recovery snapshots across all four Routing Modes. It replaces
 the locked Session Key, verifies both lock modes select the Router-resolved successor, and proves explicit selections are
 never overridden. WPF coverage also replaces the ephemeral Key of a still-present, unrelated selected row while another
