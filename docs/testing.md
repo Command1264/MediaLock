@@ -600,6 +600,13 @@ App Lock, Priority Rules and Windows Auto each require a later two-page routing-
 Settings migration, authorization UI, Native Host ownership, Extension update/removal and packaged upgrade／repair／
 uninstall evidence are independent gates and cannot be inferred from the Session Lock slice.
 
+The Issue #62 candidate now owns the focused .NET Browser tests, dependency-free Extension tests and isolated
+current-user registration contract in
+[the Browser Session Lock runbook](phase-16/browser-session-lock-candidate.md). The full solution gate remains
+mandatory because the no-Extension composition must preserve every GSMTC test. Manual acceptance then runs the six
+named lanes in that runbook; Probe results do not transfer. Until those rows pass, the candidate must not be described
+as packaged, distributed or production-qualified.
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected

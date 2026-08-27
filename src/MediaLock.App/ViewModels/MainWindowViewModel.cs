@@ -19,6 +19,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly AsyncCommand lockCommand;
+    private readonly AsyncCommand lockBrowserTargetCommand;
+    private readonly AsyncCommand revokeBrowserTargetAuthorizationCommand;
     private readonly AsyncCommand appLockCommand;
     private readonly AsyncCommand priorityRulesCommand;
     private readonly AsyncCommand windowsAutoCommand;
@@ -31,6 +33,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly TimeSpan playbackStateLockNoticeDuration;
     private IReadOnlyList<string> priorityRuleSourceIds = [];
     private SessionItemViewModel? selectedSession;
+    private BrowserTargetItemViewModel? selectedBrowserTarget;
     private RouterState routerState = RouterState.Initial;
     private PlaybackStateLockState playbackStateLock = PlaybackStateLockState.Off;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
@@ -94,6 +97,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         lockCommand = new AsyncCommand(
             LockSelectedAsync,
             _ => SelectedSession is not null);
+        lockBrowserTargetCommand = new AsyncCommand(
+            LockSelectedBrowserTargetAsync,
+            _ => SelectedBrowserTarget is not null);
+        revokeBrowserTargetAuthorizationCommand = new AsyncCommand(
+            RevokeSelectedBrowserTargetAuthorizationAsync,
+            _ => SelectedBrowserTarget is not null);
         appLockCommand = new AsyncCommand(
             LockSelectedApplicationAsync,
             _ => SelectedSession is not null);
@@ -141,6 +150,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
 
+    public ObservableCollection<BrowserTargetItemViewModel> BrowserTargets { get; } = [];
+
     public SettingsViewModel Settings { get; }
 
     public IAsyncCommand SettingsCommand { get; }
@@ -174,6 +185,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public IAsyncCommand LockCommand { get; }
+
+    public BrowserTargetItemViewModel? SelectedBrowserTarget
+    {
+        get => selectedBrowserTarget;
+        set
+        {
+            if (Equals(selectedBrowserTarget, value))
+            {
+                return;
+            }
+
+            selectedBrowserTarget = value;
+            OnPropertyChanged();
+            lockBrowserTargetCommand.RaiseCanExecuteChanged();
+            revokeBrowserTargetAuthorizationCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public IAsyncCommand LockBrowserTargetCommand => lockBrowserTargetCommand;
+
+    public IAsyncCommand RevokeBrowserTargetAuthorizationCommand =>
+        revokeBrowserTargetAuthorizationCommand;
 
     public IAsyncCommand AppLockCommand { get; }
 
@@ -242,6 +275,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public bool HasSessions => Sessions.Count > 0;
 
+    public bool HasBrowserTargets => BrowserTargets.Count > 0;
+
     public string EmptyStateText => catalogStatus switch
     {
         MediaSessionCatalogStatus.Suspended => UiText.Get("Empty_Suspended"),
@@ -257,26 +292,34 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         get
         {
             var target = ResolveTarget();
-            return target is null
+            var directTarget = ResolveTargetSnapshot();
+            return target is null && directTarget is null
                 ? routerState.Mode == RoutingMode.WindowsAuto
                     ? UiText.Get("Target_WindowsUnavailable")
                     : routerState.Mode == RoutingMode.PriorityRules
                         ? UiText.Get("Target_RulesUnavailable")
                         : UiText.Get("Target_LockedUnavailable")
-                : $"{target.SourceApplicationDisplayName} — {target.Title}";
+                : target is not null
+                    ? $"{target.SourceApplicationDisplayName} — {target.Title}"
+                    : $"{directTarget!.Presentation.SourceDisplayName} — " +
+                        $"{directTarget.Presentation.Metadata?.Title ?? UiText.Get("Media_UnknownTitle")}";
         }
     }
 
     public string CurrentTargetSourceDetails =>
         ResolveTarget()?.SourceApplicationDetails ??
+        ResolveTargetSnapshot()?.Id.ToString() ??
         routerState.LockedTarget?.Fingerprint.Descriptor.SourceAppUserModelId ??
         string.Empty;
 
-    public string NowPlayingTitle => ResolveTarget()?.Title ?? string.Empty;
+    public string NowPlayingTitle => ResolveTarget()?.Title ??
+        ResolveTargetSnapshot()?.Presentation.Metadata?.Title ?? string.Empty;
 
-    public string NowPlayingArtist => ResolveTarget()?.Artist ?? string.Empty;
+    public string NowPlayingArtist => ResolveTarget()?.Artist ??
+        ResolveTargetSnapshot()?.Presentation.Metadata?.Artist ?? string.Empty;
 
-    public MediaArtwork? NowPlayingArtwork => ResolveTarget()?.Artwork;
+    public MediaArtwork? NowPlayingArtwork => ResolveTarget()?.Artwork ??
+        ResolveTargetSnapshot()?.Presentation.Artwork;
 
     public bool HasNowPlayingTimeline => ResolveTimeline() is not null;
 
@@ -284,12 +327,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         get
         {
-            var target = ResolveTarget();
-            var timeline = target?.Timeline;
+            var target = ResolveTargetSnapshot();
+            var timeline = target?.Presentation.Timeline;
             return catalogStatus == MediaSessionCatalogStatus.Available &&
                 routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable &&
                 target is not null &&
-                (target.Capabilities & MediaCommandCapabilities.SeekAbsolute) != 0 &&
+                (target.Presentation.Capabilities & MediaCommandCapabilities.SeekAbsolute) != 0 &&
                 timeline is not null &&
                 timeline.Start >= TimeSpan.Zero &&
                 timeline.End > timeline.Start;
@@ -355,15 +398,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        var target = ResolveTarget();
-        var timeline = target?.Timeline;
+        var target = ResolveTargetSnapshot();
+        var timeline = target?.Presentation.Timeline;
         if (target is null || timeline is null)
         {
             return;
         }
 
         seekPreview = new SeekPreview(
-            target.Key,
+            target.Id,
             timeline.Start,
             timeline.End - timeline.Start,
             TimeSpan.FromTicks(Math.Clamp(
@@ -402,7 +445,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             preview.Duration,
             preview.Elapsed,
             routerState.Revision,
-            ResolveTarget()?.Timeline?.LastUpdatedAt,
+            ResolveTargetSnapshot()?.Presentation.Timeline?.LastUpdatedAt,
             timeProvider.GetUtcNow());
         RefreshTimeline();
         var result = await DispatchAsync(new ApplicationIntent.Route(
@@ -469,9 +512,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         await DispatchAsync(new ApplicationIntent.LockApplication(SelectedSession.SourceApplication));
     }
 
+    private async Task LockSelectedBrowserTargetAsync(object? parameter)
+    {
+        if (SelectedBrowserTarget is { } target)
+        {
+            await DispatchAsync(new ApplicationIntent.LockTarget(target.Id));
+        }
+    }
+
+    private async Task RevokeSelectedBrowserTargetAuthorizationAsync(object? parameter)
+    {
+        if (SelectedBrowserTarget is { } target)
+        {
+            await DispatchAsync(new ApplicationIntent.RevokeTargetAuthorization(target.Id));
+        }
+    }
+
     private AsyncCommand MediaCommand(MediaLock.Core.Media.MediaCommand command) => new(
         _ => DispatchAsync(new ApplicationIntent.Route(command)),
-        _ => ResolveTarget()?.Capabilities.Supports(command) is true &&
+        _ => ResolveTargetSnapshot()?.Presentation.Capabilities.Supports(command) is true &&
             routerState.Status is not RouterStatus.Recovering and not RouterStatus.Unavailable);
 
     private async Task<ApplicationResult?> DispatchAsync(ApplicationIntent intent)
@@ -655,6 +714,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                     presentations[session.SourceAppUserModelId]));
             }
 
+            var selectedBrowserTargetId = SelectedBrowserTarget?.Id;
+            BrowserTargets.Clear();
+            foreach (var target in routerState.Targets.Where(
+                target => target.Id.Provider == MediaTargetProviderId.Browser))
+            {
+                BrowserTargets.Add(BrowserTargetItemViewModel.From(target));
+            }
+
+            SelectedBrowserTarget = selectedBrowserTargetId is { } id
+                ? BrowserTargets.FirstOrDefault(target => target.Id == id)
+                : BrowserTargets.FirstOrDefault();
+
             var nextSelection = ResolveSelection();
             SelectedSession = nextSelection;
         }
@@ -666,6 +737,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         ReconcileSeekState();
         OnPropertyChanged(nameof(Sessions));
         OnPropertyChanged(nameof(HasSessions));
+        OnPropertyChanged(nameof(BrowserTargets));
+        OnPropertyChanged(nameof(HasBrowserTargets));
         OnPropertyChanged(nameof(EmptyStateText));
         OnPropertyChanged(nameof(RoutingStatus));
         OnPropertyChanged(nameof(RoutingStatusLine));
@@ -699,24 +772,45 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             : null;
     }
 
+    private MediaTargetSnapshot? ResolveTargetSnapshot()
+    {
+        if (routerState.ActiveTarget is not { } target)
+        {
+            return null;
+        }
+
+        var snapshot = routerState.Targets.FirstOrDefault(candidate => candidate.Id == target);
+        if (snapshot is not null)
+        {
+            return snapshot;
+        }
+
+        return target.Provider == MediaTargetProviderId.Gsmtc
+            ? routerState.Sessions
+                .Where(session => session.Key.Value == target.Value)
+                .Select(MediaTargetSnapshot.FromGsmtc)
+                .FirstOrDefault()
+            : null;
+    }
+
     private (TimeSpan Position, TimeSpan Duration)? ResolveTimeline()
     {
-        var target = ResolveTarget();
+        var target = ResolveTargetSnapshot();
         if (target is not null &&
             seekPreview is { } preview &&
-            preview.Target == target.Key)
+            preview.Target == target.Id)
         {
             return (preview.Elapsed, preview.Duration);
         }
 
         if (target is not null &&
             pendingSeek is { } pending &&
-            pending.Target == target.Key)
+            pending.Target == target.Id)
         {
             return (pending.Elapsed, pending.Duration);
         }
 
-        var timeline = target?.Timeline;
+        var timeline = target?.Presentation.Timeline;
         if (timeline is null || timeline.End <= timeline.Start)
         {
             return null;
@@ -724,7 +818,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
         var duration = timeline.End - timeline.Start;
         var position = timeline.Position - timeline.Start;
-        if (target!.PlaybackState == PlaybackStatus.Playing)
+        if (target!.Presentation.PlaybackStatus == PlaybackStatus.Playing)
         {
             var elapsed = timeProvider.GetUtcNow() - timeline.LastUpdatedAt;
             if (elapsed > TimeSpan.Zero)
@@ -745,7 +839,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void ReconcileSeekState()
     {
-        var target = ResolveTarget();
+        var target = ResolveTargetSnapshot();
         if (target is null ||
             catalogStatus != MediaSessionCatalogStatus.Available ||
             routerState.Status is RouterStatus.Recovering or RouterStatus.Unavailable)
@@ -761,7 +855,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        if (seekPreview is { } preview && preview.Target != target.Key)
+        if (seekPreview is { } preview && preview.Target != target.Id)
         {
             seekPreview = null;
             SetError(UiText.Get("Error_SeekInterrupted"));
@@ -772,14 +866,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        if (pending.Target != target.Key)
+        if (pending.Target != target.Id)
         {
             pendingSeek = null;
             SetError(UiText.Get("Error_SeekInterrupted"));
             return;
         }
 
-        var timeline = target.Timeline;
+        var timeline = target.Presentation.Timeline;
         if (routerState.Revision <= pending.BaselineRevision ||
             timeline is null ||
             (pending.BaselineTimelineUpdatedAt is { } baselineUpdatedAt &&
@@ -877,13 +971,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     }
 
     private sealed record SeekPreview(
-        SessionKey Target,
+        MediaTargetId Target,
         TimeSpan Start,
         TimeSpan Duration,
         TimeSpan Elapsed);
 
     private sealed record PendingSeek(
-        SessionKey Target,
+        MediaTargetId Target,
         TimeSpan AbsolutePosition,
         TimeSpan Duration,
         TimeSpan Elapsed,

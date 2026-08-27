@@ -7,9 +7,11 @@ complete `0.3.0` GSMTC path independent. Phase 16C freezes the production seam, 
 implementation slices. It does not connect the disposable Probe to the production Router, change settings or ship an
 Extension.
 
-Status: gate definition accepted through PR #59. The provider-neutral Core／Application seam is the Issue #60
-candidate; production Browser Adapter code, persistence, packaging and support claims remain separately gated by this
-plan and [ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md).
+Status: gate definition accepted through PR #59 and the provider-neutral Core／Application seam is integrated.
+Issue #62 implements slice 3 as a runtime-only Browser Session Lock candidate. Persistence, remaining Routing Modes,
+store distribution, installed-package ownership and support claims remain separately gated by this plan,
+[ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md) and
+[ADR 0007](../adr/0007-use-a-current-user-native-messaging-bridge.md).
 
 ## Entry evidence and unresolved claims
 
@@ -114,10 +116,16 @@ Status: implemented as the Issue #60 candidate; merge remains separately gated.
 
 ### 3. Browser Session Lock vertical slice
 
+Status: candidate implemented by Issue #62; automated and named manual qualification remain the acceptance gate.
+
 - Add the production Browser Adapter Module behind the accepted seam.
 - Discover only explicitly authorized targets and route Play, Pause and bounded Seek to one exact Endpoint.
 - Preserve target identity through Recovery while failing closed on ambiguity, permission loss and stale Endpoint.
 - Add the minimum authorization and target-detail UI needed to create, inspect and revoke a direct Session Lock.
+
+The candidate uses an unpacked fixed-ID Chromium Extension and a current-user-only Native Messaging／named-pipe bridge.
+It is intentionally runtime-only and does not enter the installed `0.3.0` payload. See the
+[candidate runbook](browser-session-lock-candidate.md).
 
 ### 4. Remaining Routing Modes and persistence
 

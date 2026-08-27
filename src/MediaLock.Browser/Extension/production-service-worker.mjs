@@ -1,0 +1,388 @@
+import { createBrowserAuthorizationModule } from './browser-authorization.mjs';
+import { dispatchBoundCommand } from './browser-dispatch.mjs';
+import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
+import {
+  createInboundCommandGuard,
+  validateHelloAck,
+  validateHostHello,
+} from './production-protocol.mjs';
+
+const NATIVE_HOST_NAME = 'com.command1264.medialock.browser';
+const CAPABILITIES = Object.freeze(['pause', 'play', 'seek']);
+const HANDSHAKE_TIMEOUT_MILLISECONDS = 5000;
+const browserAuthorization = createBrowserAuthorizationModule({
+  tabs: chrome.tabs,
+  scripting: chrome.scripting,
+  permissions: chrome.permissions,
+});
+const genericTargetRegistry = createBrowserMediaTargetRegistry({
+  authorization: browserAuthorization,
+  tabs: chrome.tabs,
+});
+const authorizedTargets = new Map();
+const suspendedTabs = new Set();
+
+let nativePort;
+let handshake;
+let connectionId;
+let negotiatedCapabilities = [];
+let outboundSequence = 0;
+let inboundCommandGuard;
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender?.id !== chrome.runtime.id || message?.type !== 'authorizeGenericTarget') {
+    return false;
+  }
+  authorizeTarget(message.scope).then(sendResponse, () => {
+    sendResponse({ accepted: false, errorCode: 'native-host-unavailable' });
+  });
+  return true;
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!authorizedTargets.has(tabId)) {
+    return;
+  }
+  if (changeInfo.status === 'loading') {
+    if (!suspendedTabs.has(tabId)) {
+      suspendedTabs.add(tabId);
+      genericTargetRegistry.suspendTab(tabId);
+      publishTargetRemoved(authorizedTargets.get(tabId), 'document-replaced');
+    }
+    return;
+  }
+  if (changeInfo.status !== 'complete') {
+    return;
+  }
+  suspendedTabs.delete(tabId);
+  const previous = authorizedTargets.get(tabId);
+  if (previous.target.scope !== 'site') {
+    removeTarget(tabId, 'document-replaced');
+    return;
+  }
+  genericTargetRegistry.rebindTab(tabId).then(
+    (result) => {
+      if (result.accepted === true) {
+        authorizedTargets.set(tabId, result);
+        publishTarget(result).catch(disconnectNative);
+      } else {
+        removeTarget(tabId, result.errorCode ?? 'target-unavailable');
+      }
+    },
+    () => removeTarget(tabId, 'target-unavailable'),
+  );
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => removeTarget(tabId, 'tab-closed'));
+
+chrome.permissions.onRemoved.addListener((removed) => {
+  const removedOrigins = new Set(Array.isArray(removed?.origins) ? removed.origins : []);
+  for (const [tabId, entry] of authorizedTargets) {
+    if (entry.target.scope === 'site'
+        && removedOrigins.has(`${entry.target.pageOrigin}/*`)) {
+      removeTarget(tabId, 'permission-revoked');
+    }
+  }
+});
+
+async function authorizeTarget(scope) {
+  if (scope !== 'temporary' && scope !== 'site') {
+    return { accepted: false, errorCode: 'unauthorized-command' };
+  }
+  const result = await genericTargetRegistry.bindActiveTarget({ scope });
+  if (result.accepted !== true) {
+    return result;
+  }
+  authorizedTargets.set(result.target.tabId, result);
+  if (await ensureNativeConnection() !== true) {
+    return { accepted: false, errorCode: 'native-host-unavailable' };
+  }
+  await publishTarget(result);
+  return { accepted: true };
+}
+
+async function ensureNativeConnection() {
+  if (connectionId) {
+    return true;
+  }
+  if (handshake) {
+    return handshake.promise;
+  }
+
+  let resolveHandshake;
+  const promise = new Promise((resolve) => {
+    resolveHandshake = resolve;
+  });
+  handshake = { promise, resolve: resolveHandshake };
+  try {
+    nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+    nativePort.onMessage.addListener((message) => {
+      handleNativeMessage(message).catch(disconnectNative);
+    });
+    nativePort.onDisconnect.addListener(() => disconnectNative());
+  } catch {
+    disconnectNative();
+    return false;
+  }
+
+  const timeout = setTimeout(() => disconnectNative(), HANDSHAKE_TIMEOUT_MILLISECONDS);
+  const ready = await promise;
+  clearTimeout(timeout);
+  return ready;
+}
+
+async function handleNativeMessage(message) {
+  if (message?.type === 'hostHello') {
+    if (connectionId) {
+      throw new Error('Native Host hello was repeated.');
+    }
+    const hello = validateHostHello(message);
+    const profileId = await getProfileId();
+    const extensionNonce = crypto.randomUUID();
+    const browserFamily = await detectBrowserFamily();
+    const capabilities = hello.capabilities.filter((value) => CAPABILITIES.includes(value));
+    if (capabilities.length === 0) {
+      throw new Error('Native Host and Extension have no shared capabilities.');
+    }
+    handshake.expected = Object.freeze({
+      extensionId: chrome.runtime.id,
+      hostNonce: hello.hostNonce,
+      extensionNonce,
+      browserFamily,
+      profileId,
+      capabilities,
+    });
+    nativePort.postMessage({
+      protocolVersion: 2,
+      type: 'extensionHello',
+      ...handshake.expected,
+    });
+    return;
+  }
+
+  if (message?.type === 'helloAck') {
+    if (!handshake?.expected || connectionId) {
+      throw new Error('Unexpected Native Host acknowledgement.');
+    }
+    const accepted = await validateHelloAck(message, handshake.expected);
+    connectionId = accepted.connectionId;
+    negotiatedCapabilities = accepted.capabilities;
+    inboundCommandGuard = createInboundCommandGuard();
+    handshake.resolve(true);
+    for (const target of authorizedTargets.values()) {
+      await publishTarget(target);
+    }
+    return;
+  }
+
+  if (message?.type === 'command') {
+    if (!connectionId || !inboundCommandGuard) {
+      throw new Error('Native command arrived before negotiation.');
+    }
+    const request = inboundCommandGuard.validate(
+      message,
+      connectionId,
+      negotiatedCapabilities,
+    );
+    const result = await dispatchBoundCommand({
+      tabs: chrome.tabs,
+      documentRegistry: { matches: () => false },
+      genericTargetRegistry,
+      request,
+    });
+    postMessage({
+      protocolVersion: 2,
+      type: 'commandResult',
+      connectionId,
+      sequence: nextOutboundSequence(),
+      requestId: request.requestId,
+      accepted: result?.accepted === true,
+      errorCode: result?.accepted === true
+        ? null
+        : normalizeError(result?.errorCode),
+    });
+    if (result?.accepted === true && result.presentation) {
+      const current = authorizedTargets.get(request.target.tabId);
+      if (current?.target.bindingId === request.target.bindingId
+          && current.target.endpointId === request.target.endpointId) {
+        const updated = Object.freeze({
+          ...current,
+          presentation: result.presentation,
+        });
+        authorizedTargets.set(request.target.tabId, updated);
+        await publishTarget(updated);
+      }
+    }
+    return;
+  }
+
+  if (message?.type === 'revoke') {
+    if (!connectionId || !inboundCommandGuard) {
+      throw new Error('Native revoke arrived before negotiation.');
+    }
+    const request = inboundCommandGuard.validateRevoke(message, connectionId);
+    const matches = [...authorizedTargets.entries()]
+      .filter(([, entry]) => entry.target.bindingId === request.bindingId);
+    let revoked = false;
+    if (matches.length === 1) {
+      const [tabId, entry] = matches[0];
+      if (entry.target.scope === 'site') {
+        await chrome.permissions.remove({ origins: [`${entry.target.pageOrigin}/*`] });
+      }
+      removeTarget(tabId, 'permission-revoked');
+      revoked = true;
+    }
+    postMessage({
+      protocolVersion: 2,
+      type: 'revokeResult',
+      connectionId,
+      sequence: nextOutboundSequence(),
+      requestId: request.requestId,
+      revoked,
+    });
+    return;
+  }
+
+  throw new Error('Native Host message type is unsupported.');
+}
+
+async function publishTarget(entry) {
+  if (!connectionId) {
+    throw new Error('Native Host is unavailable.');
+  }
+  postMessage({
+    protocolVersion: 2,
+    type: 'targetSnapshot',
+    connectionId,
+    sequence: nextOutboundSequence(),
+    target: entry.target,
+    presentation: normalizePresentation(entry.presentation),
+  });
+}
+
+function removeTarget(tabId, reason) {
+  const entry = authorizedTargets.get(tabId);
+  if (!entry) {
+    return;
+  }
+  authorizedTargets.delete(tabId);
+  suspendedTabs.delete(tabId);
+  genericTargetRegistry.clearTab(tabId);
+  publishTargetRemoved(entry, reason);
+}
+
+function publishTargetRemoved(entry, reason) {
+  if (connectionId) {
+    postMessage({
+      protocolVersion: 2,
+      type: 'targetRemoved',
+      connectionId,
+      sequence: nextOutboundSequence(),
+      bindingId: entry.target.bindingId,
+      reason: normalizeError(reason),
+    });
+  }
+}
+
+function normalizePresentation(value) {
+  const sourceDisplayName = typeof value?.sourceDisplayName === 'string'
+    ? value.sourceDisplayName.slice(0, 256)
+    : 'Authorized web media';
+  const playbackStatus = ['playing', 'paused', 'stopped', 'changing']
+    .includes(value?.playbackStatus)
+    ? value.playbackStatus
+    : 'unknown';
+  const capabilities = Array.isArray(value?.capabilities)
+    ? [...new Set(value.capabilities.filter((item) => CAPABILITIES.includes(item)))].sort()
+    : [];
+  if (capabilities.length === 0) {
+    throw new Error('Authorized target has no supported capabilities.');
+  }
+  const timeline = value?.timeline === null
+    ? null
+    : normalizeTimeline(value?.timeline);
+  return Object.freeze({
+    sourceDisplayName,
+    playbackStatus,
+    capabilities,
+    observedAt: new Date(value?.observedAt).toISOString(),
+    timeline,
+  });
+}
+
+function normalizeTimeline(value) {
+  if (!Number.isFinite(value?.startSeconds)
+      || !Number.isFinite(value?.endSeconds)
+      || !Number.isFinite(value?.positionSeconds)
+      || value.startSeconds < 0
+      || value.endSeconds <= value.startSeconds
+      || value.positionSeconds < value.startSeconds
+      || value.positionSeconds > value.endSeconds) {
+    throw new Error('Authorized target timeline is invalid.');
+  }
+  return Object.freeze({
+    startSeconds: value.startSeconds,
+    endSeconds: value.endSeconds,
+    positionSeconds: value.positionSeconds,
+  });
+}
+
+function postMessage(message) {
+  if (!nativePort || !connectionId) {
+    throw new Error('Native Host is unavailable.');
+  }
+  nativePort.postMessage(message);
+}
+
+function nextOutboundSequence() {
+  outboundSequence += 1;
+  return outboundSequence;
+}
+
+function disconnectNative() {
+  try {
+    nativePort?.disconnect();
+  } catch {
+    nativePort = undefined;
+  }
+  nativePort = undefined;
+  connectionId = undefined;
+  negotiatedCapabilities = [];
+  inboundCommandGuard = undefined;
+  outboundSequence = 0;
+  handshake?.resolve(false);
+  handshake = undefined;
+}
+
+async function getProfileId() {
+  const existing = await chrome.storage.local.get('profileId');
+  if (typeof existing.profileId === 'string') {
+    return existing.profileId;
+  }
+  const profileId = crypto.randomUUID();
+  await chrome.storage.local.set({ profileId });
+  return profileId;
+}
+
+async function detectBrowserFamily() {
+  if (typeof navigator.brave?.isBrave === 'function' && await navigator.brave.isBrave()) {
+    return 'brave';
+  }
+  return 'chrome';
+}
+
+function normalizeError(value) {
+  const allowed = new Set([
+    'ambiguous-media-elements',
+    'document-replaced',
+    'media-element-unavailable',
+    'permission-denied',
+    'permission-revoked',
+    'play-rejected',
+    'seek-out-of-range',
+    'tab-closed',
+    'target-unavailable',
+    'unauthorized-command',
+  ]);
+  return allowed.has(value) ? value : 'target-unavailable';
+}

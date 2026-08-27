@@ -12,6 +12,53 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public async Task BrowserPageTargetCanBeSelectedLockedAndAuthorizationRevoked()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-7",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play |
+                    MediaCommandCapabilities.Pause |
+                    MediaCommandCapabilities.SeekAbsolute,
+                DateTimeOffset.Parse("2026-08-27T00:00:00Z"),
+                new MediaMetadata("Big Buck Bunny", "Nuevo", null, null),
+                new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromMinutes(2),
+                    DateTimeOffset.Parse("2026-08-27T00:00:00Z"))));
+        var state = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Targets = [target],
+                Revision = 1,
+            },
+        };
+        var application = new FakeApplication(state);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        var item = Assert.Single(viewModel.BrowserTargets);
+        Assert.Equal("Nuevo Big Buck Bunny", item.SourceDisplayName);
+        Assert.Contains("browser:", item.TargetDetails, StringComparison.Ordinal);
+        viewModel.SelectedBrowserTarget = item;
+
+        Assert.True(viewModel.LockBrowserTargetCommand.CanExecute(null));
+        Assert.True(viewModel.RevokeBrowserTargetAuthorizationCommand.CanExecute(null));
+        await viewModel.LockBrowserTargetCommand.ExecuteAsync(null);
+        await viewModel.RevokeBrowserTargetAuthorizationCommand.ExecuteAsync(null);
+
+        Assert.Collection(
+            application.Intents,
+            intent => Assert.Equal(target.Id, Assert.IsType<ApplicationIntent.LockTarget>(intent).Target),
+            intent => Assert.Equal(
+                target.Id,
+                Assert.IsType<ApplicationIntent.RevokeTargetAuthorization>(intent).Target));
+    }
+
+    [Fact]
     public async Task KeepPlayingCanBeEnabledForThePlayingRoutedTarget()
     {
         var session = new MediaSessionSnapshot(

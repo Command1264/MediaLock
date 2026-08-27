@@ -219,7 +219,81 @@
         </Grid>
 
         <Grid Grid.Row="3">
-            <ListBox AutomationProperties.Name="{loc:Translate Main_AvailableSessions}"
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Margin="0,0,0,10" Padding="12">
+                <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasBrowserTargets}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
+                                   Text="{loc:Translate Main_BrowserPageTargets}" />
+                        <WrapPanel Grid.Column="1">
+                            <Button Margin="8,0,0,0"
+                                    AutomationProperties.Name="{loc:Translate Main_LockBrowserTargetAutomation}"
+                                    Command="{Binding LockBrowserTargetCommand}"
+                                    Content="{loc:Translate Main_LockBrowserTarget}" />
+                            <Button Margin="8,0,0,0"
+                                    AutomationProperties.Name="{loc:Translate Main_RevokeBrowserAuthorizationAutomation}"
+                                    Command="{Binding RevokeBrowserTargetAuthorizationCommand}"
+                                    Content="{loc:Translate Main_RevokeBrowserAuthorization}" />
+                        </WrapPanel>
+                    </Grid>
+                    <ListBox Grid.Row="1" Margin="0,8,0,0" MaxHeight="126"
+                             AutomationProperties.Name="{loc:Translate Main_AvailableBrowserTargets}"
+                             ItemsSource="{Binding BrowserTargets}"
+                             SelectedItem="{Binding SelectedBrowserTarget}"
+                             KeyboardNavigation.DirectionalNavigation="Contained">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="3*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding SourceDisplayName}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                                   Text="{Binding TargetDetails}"
+                                                   ToolTip="{Binding TargetDetails}"
+                                                   AutomationProperties.HelpText="{Binding TargetDetails}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="18,0">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                                   Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center"
+                                               Text="{Binding PlaybackStatus}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+            <ListBox Grid.Row="1" AutomationProperties.Name="{loc:Translate Main_AvailableSessions}"
                      ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}"
                      KeyboardNavigation.DirectionalNavigation="Contained">
                 <ListBox.ItemTemplate>
@@ -250,7 +324,7 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <Border Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}"
+            <Border Grid.Row="1" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1" CornerRadius="12">
                 <Border.Style>
                     <Style TargetType="Border">

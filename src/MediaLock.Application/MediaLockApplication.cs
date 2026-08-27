@@ -18,6 +18,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private readonly IRuntimeStateRepository? runtimeStateRepository;
     private readonly IDiagnosticLog? diagnosticLog;
     private readonly IWorkstationLockState? workstationLockState;
+    private readonly IMediaTargetAuthorizationController? mediaTargetAuthorizationController;
     private readonly TimeProvider timeProvider;
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim dispatchGate = new(1, 1);
@@ -47,7 +48,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     public MediaLockApplication(
         IMediaTargetCatalog catalog,
-        IMediaRouter router)
+        IMediaRouter router,
+        IMediaTargetAuthorizationController? mediaTargetAuthorizationController = null)
         : this(
             catalog,
             router,
@@ -56,7 +58,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
             runtimeStateRepository: null,
             diagnosticLog: null,
             workstationLockState: null,
-            timeProvider: null)
+            timeProvider: null,
+            mediaTargetAuthorizationController: mediaTargetAuthorizationController)
     {
     }
 
@@ -68,7 +71,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
         IRuntimeStateRepository? runtimeStateRepository = null,
         IDiagnosticLog? diagnosticLog = null,
         IWorkstationLockState? workstationLockState = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IMediaTargetAuthorizationController? mediaTargetAuthorizationController = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(router);
@@ -79,6 +83,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         this.runtimeStateRepository = runtimeStateRepository;
         this.diagnosticLog = diagnosticLog;
         this.workstationLockState = workstationLockState;
+        this.mediaTargetAuthorizationController = mediaTargetAuthorizationController;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         if (workstationLockState is not null)
         {
@@ -226,11 +231,20 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 cancellationToken);
         }
 
+        if (intent is ApplicationIntent.RevokeTargetAuthorization revokeTargetAuthorization)
+        {
+            return await RevokeTargetAuthorizationAsync(
+                revokeTargetAuthorization.Target,
+                cancellationToken);
+        }
+
         (RouterIntent routerIntent, RoutingMode? startupRoutingMode, bool persistRuntimeState) =
             intent switch
             {
                 ApplicationIntent.LockSession lockSession =>
                     ((RouterIntent)new RouterIntent.LockSession(lockSession.Session), (RoutingMode?)RoutingMode.SessionLock, true),
+                ApplicationIntent.LockTarget lockTarget =>
+                    ((RouterIntent)new RouterIntent.LockTarget(lockTarget.Target), (RoutingMode?)null, false),
                 ApplicationIntent.LockApplication lockApplication =>
                     ((RouterIntent)new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId), (RoutingMode?)RoutingMode.AppLock, true),
                 ApplicationIntent.UsePriorityRules =>
@@ -306,6 +320,43 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 PlaybackStateLockMode.KeepPlaying,
                 PlaybackStateLockStatus.Ready,
                 activeSession.Key));
+            return new ApplicationResult(State, RouteDecision.StateUpdated);
+        }
+        finally
+        {
+            dispatchGate.Release();
+        }
+    }
+
+    private async ValueTask<ApplicationResult> RevokeTargetAuthorizationAsync(
+        MediaTargetId target,
+        CancellationToken cancellationToken)
+    {
+        if (!target.IsValid || target.Provider == MediaTargetProviderId.Gsmtc)
+        {
+            throw new ArgumentException(
+                "Only a valid direct Media Target authorization can be revoked.",
+                nameof(target));
+        }
+        if (mediaTargetAuthorizationController is null)
+        {
+            throw new InvalidOperationException("Media Target authorization control is unavailable.");
+        }
+
+        using var revokeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            lifetime.Token);
+        await dispatchGate.WaitAsync(revokeCancellation.Token);
+        try
+        {
+            if (!await mediaTargetAuthorizationController.RevokeAsync(
+                    target,
+                    revokeCancellation.Token))
+            {
+                throw new InvalidOperationException(
+                    "The Media Target authorization could not be revoked.");
+            }
+
             return new ApplicationResult(State, RouteDecision.StateUpdated);
         }
         finally
@@ -628,20 +679,25 @@ public sealed class MediaLockApplication : IMediaLockApplication
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
                 var nextVisibleTargets = snapshot.Targets;
-                var sessions = nextVisibleTargets
-                    .Where(target => target.GsmtcSession is not null)
-                    .Select(target => target.GsmtcSession!)
-                    .ToImmutableArray();
-                var windowsCurrentSession = snapshot.WindowsCurrentTarget is
-                { Provider: var provider, Value: var value } &&
-                    provider == MediaTargetProviderId.Gsmtc &&
-                    nextVisibleTargets.Any(target => target.Id == snapshot.WindowsCurrentTarget)
-                        ? new SessionKey(value)
-                        : (SessionKey?)null;
+                var visibleWindowsCurrentTarget = snapshot.WindowsCurrentTarget is { } currentTarget &&
+                    nextVisibleTargets.Any(target => target.Id == currentTarget)
+                        ? currentTarget
+                        : (MediaTargetId?)null;
+                var containsOnlyGsmtcTargets = nextVisibleTargets.All(
+                    target => target.GsmtcSession is not null);
+                RouterIntent catalogIntent = containsOnlyGsmtcTargets
+                    ? new RouterIntent.CatalogUpdated(
+                        nextVisibleTargets
+                            .Select(target => target.GsmtcSession!)
+                            .ToImmutableArray(),
+                        visibleWindowsCurrentTarget is { Value: var currentValue }
+                            ? new SessionKey(currentValue)
+                            : null)
+                    : new RouterIntent.MediaTargetsUpdated(
+                        nextVisibleTargets,
+                        visibleWindowsCurrentTarget);
                 await DispatchRouterAsync(
-                    new RouterIntent.CatalogUpdated(
-                        sessions,
-                        windowsCurrentSession),
+                    catalogIntent,
                     cancellationToken,
                     persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
                     nextCatalogStatus: snapshot.Status,
@@ -727,7 +783,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
 
             Apply(result);
-            if (intent is RouterIntent.CatalogUpdated)
+            if (intent is RouterIntent.CatalogUpdated or RouterIntent.MediaTargetsUpdated)
             {
                 result = await CorrectPlaybackStateAsync(result, dispatchCancellation.Token);
             }

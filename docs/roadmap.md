@@ -732,8 +732,9 @@ compatibility rows, and stage Session Lock before any Browser Direct code enters
 or packaging.
 
 Status: the gate definition was accepted through PR #59 and the provider-neutral Core／Application seam is tracked by
-[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). That seam preserves the no-Extension GSMTC
-composition, adds provider-qualified identity／catalog／controller outcomes and defines exact duplicate reconciliation;
-it ships no production Browser Adapter, Extension, UI or settings migration. The next code slice adds only
-exact-Page-Binding Session Lock with Play, Pause and bounded Seek; other Routing Modes, schema migration and packaging
-remain later independent gates.
+[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). The seam is integrated, and
+[Issue #62](https://github.com/Command1264/MediaLock/issues/62) carries the first Browser Session Lock candidate:
+exact runtime Page Binding, Play／Pause／bounded Seek, explicit authorization／revoke UI, a current-user Native Messaging
+bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store distribution, installed
+package ownership and release qualification remain later independent gates. See the
+[candidate runbook](phase-16/browser-session-lock-candidate.md) and [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).

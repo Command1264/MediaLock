@@ -81,6 +81,52 @@ public sealed class MediaTargetCatalogTests
         Assert.Equal(target.Id, application.State.PlaybackStateLock.ArmedTarget);
     }
 
+    [Fact]
+    public async Task ApplicationLocksAndRoutesAnExactBrowserMediaTarget()
+    {
+        var browser = BrowserTarget("locked-page", "Browser media");
+        var controller = new RecordingTargetController();
+        await using var application = new MediaLockApplication(
+            new SingleSnapshotTargetCatalog(new MediaTargetCatalogSnapshot(
+                [browser],
+                null,
+                [])),
+            new MediaRouter(controller));
+        await application.StartAsync(CancellationToken.None);
+
+        await application.DispatchAsync(
+            new ApplicationIntent.LockTarget(browser.Id),
+            CancellationToken.None);
+        var routed = await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Pause),
+            CancellationToken.None);
+
+        Assert.Equal(browser.Id, routed.State.Router.ActiveTarget);
+        Assert.Equal(browser.Id, routed.Decision.Target);
+        Assert.Equal([(browser.Id, MediaCommand.Pause)], controller.Commands);
+    }
+
+    [Fact]
+    public async Task ApplicationRevokesOnlyTheExactBrowserTargetAuthorization()
+    {
+        var browser = BrowserTarget("revoked-page", "Browser media");
+        var authorization = new RecordingAuthorizationController();
+        await using var application = new MediaLockApplication(
+            new SingleSnapshotTargetCatalog(new MediaTargetCatalogSnapshot(
+                [browser],
+                null,
+                [])),
+            new MediaRouter(new SuccessfulTargetController()),
+            mediaTargetAuthorizationController: authorization);
+        await application.StartAsync(CancellationToken.None);
+
+        await application.DispatchAsync(
+            new ApplicationIntent.RevokeTargetAuthorization(browser.Id),
+            CancellationToken.None);
+
+        Assert.Equal([browser.Id], authorization.RevokedTargets);
+    }
+
     private static MediaSessionSnapshot Session(string key, string source) => new(
         new SessionKey(key),
         source,
@@ -127,5 +173,32 @@ public sealed class MediaTargetCatalogTests
             MediaCommand command,
             CancellationToken cancellationToken) =>
             ValueTask.FromResult(MediaCommandOutcome.Succeeded);
+    }
+
+    private sealed class RecordingTargetController : IMediaTargetController
+    {
+        public List<(MediaTargetId Target, MediaCommand Command)> Commands { get; } = [];
+
+        public ValueTask<MediaCommandOutcome> TryExecuteAsync(
+            MediaTargetId target,
+            MediaCommand command,
+            CancellationToken cancellationToken)
+        {
+            Commands.Add((target, command));
+            return ValueTask.FromResult(MediaCommandOutcome.Succeeded);
+        }
+    }
+
+    private sealed class RecordingAuthorizationController : IMediaTargetAuthorizationController
+    {
+        public List<MediaTargetId> RevokedTargets { get; } = [];
+
+        public ValueTask<bool> RevokeAsync(
+            MediaTargetId target,
+            CancellationToken cancellationToken)
+        {
+            RevokedTargets.Add(target);
+            return ValueTask.FromResult(true);
+        }
     }
 }

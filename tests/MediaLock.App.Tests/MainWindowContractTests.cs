@@ -20,6 +20,32 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowContractTests
 {
     [Fact]
+    public void BrowserTargetsExposeExactIdentityLockAndAuthorizationRevocation()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+        var list = Assert.Single(
+            xaml.Descendants(presentation + "ListBox"),
+            element => (string?)element.Attribute("ItemsSource") == "{Binding BrowserTargets}");
+        Assert.Equal("{Binding SelectedBrowserTarget}", (string?)list.Attribute("SelectedItem"));
+        var details = Assert.Single(
+            list.Descendants(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding TargetDetails}");
+        Assert.Equal("{Binding TargetDetails}",
+            (string?)details.Attribute("AutomationProperties.HelpText"));
+        Assert.Contains(
+            xaml.Descendants(presentation + "Button"),
+            element => (string?)element.Attribute("Command") ==
+                "{Binding LockBrowserTargetCommand}");
+        Assert.Contains(
+            xaml.Descendants(presentation + "Button"),
+            element => (string?)element.Attribute("Command") ==
+                "{Binding RevokeBrowserTargetAuthorizationCommand}");
+    }
+
+    [Fact]
     public void SourceIdentityPresentationKeepsRawDetailsAccessible()
     {
         var xaml = XDocument.Load(Path.Combine(
@@ -376,7 +402,9 @@ public sealed class MainWindowContractTests
             try
             {
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                var listBox = Assert.Single(WpfTestHost.FindVisualChildren<ListBox>(window));
+                var listBox = Assert.Single(
+                    WpfTestHost.FindVisualChildren<ListBox>(window),
+                    candidate => ReferenceEquals(candidate.ItemsSource, viewModel.Sessions));
                 listBox.SelectedItem = Assert.Single(
                     viewModel.Sessions,
                     session => session.Key == brave.Key);

@@ -378,6 +378,11 @@ collapse distinct pages, profiles or Web Apps into one `Chrome`／`Brave` entry.
 but its selected target and UI projection still identify the exact page. Ambiguity produces no route instead of
 choosing the first tab.
 
+The first production candidate deliberately enables only runtime Session Lock for Browser targets. Its authorization
+and target identity are not persisted, and App Lock, Priority Rules and Windows Auto continue to resolve GSMTC only.
+This staged limitation prevents an unpacked Extension or unproven restart identity from silently changing existing
+settings semantics. The remaining modes require their own two-page ambiguity and schema-migration gates.
+
 #### Human-readable source identities
 
 User-facing Session and Priority Rule surfaces resolve an exact `SourceAppUserModelId` through authoritative Windows

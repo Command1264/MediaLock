@@ -29,6 +29,12 @@
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
   <data name="Main_DismissError" xml:space="preserve"><value>Dismiss error</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>Media Sessions</value></data>
+  <data name="Main_BrowserPageTargets" xml:space="preserve"><value>Authorized browser pages</value></data>
+  <data name="Main_AvailableBrowserTargets" xml:space="preserve"><value>Authorized browser media page targets</value></data>
+  <data name="Main_LockBrowserTarget" xml:space="preserve"><value>Lock page</value></data>
+  <data name="Main_LockBrowserTargetAutomation" xml:space="preserve"><value>Lock the selected authorized browser page</value></data>
+  <data name="Main_RevokeBrowserAuthorization" xml:space="preserve"><value>Revoke access</value></data>
+  <data name="Main_RevokeBrowserAuthorizationAutomation" xml:space="preserve"><value>Revoke authorization for the selected browser page</value></data>
   <data name="Main_Subtitle" xml:space="preserve"><value>Keep media keys with the player you choose.</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>Lock session</value></data>
   <data name="Main_LockSessionAutomation" xml:space="preserve"><value>Lock selected Media Session</value></data>

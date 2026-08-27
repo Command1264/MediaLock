@@ -457,6 +457,16 @@ suppresses only the one GSMTC target named by an authoritative correlation while
 correlation is inferred from Brave／Chrome executable identity, title, URL, origin similarity, tab order or track
 metadata. Therefore installing an Extension does not hide unrelated or uncorrelated Brave GSMTC targets.
 
+The first production candidate composes the existing GSMTC Adapter as the primary provider with an optional Browser
+Adapter. The Browser Module owns protocol v2, authorization, profile／Page Binding／Endpoint state and one-shot command
+correlation. A minimal Native Host validates the fixed Extension launch origin and relays bounded frames over the
+fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
+[ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+This composition enables only exact Browser Session Lock at runtime. It emits no inferred GSMTC correlation, so Brave
+GSMTC targets remain visible unless a future provider supplies an authoritative exact link. Browser target loss keeps
+the provider-qualified lock in Recovery／Unavailable; it never asks the GSMTC primary provider for a similar target.
+
 ## 10. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

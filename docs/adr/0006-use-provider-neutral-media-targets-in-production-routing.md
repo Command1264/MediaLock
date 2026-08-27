@@ -43,8 +43,9 @@ controllable as fallback.
 ## Consequences
 
 The existing GSMTC adapter is exposed through `IMediaTargetCatalog` and `IMediaTargetController`; Core／Application
-state, expected-target capture, route decisions and Playback State Lock use provider-qualified identity while the
-current UI retains an explicit GSMTC Session projection. This accepted seam ships no Browser Adapter, Extension, UI,
-settings migration or package integration. Browser Session Lock with Play, Pause and bounded Seek is the next
-independent slice; other Routing Modes, persistence, authorization UI and packaging remain later gates. The complete
-GSMTC-only composition remains supported and independently tested when no Extension is installed.
+state, expected-target capture and route decisions use provider-qualified identity while the current UI retains an
+explicit GSMTC Session projection. Issue #62 builds the next independent slice on this seam: runtime-only Browser
+Session Lock with Play, Pause, bounded Seek and explicit authorization revocation. Its transport decision is recorded
+in [ADR 0007](0007-use-a-current-user-native-messaging-bridge.md). Other Routing Modes, persistence, installed-package
+integration and distribution remain later gates. The complete GSMTC-only composition remains independently supported
+when no Extension is installed.

@@ -8,6 +8,13 @@ public interface IMediaTargetController
         CancellationToken cancellationToken);
 }
 
+public interface IMediaTargetAuthorizationController
+{
+    ValueTask<bool> RevokeAsync(
+        MediaTargetId target,
+        CancellationToken cancellationToken);
+}
+
 public enum MediaCommandOutcome
 {
     Succeeded,
