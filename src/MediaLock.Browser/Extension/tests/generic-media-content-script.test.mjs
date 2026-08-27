@@ -76,3 +76,90 @@ test('the content message boundary awaits one Play result before responding', as
   assert.equal(responses[0].errorCode, null);
   assert.equal(playCount, 1);
 });
+
+test('an external Pause publishes one exact-target presentation update', async () => {
+  const runtimeListeners = [];
+  const mediaListeners = new Map();
+  const sentMessages = [];
+  class FakeMediaElement {}
+  const media = new FakeMediaElement();
+  Object.assign(media, {
+    isConnected: true,
+    paused: false,
+    playbackRate: 1.5,
+    duration: 180,
+    currentTime: 45,
+    seekable: { length: 1, start: () => 0, end: () => 180 },
+    pause() {},
+    async play() {},
+    addEventListener(name, listener) {
+      mediaListeners.set(name, listener);
+    },
+    removeEventListener(name) {
+      mediaListeners.delete(name);
+    },
+  });
+  const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
+  const context = vm.createContext({
+    HTMLMediaElement: FakeMediaElement,
+    document: {
+      title: 'External Pause Video',
+      querySelectorAll: () => [media],
+    },
+    window: { location: { origin: 'https://media.example.test' } },
+    crypto: { randomUUID: () => 'endpoint-external-pause' },
+    console,
+    setTimeout,
+    clearTimeout,
+    queueMicrotask,
+    chrome: {
+      runtime: {
+        id: extensionId,
+        onMessage: {
+          addListener(listener) {
+            runtimeListeners.push(listener);
+          },
+        },
+        async sendMessage(message) {
+          sentMessages.push(message);
+        },
+      },
+    },
+  });
+  context.globalThis = context;
+  for (const source of sourceFiles) {
+    vm.runInContext(source, context);
+  }
+  const sender = {
+    id: extensionId,
+    url: `chrome-extension://${extensionId}/service-worker.mjs`,
+  };
+  const binding = {
+    bindingId: 'binding-external-pause',
+    scope: 'temporary',
+    tabId: 42,
+    frameId: 0,
+    documentId: 'document-external-pause',
+    pageOrigin: 'https://media.example.test',
+  };
+  let endpoint;
+  runtimeListeners[0]({ type: 'bindGenericEndpoint', binding }, sender, (response) => {
+    endpoint = response;
+  });
+
+  media.paused = true;
+  media.currentTime = 46;
+  mediaListeners.get('pause')();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(endpoint.accepted, true);
+  assert.equal(sentMessages.length, 1);
+  assert.equal(sentMessages[0].type, 'genericPresentationChanged');
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(sentMessages[0].target)),
+    { ...binding, endpointId: endpoint.endpointId },
+  );
+  assert.equal(sentMessages[0].presentation.playbackStatus, 'paused');
+  assert.equal(sentMessages[0].presentation.playbackRate, 1.5);
+  assert.equal(sentMessages[0].presentation.timeline.positionSeconds, 46);
+});

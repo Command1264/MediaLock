@@ -568,6 +568,10 @@ only to the bound page. App Lock must use its explicit Browser Application Scope
 Windows Auto may change targets by policy, but its visible selection must still identify the exact page. Reload,
 same-origin navigation, cross-origin navigation, tab duplication, tab replacement and browser restart must never
 silently rebind a saved lock or rule to the other page.
+For the first production Browser Session Lock candidate, any tab `loading` event removes every temporary or exact-site
+binding for that tab and never automatically rebinds it. Deterministic Extension tests also require same-tab repeated
+authorization to publish the old binding's removal before its replacement, reject stale-document observations,
+republish page-originated playback changes and carry bounded playback rate into desktop timeline interpolation.
 See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
 
 ### Phase 16C production integration

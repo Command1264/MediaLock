@@ -29,9 +29,15 @@ The Browser Adapter Module owns three interfaces:
 The first generic command set is Play, Pause and Seek. Dispatch names one Page Binding, current document generation,
 frame and Endpoint, executes at most once and fails closed when any identity or permission fact is stale.
 
-Reload and same-origin navigation invalidate the live Endpoint. A successor may be resolved only under the same Page
-Binding and authorized scope. Cross-origin navigation suspends the binding until the destination is separately
-authorized and the user explicitly chooses whether to move it. Tab duplication always receives a new Page Binding.
+Reload or navigation invalidates every Page Binding owned by that tab as soon as the browser reports `loading`.
+The Extension publishes removal for each target and never automatically creates an Endpoint successor. An exact-site
+permission may remain granted, but permission alone does not recreate routing identity; the user must explicitly
+authorize the loaded document again, which issues a new Page Binding. Other tabs are unaffected. Tab duplication
+always receives a new Page Binding.
+
+Explicitly authorizing the same tab again replaces its current binding atomically from the desktop's perspective:
+the old binding is removed before the new binding is published. This prevents stale opaque identities from remaining
+as ghost targets even though the Extension keeps only one current entry for the tab.
 
 The Extension uses required `activeTab` and `scripting` permissions for user-invoked temporary access and optional
 HTTPS host permissions for exact-site persistence. It never requires `<all_urls>`. Existing fixed-site Probe access
@@ -45,6 +51,7 @@ Browser Adapter Module.
 
 - Two pages with identical titles remain distinct targets.
 - Permission loss is an observable target-preserving failure, not permission to route to a competitor.
+- Reload／navigation intentionally sacrifices automatic Page Binding continuity for fail-closed target cleanup.
 - Unsupported, DRM-only, Canvas-rendered, inaccessible-frame and ambiguous pages advertise no false direct
   capability and remain GSMTC-capable when the browser publishes a Session.
 - Browser restart Recovery remains unavailable unless the Extension can prove Page Binding continuity.

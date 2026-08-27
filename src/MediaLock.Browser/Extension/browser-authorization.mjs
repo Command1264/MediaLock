@@ -82,54 +82,6 @@ export function createBrowserAuthorizationModule({
       return { accepted: true, binding };
     },
 
-    async rebindTab(tabId) {
-      const current = bindings.get(tabId);
-      if (current?.scope !== 'site') {
-        return { accepted: false, errorCode: 'target-unavailable' };
-      }
-
-      let tab;
-      let pageUrl;
-      try {
-        tab = await tabs.get(tabId);
-        pageUrl = new URL(tab.url);
-      } catch {
-        return { accepted: false, errorCode: 'target-unavailable' };
-      }
-      if (pageUrl.protocol !== 'https:' || pageUrl.origin !== current.pageOrigin) {
-        return { accepted: false, errorCode: 'target-unavailable' };
-      }
-      const originPattern = `${current.pageOrigin}/*`;
-      if (await permissions?.contains({ origins: [originPattern] }) !== true) {
-        bindings.delete(tabId);
-        return { accepted: false, errorCode: 'permission-denied' };
-      }
-
-      let injectionResults;
-      try {
-        injectionResults = await scripting.executeScript({
-          target: { tabId, frameIds: [0] },
-          files: [...GENERIC_CONTENT_SCRIPT_FILES],
-        });
-      } catch {
-        return { accepted: false, errorCode: 'target-unavailable' };
-      }
-      if (!Array.isArray(injectionResults)
-          || injectionResults.length !== 1
-          || injectionResults[0].frameId !== 0
-          || typeof injectionResults[0].documentId !== 'string'
-          || !OPAQUE_DOCUMENT_ID_PATTERN.test(injectionResults[0].documentId)) {
-        return { accepted: false, errorCode: 'document-identity-unavailable' };
-      }
-
-      const binding = Object.freeze({
-        ...current,
-        documentId: injectionResults[0].documentId,
-      });
-      bindings.set(tabId, binding);
-      return { accepted: true, binding };
-    },
-
     clearTab(tabId) {
       bindings.delete(tabId);
     },

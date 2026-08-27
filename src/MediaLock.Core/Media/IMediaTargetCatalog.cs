@@ -18,7 +18,8 @@ public sealed record MediaTargetPresentation(
     MediaMetadata? Metadata = null,
     MediaTimeline? Timeline = null,
     MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
-    MediaArtwork? Artwork = null);
+    MediaArtwork? Artwork = null,
+    double PlaybackRate = 1d);
 
 public sealed record MediaTargetSnapshot
 {

@@ -31,8 +31,13 @@ $fingerprintFiles = @(
             $_.FullName -notmatch '[\\/](bin|obj)[\\/]'
         }
 )
+$repositoryPrefix = $repositoryRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+    [System.IO.Path]::DirectorySeparatorChar
 $fingerprintLines = foreach ($file in $fingerprintFiles | Sort-Object FullName) {
-    $relativePath = [System.IO.Path]::GetRelativePath($repositoryRoot, $file.FullName)
+    if (!$file.FullName.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The fingerprint file is outside the repository: $($file.FullName)"
+    }
+    $relativePath = $file.FullName.Substring($repositoryPrefix.Length)
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
     "$relativePath`:$hash"
 }
@@ -40,8 +45,8 @@ $fingerprintBytes = [System.Text.Encoding]::UTF8.GetBytes(
     [string]::Join("`n", $fingerprintLines))
 $sha256 = [System.Security.Cryptography.SHA256]::Create()
 try {
-    $fingerprint = [Convert]::ToHexString(
-        $sha256.ComputeHash($fingerprintBytes)).ToLowerInvariant()
+    $fingerprint = [BitConverter]::ToString(
+        $sha256.ComputeHash($fingerprintBytes)).Replace('-', '').ToLowerInvariant()
 }
 finally {
     $sha256.Dispose()

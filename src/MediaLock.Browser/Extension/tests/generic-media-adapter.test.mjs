@@ -138,6 +138,48 @@ test('one compatible media element receives one bounded Seek command', () => {
   assert.equal(seekCount, 1);
 });
 
+test('presentation includes playback rate and publishes external media changes', async () => {
+  const listeners = new Map();
+  const observations = [];
+  const media = {
+    paused: false,
+    playbackRate: 1.75,
+    duration: 240,
+    currentTime: 60,
+    seekable: { length: 1, start: () => 0, end: () => 240 },
+    isConnected: true,
+    pause() {},
+    async play() {},
+    addEventListener(name, listener) {
+      listeners.set(name, listener);
+    },
+    removeEventListener(name) {
+      listeners.delete(name);
+    },
+  };
+  const adapter = createGenericMediaAdapter({
+    getCandidates: () => [media],
+    isMediaElement: (candidate) => candidate === media,
+    createEndpointId: () => 'endpoint-observation',
+    isSeekAllowed,
+  });
+
+  const binding = adapter.bindSingleEndpoint(
+    (presentation) => observations.push(presentation),
+  );
+  assert.equal(binding.presentation.playbackRate, 1.75);
+
+  media.paused = true;
+  media.currentTime = 75;
+  listeners.get('pause')();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(observations.length, 1);
+  assert.equal(observations[0].playbackStatus, 'paused');
+  assert.equal(observations[0].timeline.positionSeconds, 75);
+  assert.equal(observations[0].playbackRate, 1.75);
+});
+
 test('an out-of-range Seek is rejected without moving the media element', () => {
   let currentTime = 10;
   let seekCount = 0;

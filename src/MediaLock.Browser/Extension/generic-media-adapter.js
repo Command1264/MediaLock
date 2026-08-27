@@ -7,6 +7,7 @@
     getSourceDisplayName = () => 'Authorized web media',
   }) {
     let boundEndpoint;
+    let detachObservation = () => {};
 
     const createPresentation = () => {
       const timeline = Number.isFinite(boundEndpoint.media.duration)
@@ -25,6 +26,7 @@
         sourceDisplayName: String(getSourceDisplayName()).slice(0, 256)
           || 'Authorized web media',
         playbackStatus: boundEndpoint.media.paused ? 'paused' : 'playing',
+        playbackRate: normalizePlaybackRate(boundEndpoint.media.playbackRate),
         capabilities: boundEndpoint.capabilities,
         observedAt: new Date().toISOString(),
         timeline,
@@ -32,7 +34,7 @@
     };
 
     return Object.freeze({
-      bindSingleEndpoint() {
+      bindSingleEndpoint(onPresentationChanged) {
         const candidates = [...getCandidates()].filter(isMediaElement);
         if (candidates.length > 1) {
           return {
@@ -54,11 +56,17 @@
             && candidates[0].seekable.length > 0) {
           capabilities.push('seek');
         }
+        detachObservation();
         boundEndpoint = Object.freeze({
           endpointId: createEndpointId(),
           media: candidates[0],
           capabilities: Object.freeze(capabilities),
         });
+        detachObservation = observeMedia(
+          boundEndpoint,
+          createPresentation,
+          onPresentationChanged,
+        );
         return Object.freeze({
           accepted: true,
           endpointId: boundEndpoint.endpointId,
@@ -112,6 +120,67 @@
           );
       },
     });
+  }
+
+  function normalizePlaybackRate(value) {
+    return Number.isFinite(value) && value >= 0 && value <= 16 ? value : 1;
+  }
+
+  function observeMedia(endpoint, createPresentation, onPresentationChanged) {
+    if (typeof onPresentationChanged !== 'function'
+        || typeof endpoint.media.addEventListener !== 'function'
+        || typeof endpoint.media.removeEventListener !== 'function') {
+      return () => {};
+    }
+    let immediatePending = false;
+    let timelineTimer;
+    const publish = () => {
+      if (endpoint.media.isConnected !== true) {
+        return;
+      }
+      onPresentationChanged(createPresentation());
+    };
+    const publishImmediate = () => {
+      if (immediatePending) {
+        return;
+      }
+      immediatePending = true;
+      queueMicrotask(() => {
+        immediatePending = false;
+        publish();
+      });
+    };
+    const publishTimeline = () => {
+      if (timelineTimer !== undefined) {
+        return;
+      }
+      timelineTimer = setTimeout(() => {
+        timelineTimer = undefined;
+        publish();
+      }, 1000);
+    };
+    const immediateEvents = [
+      'play',
+      'pause',
+      'ratechange',
+      'durationchange',
+      'loadedmetadata',
+      'emptied',
+      'ended',
+    ];
+    for (const eventName of immediateEvents) {
+      endpoint.media.addEventListener(eventName, publishImmediate);
+    }
+    endpoint.media.addEventListener('timeupdate', publishTimeline);
+    return () => {
+      for (const eventName of immediateEvents) {
+        endpoint.media.removeEventListener(eventName, publishImmediate);
+      }
+      endpoint.media.removeEventListener('timeupdate', publishTimeline);
+      if (timelineTimer !== undefined) {
+        clearTimeout(timelineTimer);
+      }
+    };
   }
 
   globalThis.MediaLockGenericWeb = Object.freeze({ createGenericMediaAdapter });

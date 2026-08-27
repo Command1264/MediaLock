@@ -823,7 +823,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             var elapsed = timeProvider.GetUtcNow() - timeline.LastUpdatedAt;
             if (elapsed > TimeSpan.Zero)
             {
-                position += elapsed;
+                var playbackRate = target.Presentation.PlaybackRate;
+                if (!double.IsFinite(playbackRate) || playbackRate < 0 || playbackRate > 16)
+                {
+                    playbackRate = 1;
+                }
+                position += TimeSpan.FromSeconds(Math.Min(
+                    elapsed.TotalSeconds * playbackRate,
+                    duration.TotalSeconds));
             }
         }
 

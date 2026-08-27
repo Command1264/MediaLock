@@ -370,6 +370,7 @@ public sealed class BrowserMediaAdapter :
             value,
             "sourceDisplayName",
             "playbackStatus",
+            "playbackRate",
             "capabilities",
             "observedAt",
             "timeline");
@@ -383,6 +384,11 @@ public sealed class BrowserMediaAdapter :
             _ => PlaybackStatus.Unknown,
         };
         var capabilities = ToMediaCapabilities(RequireCapabilities(value.GetProperty("capabilities")));
+        var playbackRate = RequireFiniteDouble(value, "playbackRate");
+        if (playbackRate < 0 || playbackRate > 16)
+        {
+            throw new InvalidDataException("The Browser target playback rate is invalid.");
+        }
         if (!DateTimeOffset.TryParse(
                 RequireString(value, "observedAt"),
                 CultureInfo.InvariantCulture,
@@ -422,7 +428,8 @@ public sealed class BrowserMediaAdapter :
             playback,
             capabilities,
             observedAt,
-            Timeline: timeline);
+            Timeline: timeline,
+            PlaybackRate: playbackRate);
     }
 
     private static MediaCommandCapabilities ToMediaCapabilities(IEnumerable<string> capabilities)

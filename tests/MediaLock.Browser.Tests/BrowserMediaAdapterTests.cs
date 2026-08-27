@@ -55,6 +55,7 @@ public sealed class BrowserMediaAdapterTests
             {
                 sourceDisplayName = "Big Buck Bunny — Brave",
                 playbackStatus = "playing",
+                playbackRate = 1.75,
                 capabilities = new[] { "pause", "play", "seek" },
                 observedAt = "2026-08-27T00:00:00Z",
                 timeline = new
@@ -72,6 +73,7 @@ public sealed class BrowserMediaAdapterTests
         var target = Assert.Single(snapshot.ObservedTargets);
         Assert.Equal(MediaTargetProviderId.Browser, target.Id.Provider);
         Assert.Equal("Big Buck Bunny — Brave", target.Presentation.SourceDisplayName);
+        Assert.Equal(1.75, target.Presentation.PlaybackRate);
 
         var dispatch = adapter.TryExecuteAsync(
             target.Id,
@@ -114,6 +116,7 @@ public sealed class BrowserMediaAdapterTests
             {
                 sourceDisplayName = "Big Buck Bunny — Brave",
                 playbackStatus = "paused",
+                playbackRate = 1.75,
                 capabilities = new[] { "pause", "play", "seek" },
                 observedAt = "2026-08-27T00:00:01Z",
                 timeline = new

@@ -29,6 +29,8 @@ Run from the repository root:
 ```powershell
 dotnet test .\MediaLock.sln -c Release
 pwsh -NoProfile -File .\tests\MediaLock.Browser.Tests\NativeMessagingRegistration.Tests.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+    -File .\tests\MediaLock.Browser.Tests\NativeMessagingRegistration.Tests.ps1
 node --test .\src\MediaLock.Browser\Extension\tests\*.test.mjs
 Get-ChildItem .\src\MediaLock.Browser\Extension -File -Include *.js,*.mjs |
     ForEach-Object { node --check $_.FullName }
@@ -41,6 +43,11 @@ The deterministic matrix covers provider absence, provider-specific one-shot dis
 two same-title competitors, capability and Seek bounds, exact duplicate correlation, permission revocation, strict
 framing／identity／configuration, Extension protocol sequences and ownership-safe registration.
 
+Browser-specific regression tests additionally require same-tab reauthorization to remove the prior binding before
+publishing its replacement, any tab reload to remove temporary and exact-site targets without automatic rebind,
+stale document observations to be ignored, page-originated Play／Pause to refresh the desktop snapshot, and non-1×
+playback rate to reach WPF timeline interpolation.
+
 ## Manual candidate matrix
 
 All rows use a long top-level standards-based video (Nuevo Big Buck Bunny is the reference), a simultaneously playing
@@ -52,8 +59,10 @@ delay／duplicate／error.
    prompt and no error. Lock YouTube Music and verify one Pause／Play while Nuevo remains unaffected.
 2. **Temporary Page Binding:** authorize Nuevo once, select the Browser page target in Media Lock, lock it, then verify
    exactly one Pause, Play and in-range Seek while YouTube Music remains unaffected.
-3. **Exact target loss:** reload／navigate the locked page and issue a command before a valid successor is published;
-   Media Lock must show Recovering／Unavailable and neither Nuevo's replacement nor YouTube Music may change.
+3. **Exact target loss:** reload／navigate the locked page; every Browser target for that tab must disappear and no
+   temporary or exact-site binding may be rebuilt automatically. Media Lock must show Recovering／Unavailable, its
+   controls must fail closed and neither Nuevo's replacement nor YouTube Music may change. Explicit reauthorization
+   creates a new identity and never silently satisfies the old lock.
 4. **Permission revocation:** authorize exact-site, lock the page, use **Revoke access** in Media Lock, then verify the
    target disappears and later commands do not fall through to any GSMTC target.
 5. **Disconnect／reconnect:** close or disable the Extension while the page target is locked; no competitor changes.
@@ -64,3 +73,20 @@ delay／duplicate／error.
 
 Manual results apply only to the exact unpacked Extension and Host candidate. They do not qualify an installer,
 Extension-store package or future commit.
+
+## 2026-08-28 pre-fix manual findings
+
+The no-Extension lane passed with two distinguishable Brave GSMTC Sessions and exact YouTube Music Pause／Play
+isolation. Temporary Browser Session Lock then passed one Pause, Play and in-range Seek against Nuevo while YouTube
+Music remained unaffected. Reload removed the temporary target, preserved the unavailable locked identity and
+disabled commands without falling through. Explicit reauthorization correctly required a new lock.
+
+That run also exposed three candidate blockers before the remaining lanes:
+
+- authorizing the same tab repeatedly accumulated old opaque bindings in the desktop catalog;
+- page-originated Pause was not republished, leaving Browser playback state stale;
+- non-1× playback omitted its rate, so WPF interpolated at 1×.
+
+The corrective implementation now has automated regression coverage for all three findings and the stricter
+reload-removes-all-bindings policy. Manual validation must restart from a rebuilt Extension／desktop candidate; these
+pre-fix observations do not qualify the corrective commit.

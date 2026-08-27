@@ -95,54 +95,7 @@ test('an untrusted page error cannot cross the target registry', async () => {
   });
 });
 
-test('an allowed site reload replaces only its live Endpoint', async () => {
-  let documentId = 'document-before-reload';
-  const tabs = {
-    async query() {
-      return [{ id: 42, url: 'https://media.example.test/watch' }];
-    },
-    async get() {
-      return { id: 42, url: 'https://media.example.test/watch-next' };
-    },
-    async sendMessage(tabId, message) {
-      return {
-        accepted: true,
-        endpointId: `endpoint-for-${message.binding.documentId}`,
-        capabilities: ['pause', 'play', 'seek'],
-      };
-    },
-  };
-  const authorization = createBrowserAuthorizationModule({
-    tabs,
-    scripting: {
-      async executeScript() {
-        return [{ frameId: 0, documentId }];
-      },
-    },
-    permissions: {
-      async request() {
-        return true;
-      },
-      async contains() {
-        return true;
-      },
-    },
-    createBindingId: () => 'binding-site-reload',
-  });
-  const registry = createBrowserMediaTargetRegistry({ authorization, tabs });
-  const first = await registry.bindActiveTarget({ scope: 'site' });
-  documentId = 'document-after-reload';
-
-  const successor = await registry.rebindTab(42);
-
-  assert.equal(successor.accepted, true);
-  assert.equal(successor.target.bindingId, first.target.bindingId);
-  assert.notEqual(successor.target.endpointId, first.target.endpointId);
-  assert.equal(registry.matches(first.target), false);
-  assert.equal(registry.matches(successor.target), true);
-});
-
-test('page loading immediately suspends the old live Endpoint', async () => {
+test('page loading permanently clears the old live Endpoint and Page Binding', async () => {
   const tabs = {
     async query() {
       return [{ id: 42, url: 'https://media.example.test/watch' }];
@@ -167,13 +120,10 @@ test('page loading immediately suspends the old live Endpoint', async () => {
   const registry = createBrowserMediaTargetRegistry({ authorization, tabs });
   const first = await registry.bindActiveTarget({ scope: 'temporary' });
 
-  registry.suspendTab(42);
+  registry.clearTab(42);
 
   assert.equal(registry.get(42), undefined);
   assert.equal(registry.matches(first.target), false);
-
-  registry.clearTab(42);
-
   assert.equal(authorization.matches(first.target), false);
 });
 

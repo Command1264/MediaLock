@@ -23,6 +23,12 @@ deadlines, fresh nonces, a derived connection identity, strictly monotonic seque
 Play／Pause／bounded Seek. Unknown command outcomes are never retried. Diagnostics expose exception categories only;
 page URLs, titles and message payloads are not logged.
 
+Browser presentation snapshots include bounded playback rate and are republished after exact-document
+`play`／`pause`／`ratechange`／timeline events. High-frequency timeline events are coalesced. The service worker accepts
+an observation only when its browser-owned tab, top-level frame, document and current Page Binding／Endpoint all
+match. Reauthorizing a tab removes the prior binding before publishing its replacement; reload removes that tab's
+bindings and does not automatically rebind them.
+
 The candidate registration script writes only the exact current-user Chrome-compatible Native Messaging value and
 uses a content-addressed Host output. Unregistration removes only a value that still points to its exact owned
 manifest. Chrome and Brave share this one verified registry seam. The files remain unsigned and same-user replacement

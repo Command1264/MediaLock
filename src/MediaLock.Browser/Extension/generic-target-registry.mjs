@@ -65,6 +65,7 @@ export function createBrowserMediaTargetRegistry({ authorization, tabs }) {
       : Object.freeze({
         sourceDisplayName: 'Authorized web media',
         playbackStatus: 'unknown',
+        playbackRate: 1,
         capabilities,
         observedAt: new Date().toISOString(),
         timeline: null,
@@ -82,14 +83,6 @@ export function createBrowserMediaTargetRegistry({ authorization, tabs }) {
     async bindActiveTarget({ scope }) {
       const authorized = await authorization.authorizeActivePage({ scope });
       return bindAuthorized(authorized);
-    },
-
-    async rebindTab(tabId) {
-      return bindAuthorized(await authorization.rebindTab(tabId));
-    },
-
-    suspendTab(tabId) {
-      targets.delete(tabId);
     },
 
     clearTab(tabId) {

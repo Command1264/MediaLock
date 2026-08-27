@@ -14,6 +14,18 @@
     adapter,
     extensionId: chrome.runtime.id,
     pageOrigin: window.location.origin,
+    publishPresentation: (target, presentation) => {
+      chrome.runtime.sendMessage({
+        type: 'genericPresentationChanged',
+        target,
+        presentation,
+      }).catch((error) => {
+        console.debug(
+          'Media Lock presentation update was not delivered.',
+          error instanceof Error ? error.name : 'UnknownError',
+        );
+      });
+    },
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

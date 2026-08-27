@@ -17,7 +17,7 @@ store distribution, installed-package ownership and support claims remain separa
 
 Phase 16A proved fixed-site Play, Pause and Seek with exact-page isolation on Chrome, ordinary Brave and the installed
 Brave YouTube Music PWA. Phase 16B proved a temporary or exact-site Page Binding, one top-level
-`HTMLMediaElement`, bounded Play／Pause／Seek, same-origin reload Recovery, revocation, ambiguity and stale-target
+`HTMLMediaElement`, bounded Play／Pause／Seek, revocation, ambiguity and stale-target
 failure on Chrome. The subsequent Brave compatibility-closure Gate qualified named direct MP4, cloud-hosted MP4,
 ordinary streaming and unsupported-page samples. Both Probes proved that disabling or omitting the Extension leaves
 the existing GSMTC path usable.
@@ -73,8 +73,9 @@ Provider absence and loss of a bound target are different state transitions:
 2. **Bound target lost** — permission revocation, disconnect, navigation or stale Endpoint preserves the Browser Media
    Target identity and enters target-preserving Recovery／Unavailable. Session Lock never reroutes that command to a
    competing GSMTC Session or page.
-3. **Endpoint successor** — reload or same-origin navigation may resolve a successor only when the Extension proves the
-   same Page Binding and authorized scope. A command captured for the old Endpoint is rejected, not replayed.
+3. **Reload／navigation** — browser `loading` removes every binding for that tab, including exact-site bindings. Site
+   permission may remain, but no successor is created until an explicit authorization issues a new Page Binding. A
+   command captured for the old Endpoint is rejected, not replayed.
 4. **Browser restart** — the target stays unavailable unless the Extension proves Page Binding continuity. URL, title,
    origin similarity and tab order are never Recovery evidence by themselves.
 5. **Return to GSMTC** — the user explicitly unlocks／changes Routing Mode or selects a GSMTC target. Adapter failure is

@@ -1,5 +1,10 @@
 (() => {
-  function createGenericContentController({ adapter, extensionId, pageOrigin }) {
+  function createGenericContentController({
+    adapter,
+    extensionId,
+    pageOrigin,
+    publishPresentation = () => {},
+  }) {
     const extensionOrigin = `chrome-extension://${extensionId}/`;
     let activeTarget;
 
@@ -20,7 +25,11 @@
             return { accepted: false, errorCode: 'unauthorized-command' };
           }
 
-          const endpoint = adapter.bindSingleEndpoint();
+          const endpoint = adapter.bindSingleEndpoint((presentation) => {
+            if (activeTarget) {
+              publishPresentation(activeTarget, presentation);
+            }
+          });
           if (endpoint.accepted !== true) {
             return endpoint;
           }

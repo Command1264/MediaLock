@@ -347,6 +347,12 @@ page-aware Recovery, human-readable source names and direct playback state, meta
 The existing GSMTC path remains available whenever the integration is absent, unsupported, disconnected or denied
 permission.
 
+The first production candidate treats browser reload or navigation as terminal for every Page Binding on that tab.
+It removes the targets immediately and does not recreate them from an exact-site permission; the user explicitly
+authorizes the loaded document to receive a new binding. Reauthorizing one unchanged tab likewise replaces its old
+binding instead of accumulating opaque ghost targets. Direct presentation observes page-originated Play／Pause,
+timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback.
+
 The Extension is an optional enhancement, not a prerequisite or replacement installation path. A user who never
 installs it must retain the complete `0.3.0` GSMTC experience: Session discovery, all four routing modes, Recovery,
 global media-key interception, playback-state lock, controls, Seek, Settings, tray and startup continue through the
@@ -371,8 +377,9 @@ preserve existing App Lock, Session Lock, Priority Rules, Recovery, expected-tar
 semantics. Site DOM or private JavaScript dependencies remain isolated behind site-specific adapters and must fail
 closed rather than route to another tab when the page changes.
 
-Browser routing identity is page-aware in every Routing Mode. Session Lock captures one Page Binding and only accepts
-its Endpoint successors. App Lock uses a Browser Application Scope rather than the whole browser executable and must
+Browser routing identity is page-aware in every Routing Mode. Session Lock captures one Page Binding and never
+reconstructs it after reload／navigation without a new explicit authorization. App Lock uses a Browser Application
+Scope rather than the whole browser executable and must
 resolve a unique page using an explicit candidate policy. Priority Rules persist their exact selector scope and never
 collapse distinct pages, profiles or Web Apps into one `Chrome`／`Brave` entry. Windows Auto does not persist a binding,
 but its selected target and UI projection still identify the exact page. Ambiguity produces no route instead of

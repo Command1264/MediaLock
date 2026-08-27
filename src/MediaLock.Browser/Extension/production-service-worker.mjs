@@ -1,4 +1,5 @@
 import { createBrowserAuthorizationModule } from './browser-authorization.mjs';
+import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.mjs';
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 import {
@@ -19,8 +20,11 @@ const genericTargetRegistry = createBrowserMediaTargetRegistry({
   authorization: browserAuthorization,
   tabs: chrome.tabs,
 });
-const authorizedTargets = new Map();
-const suspendedTabs = new Set();
+const authorizedTargetLifecycle = createAuthorizedTargetLifecycle({
+  publishTarget,
+  publishTargetRemoved,
+  clearTab: (tabId) => genericTargetRegistry.clearTab(tabId),
+});
 
 let nativePort;
 let handshake;
@@ -30,57 +34,37 @@ let outboundSequence = 0;
 let inboundCommandGuard;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (sender?.id !== chrome.runtime.id || message?.type !== 'authorizeGenericTarget') {
+  if (sender?.id !== chrome.runtime.id) {
     return false;
   }
-  authorizeTarget(message.scope).then(sendResponse, () => {
-    sendResponse({ accepted: false, errorCode: 'native-host-unavailable' });
-  });
-  return true;
+  if (message?.type === 'authorizeGenericTarget') {
+    authorizeTarget(message.scope).then(sendResponse, () => {
+      sendResponse({ accepted: false, errorCode: 'native-host-unavailable' });
+    });
+    return true;
+  }
+  if (message?.type === 'genericPresentationChanged') {
+    handlePresentationChanged(message, sender).then(
+      (accepted) => sendResponse({ accepted }),
+      () => sendResponse({ accepted: false }),
+    );
+    return true;
+  }
+  return false;
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (!authorizedTargets.has(tabId)) {
-    return;
-  }
-  if (changeInfo.status === 'loading') {
-    if (!suspendedTabs.has(tabId)) {
-      suspendedTabs.add(tabId);
-      genericTargetRegistry.suspendTab(tabId);
-      publishTargetRemoved(authorizedTargets.get(tabId), 'document-replaced');
-    }
-    return;
-  }
-  if (changeInfo.status !== 'complete') {
-    return;
-  }
-  suspendedTabs.delete(tabId);
-  const previous = authorizedTargets.get(tabId);
-  if (previous.target.scope !== 'site') {
-    removeTarget(tabId, 'document-replaced');
-    return;
-  }
-  genericTargetRegistry.rebindTab(tabId).then(
-    (result) => {
-      if (result.accepted === true) {
-        authorizedTargets.set(tabId, result);
-        publishTarget(result).catch(disconnectNative);
-      } else {
-        removeTarget(tabId, result.errorCode ?? 'target-unavailable');
-      }
-    },
-    () => removeTarget(tabId, 'target-unavailable'),
-  );
+  authorizedTargetLifecycle.handleTabUpdated(tabId, changeInfo);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => removeTarget(tabId, 'tab-closed'));
 
 chrome.permissions.onRemoved.addListener((removed) => {
   const removedOrigins = new Set(Array.isArray(removed?.origins) ? removed.origins : []);
-  for (const [tabId, entry] of authorizedTargets) {
+  for (const entry of [...authorizedTargetLifecycle.values()]) {
     if (entry.target.scope === 'site'
         && removedOrigins.has(`${entry.target.pageOrigin}/*`)) {
-      removeTarget(tabId, 'permission-revoked');
+      removeTarget(entry.target.tabId, 'permission-revoked');
     }
   }
 });
@@ -93,11 +77,10 @@ async function authorizeTarget(scope) {
   if (result.accepted !== true) {
     return result;
   }
-  authorizedTargets.set(result.target.tabId, result);
   if (await ensureNativeConnection() !== true) {
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
-  await publishTarget(result);
+  await authorizedTargetLifecycle.replace(result);
   return { accepted: true };
 }
 
@@ -169,7 +152,7 @@ async function handleNativeMessage(message) {
     negotiatedCapabilities = accepted.capabilities;
     inboundCommandGuard = createInboundCommandGuard();
     handshake.resolve(true);
-    for (const target of authorizedTargets.values()) {
+    for (const target of authorizedTargetLifecycle.values()) {
       await publishTarget(target);
     }
     return;
@@ -202,15 +185,10 @@ async function handleNativeMessage(message) {
         : normalizeError(result?.errorCode),
     });
     if (result?.accepted === true && result.presentation) {
-      const current = authorizedTargets.get(request.target.tabId);
+      const current = authorizedTargetLifecycle.get(request.target.tabId);
       if (current?.target.bindingId === request.target.bindingId
           && current.target.endpointId === request.target.endpointId) {
-        const updated = Object.freeze({
-          ...current,
-          presentation: result.presentation,
-        });
-        authorizedTargets.set(request.target.tabId, updated);
-        await publishTarget(updated);
+        await authorizedTargetLifecycle.observe(request.target, result.presentation);
       }
     }
     return;
@@ -221,15 +199,15 @@ async function handleNativeMessage(message) {
       throw new Error('Native revoke arrived before negotiation.');
     }
     const request = inboundCommandGuard.validateRevoke(message, connectionId);
-    const matches = [...authorizedTargets.entries()]
-      .filter(([, entry]) => entry.target.bindingId === request.bindingId);
+    const matches = [...authorizedTargetLifecycle.values()]
+      .filter((entry) => entry.target.bindingId === request.bindingId);
     let revoked = false;
     if (matches.length === 1) {
-      const [tabId, entry] = matches[0];
+      const [entry] = matches;
       if (entry.target.scope === 'site') {
         await chrome.permissions.remove({ origins: [`${entry.target.pageOrigin}/*`] });
       }
-      removeTarget(tabId, 'permission-revoked');
+      removeTarget(entry.target.tabId, 'permission-revoked');
       revoked = true;
     }
     postMessage({
@@ -261,14 +239,29 @@ async function publishTarget(entry) {
 }
 
 function removeTarget(tabId, reason) {
-  const entry = authorizedTargets.get(tabId);
-  if (!entry) {
-    return;
+  authorizedTargetLifecycle.remove(tabId, reason);
+}
+
+async function handlePresentationChanged(message, sender) {
+  if (!hasExactFields(message, ['type', 'target', 'presentation'])
+      || !hasExactFields(message.target, [
+        'bindingId',
+        'endpointId',
+        'scope',
+        'tabId',
+        'frameId',
+        'documentId',
+        'pageOrigin',
+      ])
+      || sender?.tab?.id !== message.target?.tabId
+      || sender?.frameId !== 0
+      || sender?.documentId !== message.target?.documentId) {
+    return false;
   }
-  authorizedTargets.delete(tabId);
-  suspendedTabs.delete(tabId);
-  genericTargetRegistry.clearTab(tabId);
-  publishTargetRemoved(entry, reason);
+  return authorizedTargetLifecycle.observe(
+    message.target,
+    normalizePresentation(message.presentation),
+  );
 }
 
 function publishTargetRemoved(entry, reason) {
@@ -285,6 +278,16 @@ function publishTargetRemoved(entry, reason) {
 }
 
 function normalizePresentation(value) {
+  if (!hasExactFields(value, [
+    'sourceDisplayName',
+    'playbackStatus',
+    'playbackRate',
+    'capabilities',
+    'observedAt',
+    'timeline',
+  ])) {
+    throw new Error('Authorized target presentation schema is invalid.');
+  }
   const sourceDisplayName = typeof value?.sourceDisplayName === 'string'
     ? value.sourceDisplayName.slice(0, 256)
     : 'Authorized web media';
@@ -292,6 +295,11 @@ function normalizePresentation(value) {
     .includes(value?.playbackStatus)
     ? value.playbackStatus
     : 'unknown';
+  if (!Number.isFinite(value?.playbackRate)
+      || value.playbackRate < 0
+      || value.playbackRate > 16) {
+    throw new Error('Authorized target playback rate is invalid.');
+  }
   const capabilities = Array.isArray(value?.capabilities)
     ? [...new Set(value.capabilities.filter((item) => CAPABILITIES.includes(item)))].sort()
     : [];
@@ -304,6 +312,7 @@ function normalizePresentation(value) {
   return Object.freeze({
     sourceDisplayName,
     playbackStatus,
+    playbackRate: value.playbackRate,
     capabilities,
     observedAt: new Date(value?.observedAt).toISOString(),
     timeline,
@@ -311,7 +320,8 @@ function normalizePresentation(value) {
 }
 
 function normalizeTimeline(value) {
-  if (!Number.isFinite(value?.startSeconds)
+  if (!hasExactFields(value, ['startSeconds', 'endSeconds', 'positionSeconds'])
+      || !Number.isFinite(value?.startSeconds)
       || !Number.isFinite(value?.endSeconds)
       || !Number.isFinite(value?.positionSeconds)
       || value.startSeconds < 0
@@ -325,6 +335,16 @@ function normalizeTimeline(value) {
     endSeconds: value.endSeconds,
     positionSeconds: value.positionSeconds,
   });
+}
+
+function hasExactFields(value, expected) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === sortedExpected.length
+    && actual.every((field, index) => field === sortedExpected[index]);
 }
 
 function postMessage(message) {
@@ -382,6 +402,7 @@ function normalizeError(value) {
     'seek-out-of-range',
     'tab-closed',
     'target-unavailable',
+    'target-replaced',
     'unauthorized-command',
   ]);
   return allowed.has(value) ? value : 'target-unavailable';

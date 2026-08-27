@@ -251,6 +251,46 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void BrowserNowPlayingTimelineUsesTheObservedPlaybackRate()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var clock = new TestTimeProvider(observedAt.AddSeconds(4));
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-rate",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.SeekAbsolute,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(4),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                PlaybackRate: 1.75));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            timeProvider: clock);
+
+        viewModel.RefreshTimeline();
+
+        Assert.Equal("0:37", viewModel.NowPlayingElapsed);
+        Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
+    }
+
+    [Fact]
     public void InvalidOrMissingTimelineIsHiddenAndCannotRetainThePreviousTarget()
     {
         var observedAt = DateTimeOffset.Parse("2026-08-23T06:00:00Z");

@@ -434,13 +434,14 @@ Browser profile + explicit permission + Page Binding
 
 A Page Binding is Extension-issued and authoritative; URL, title, artist and browser executable are never sufficient
 identity. Live resolution adds the current document generation, frame and media-element endpoint, all of which become
-stale on navigation or reload. A successor is accepted only through the same Page Binding and an authorized site
-scope. If the Extension cannot prove continuity after browser restart, the target remains unavailable rather than
-being recovered by URL similarity.
+stale on navigation or reload. The first production candidate removes every binding for that tab on browser
+`loading` and never automatically creates a successor, including under an exact-site grant. The grant may remain,
+but an explicit authorization gesture creates a new Page Binding. If the Extension cannot prove continuity after
+browser restart, the target remains unavailable rather than being recovered by URL similarity.
 
 Routing modes keep their user meaning across providers:
 
-- Session Lock captures one exact Page Binding and follows only its authorized Endpoint succession.
+- Session Lock captures one exact Page Binding; reload／navigation removes it and requires explicit reauthorization.
 - App Lock captures a Browser Application Scope (browser profile plus origin／installed Web App identity), then applies
   a deterministic candidate policy; multiple unresolved pages are an ambiguity, not permission to choose list order.
 - Priority Rules persist a typed selector and display whether it is page-scoped or application-scoped. Rules for two
@@ -458,8 +459,9 @@ correlation is inferred from Brave／Chrome executable identity, title, URL, ori
 metadata. Therefore installing an Extension does not hide unrelated or uncorrelated Brave GSMTC targets.
 
 The first production candidate composes the existing GSMTC Adapter as the primary provider with an optional Browser
-Adapter. The Browser Module owns protocol v2, authorization, profile／Page Binding／Endpoint state and one-shot command
-correlation. A minimal Native Host validates the fixed Extension launch origin and relays bounded frames over the
+Adapter. The Browser Module owns protocol v2, authorization, profile／Page Binding／Endpoint state, event-driven
+playback／timeline／rate snapshots and one-shot command correlation. A minimal Native Host validates the fixed
+Extension launch origin and relays bounded frames over the
 fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
 [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
 
