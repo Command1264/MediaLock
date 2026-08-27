@@ -163,3 +163,82 @@ test('an external Pause publishes one exact-target presentation update', async (
   assert.equal(sentMessages[0].presentation.playbackRate, 1.5);
   assert.equal(sentMessages[0].presentation.timeline.positionSeconds, 46);
 });
+
+test('an invalidated Extension context does not leak from a stale media listener', async () => {
+  const runtimeListeners = [];
+  const mediaListeners = new Map();
+  const debugMessages = [];
+  class FakeMediaElement {}
+  const media = new FakeMediaElement();
+  Object.assign(media, {
+    isConnected: true,
+    paused: false,
+    playbackRate: 1,
+    duration: 180,
+    currentTime: 45,
+    seekable: { length: 1, start: () => 0, end: () => 180 },
+    pause() {},
+    async play() {},
+    addEventListener(name, listener) {
+      mediaListeners.set(name, listener);
+    },
+    removeEventListener(name) {
+      mediaListeners.delete(name);
+    },
+  });
+  const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
+  const context = vm.createContext({
+    HTMLMediaElement: FakeMediaElement,
+    document: {
+      title: 'Reloaded Extension Video',
+      querySelectorAll: () => [media],
+    },
+    window: { location: { origin: 'https://media.example.test' } },
+    crypto: { randomUUID: () => 'endpoint-invalidated-context' },
+    console: {
+      debug(...args) {
+        debugMessages.push(args);
+      },
+    },
+    setTimeout,
+    clearTimeout,
+    queueMicrotask,
+    chrome: {
+      runtime: {
+        id: extensionId,
+        onMessage: {
+          addListener(listener) {
+            runtimeListeners.push(listener);
+          },
+        },
+        sendMessage() {
+          throw new Error('Extension context invalidated.');
+        },
+      },
+    },
+  });
+  context.globalThis = context;
+  for (const source of sourceFiles) {
+    vm.runInContext(source, context);
+  }
+  const sender = {
+    id: extensionId,
+    url: `chrome-extension://${extensionId}/service-worker.mjs`,
+  };
+  const binding = {
+    bindingId: 'binding-invalidated-context',
+    scope: 'temporary',
+    tabId: 42,
+    frameId: 0,
+    documentId: 'document-invalidated-context',
+    pageOrigin: 'https://media.example.test',
+  };
+  runtimeListeners[0]({ type: 'bindGenericEndpoint', binding }, sender, () => {});
+
+  media.paused = true;
+  mediaListeners.get('pause')();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(debugMessages.length, 1);
+  assert.equal(debugMessages[0][0], 'Media Lock presentation update was not delivered.');
+});
