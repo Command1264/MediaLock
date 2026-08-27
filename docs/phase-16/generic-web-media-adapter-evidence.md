@@ -116,3 +116,42 @@ Passed on Chrome against final code candidate `fd2d530`:
 This Gate proves the bounded top-level generic scope. A provider-specific cloud-drive player was not separately
 qualified; a standard top-level `HTMLMediaElement` follows the same tested Adapter path, while a private／DRM／nested
 frame implementation remains an explicitly unsupported GSMTC fallback rather than a false direct capability.
+
+## Brave compatibility-closure Gate B4
+
+Passed on 2026-08-27 at 17:01 Asia／Taipei against the same final disposable Probe candidate. The environment was
+Windows 11 Pro build `26200`, Brave `151.1.93.138`, Extension ID `kggfkkiifnclhhmibdglkbdfbacakemn` and installed
+Media Lock `0.3.0`. A concurrently playing Brave YouTube Music PWA was the isolation source for every direct-control
+row:
+
+1. The directly hosted [MDN rabbit MP4](https://mdn.github.io/learning-area/html/multimedia-and-embedding/video-and-audio-content/rabbit320.mp4)
+   accepted temporary authorization, one Pause, one Play and one Seek to four seconds. An out-of-range Seek returned
+   `seek-out-of-range` without changing position or playback state.
+2. Exact-site permission on the MDN origin survived reload without another gesture. Revocation immediately changed
+   Pause to `target-unavailable`; cross-origin navigation to `example.com` stayed unavailable; returning to the
+   permitted MDN origin recovered the exact-site binding. No row changed the YouTube Music PWA.
+3. The cloud-hosted [Internet Archive Big Buck Bunny MP4](https://archive.org/download/BigBuckBunny_328/BigBuckBunny_512kb.mp4)
+   accepted one Pause, one Play and one Seek to 120 seconds. Each command changed only that video once.
+4. The standards-based [Nuevo Big Buck Bunny page](https://www.nuevodevel.com/nuevo/demo/big_buck) exposed one
+   top-level media element and accepted one Pause, one Play and one Seek to 120 seconds without changing the PWA.
+5. Unsupported samples failed closed: the [Internet Archive item player](https://archive.org/details/BigBuckBunny_328)
+   returned `media-element-unavailable`, the
+   [Wikimedia Commons Big Buck Bunny page](https://commons.wikimedia.org/wiki/File:Big_Buck_Bunny_4K.webm) returned
+   `ambiguous-media-elements`, and the
+   [W3Schools nested-iframe sample](https://www.w3schools.com/html/tryit.asp?filename=tryhtml_youtubeiframe) returned
+   `media-element-unavailable`. The command after each rejected authorization returned `target-unavailable`; every
+   page and the PWA retained its prior playback state.
+6. Reloading the Extension and restarting Brave each invalidated a temporary Page Binding. Pause returned
+   `target-unavailable` until a new gesture, after which Pause and Play were each accepted once.
+7. Force-stopping exact Native Host PID `37544` made the next Play return `native-host-unavailable` without retry,
+   fallback or media mutation. This is the documented Brave fail-closed path rather than Chrome Gate B3's incidental
+   service-worker restart. Explicitly reloading the Extension and target page launched successor PID `21620`; a new
+   authorization then accepted Play once.
+8. With the Extension disabled, installed Media Lock `0.3.0` still listed and Session-Locked the Brave YouTube Music
+   Session. Two physical Play／Pause presses paused and resumed it exactly once, with no installation prompt, target
+   change, error or crash. The Extension was re-enabled after the check.
+
+All direct commands were observed for three seconds after the single gesture. No delayed command, duplicate media
+change, competitor change, error or crash occurred. This closes the disposable-Probe Brave generic-media,
+cloud-hosted MP4, ordinary streaming, named unsupported-player and no-Extension rows. It does not transfer those
+passes to a future production Extension, Native Host or installer artifact.

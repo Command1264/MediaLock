@@ -16,7 +16,9 @@ Production code, persistence, packaging and support claims remain blocked until 
 Phase 16A proved fixed-site Play, Pause and Seek with exact-page isolation on Chrome, ordinary Brave and the installed
 Brave YouTube Music PWA. Phase 16B proved a temporary or exact-site Page Binding, one top-level
 `HTMLMediaElement`, bounded Play／Pause／Seek, same-origin reload Recovery, revocation, ambiguity and stale-target
-failure on Chrome. Both Probes proved that disabling or omitting the Extension leaves the existing GSMTC path usable.
+failure on Chrome. The subsequent Brave compatibility-closure Gate qualified named direct MP4, cloud-hosted MP4,
+ordinary streaming and unsupported-page samples. Both Probes proved that disabling or omitting the Extension leaves
+the existing GSMTC path usable.
 
 That evidence does not yet support a production compatibility claim for every row named by the Phase 16B plan:
 
@@ -24,13 +26,13 @@ That evidence does not yet support a production compatibility claim for every ro
 | --- | --- | --- |
 | Fixed YouTube／YouTube Music Adapter on Chrome, Brave and Brave PWA | Complete disposable-Probe evidence | Retain as provider-specific evidence; rerun against the production candidate. |
 | Generic top-level media on Chrome | MDN single-video temporary／exact-site evidence complete | Retain as the first generic reference row. |
-| Generic top-level media on Brave | No separately recorded Phase 16B Gate | Required before Brave generic-media support is claimed. |
+| Generic top-level media on Brave | Named MDN and Nuevo Brave Gate complete | Retain as disposable-Probe evidence; rerun against the production candidate. |
 | Directly hosted MP4 | Covered by the named MDN top-level sample | Record the exact sample and browser version again for the production candidate. |
-| Cloud-hosted MP4 | Not separately qualified | Run a named accessible top-level sample or narrow the support claim; do not infer a pass. |
-| Ordinary non-YouTube streaming page | Not separately qualified through the Generic Adapter | Run a named standards-based page or narrow the support claim. |
-| Multiple elements, nested iframe and revoked permission | Chrome ambiguity／iframe／revocation evidence complete | Preserve fail-closed behavior; nested-frame selection stays out of scope. |
-| DRM, Canvas and private players | Declared unsupported; no direct capability promised | Verify fail-closed behavior on a named sample before mentioning compatibility. |
-| No Extension installed | Stable `0.3.0` Chrome Guest GSMTC lane passed | Rerun the complete relevant stable regression matrix against every production candidate. |
+| Cloud-hosted MP4 | Named Internet Archive direct MP4 Brave Gate complete | Retain as disposable-Probe evidence; rerun against the production candidate. |
+| Ordinary non-YouTube streaming page | Named Nuevo standards-based Brave Gate complete | Retain as disposable-Probe evidence; rerun against the production candidate. |
+| Multiple elements, nested iframe and revoked permission | Chrome and Brave named fail-closed evidence complete | Preserve fail-closed behavior; nested-frame selection stays out of scope. |
+| DRM, Canvas and private players | Named unsupported item-page fail-closed evidence; no DRM／Canvas／private control claim | Keep the entire class unsupported and rerun an implementation-specific named fail-closed sample before production compatibility wording. |
+| No Extension installed | Stable `0.3.0` Chrome Guest and Brave installed-PWA GSMTC lanes passed | Rerun the complete relevant stable regression matrix against every production candidate. |
 
 No generic row passes merely because its page contains an `HTMLMediaElement`; support is attached to named evidence.
 Unsupported rows remain available only through GSMTC when their source publishes a Media Session.

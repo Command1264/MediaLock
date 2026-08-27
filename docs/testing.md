@@ -573,9 +573,9 @@ See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-ad
 ### Phase 16C production integration
 
 Production integration follows the staged gates in the
-[Phase 16C plan](phase-16/production-integration-plan.md). Before implementation, complete or explicitly narrow the
-unresolved Brave generic-media, cloud-hosted MP4 and ordinary streaming rows. Disposable Probe success is not a pass
-for a different production Extension, Native Host executable or package.
+[Phase 16C plan](phase-16/production-integration-plan.md). The disposable Probe now has named Brave generic-media,
+cloud-hosted MP4, ordinary streaming and fail-closed unsupported-page evidence. Treat those rows only as entry
+evidence: every different production Extension, Native Host executable and package must rerun the named matrix.
 
 At the provider-neutral seam, deterministic tests use independent GSMTC and Browser Adapters and assert only
 observable target snapshots and command results. They cover provider-qualified identity, two same-title pages,

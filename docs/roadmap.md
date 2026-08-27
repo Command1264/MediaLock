@@ -714,9 +714,11 @@ explicit gesture creates a temporary or exact-site Page Binding for one unambigu
 routes Play, Pause and bounded Seek through the existing Native Messaging protocol. Exact-site reload Recovery,
 permission revocation, stale-target invalidation and fixed／generic Adapter coexistence have automated coverage. The
 real-browser final Gate passed on Chrome with temporary／exact-site authorization, command isolation, permission
-revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. Nested-frame
-selection and production Router／persistence／release integration remain out of this Probe, and the no-Extension GSMTC
-path stays authoritative. See the
+revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. A subsequent
+Brave compatibility-closure Gate passed named direct MP4, cloud-hosted MP4, ordinary streaming, ambiguity,
+unsupported-item／iframe fail-closed, lifecycle and installed-`0.3.0` no-Extension GSMTC rows. Nested-frame selection and
+production Router／persistence／release integration remain out of this Probe, and the no-Extension GSMTC path stays
+authoritative. See the
 [`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
 [`Phase 16A browser-direct Probe evidence`](phase-16/browser-direct-probe-evidence.md),
 [`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
