@@ -468,6 +468,9 @@ fixed current-user-only named pipe to the running desktop process; it exposes no
 This composition enables only exact Browser Session Lock at runtime. It emits no inferred GSMTC correlation, so Brave
 GSMTC targets remain visible unless a future provider supplies an authoritative exact link. Browser target loss keeps
 the provider-qualified lock in Recovery／Unavailable; it never asks the GSMTC primary provider for a similar target.
+Because the Browser lock is runtime-only, it is never serialized into the GSMTC `RuntimeStateDocument`; catalog
+refreshes and routed commands preserve the live lock without attempting an invalid durable Session Lock. The JSON
+runtime repository independently validates every document before writing as a second integrity guard.
 
 ## 10. Composition
 

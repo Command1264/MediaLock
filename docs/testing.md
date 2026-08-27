@@ -572,6 +572,9 @@ For the first production Browser Session Lock candidate, any tab `loading` event
 binding for that tab and never automatically rebinds it. Deterministic Extension tests also require same-tab repeated
 authorization to publish the old binding's removal before its replacement, reject stale-document observations,
 republish page-originated playback changes and carry bounded playback rate into desktop timeline interpolation.
+Application tests lock and route an exact Browser target with a recording runtime repository and require zero
+post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
+creating or replacing `state.json`.
 See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
 
 ### Phase 16C production integration

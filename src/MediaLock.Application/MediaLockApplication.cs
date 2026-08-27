@@ -803,6 +803,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var previousPersistedRuntimeState = persistedRuntimeState;
             var shouldPersistRuntimeState =
                 persistRuntimeState &&
+                CanPersistRuntimeState(result.State) &&
                 (!runtimeStatePersistenceSuppressed || resumeRuntimeStatePersistence);
             var runtimeStatePersisted = !shouldPersistRuntimeState ||
                 await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
@@ -1398,6 +1399,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return false;
         }
     }
+
+    private static bool CanPersistRuntimeState(RouterState routerState) =>
+        routerState.Mode is not RoutingMode.AppLock and not RoutingMode.SessionLock ||
+        routerState.LockedTarget is not null;
 
     private static SessionFingerprint ToSessionFingerprint(
         PersistedSessionFingerprint persisted) => new(

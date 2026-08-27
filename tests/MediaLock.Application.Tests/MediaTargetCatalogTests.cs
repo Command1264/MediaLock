@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using MediaLock.Core.Configuration;
 using MediaLock.Core.Media;
 using MediaLock.Core.Playback;
 using MediaLock.Core.Routing;
@@ -107,6 +108,35 @@ public sealed class MediaTargetCatalogTests
     }
 
     [Fact]
+    public async Task RuntimeOnlyBrowserLockNeverPersistsAnInvalidSessionLockDocument()
+    {
+        var browser = BrowserTarget("runtime-only-page", "Browser media");
+        var runtimeState = new RecordingRuntimeStateRepository();
+        await using var application = new MediaLockApplication(
+            new SingleSnapshotTargetCatalog(new MediaTargetCatalogSnapshot(
+                [browser],
+                null,
+                [])),
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: runtimeState);
+        await application.StartAsync(CancellationToken.None);
+        var saveCountAfterStartup = runtimeState.Saved.Count;
+
+        await application.DispatchAsync(
+            new ApplicationIntent.LockTarget(browser.Id),
+            CancellationToken.None);
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(MediaCommand.Pause),
+            CancellationToken.None);
+
+        Assert.Equal(saveCountAfterStartup, runtimeState.Saved.Count);
+        Assert.Null(application.State.ErrorMessage);
+        Assert.Equal(browser.Id, application.State.Router.ActiveTarget);
+    }
+
+    [Fact]
     public async Task ApplicationRevokesOnlyTheExactBrowserTargetAuthorization()
     {
         var browser = BrowserTarget("revoked-page", "Browser media");
@@ -199,6 +229,29 @@ public sealed class MediaTargetCatalogTests
         {
             RevokedTargets.Add(target);
             return ValueTask.FromResult(true);
+        }
+    }
+
+    private sealed class RecordingRuntimeStateRepository : IRuntimeStateRepository
+    {
+        public List<RuntimeStateDocument> Saved { get; } = [];
+
+        public ValueTask<ConfigurationLoadResult<RuntimeStateDocument>> LoadAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new ConfigurationLoadResult<RuntimeStateDocument>(
+                new RuntimeStateDocument(
+                    RuntimeStateDocument.CurrentSchemaVersion,
+                    RoutingMode.WindowsAuto,
+                    LockedTarget: null),
+                UsedDefaults: true,
+                Issues: []));
+
+        public ValueTask SaveAsync(
+            RuntimeStateDocument state,
+            CancellationToken cancellationToken)
+        {
+            Saved.Add(state);
+            return ValueTask.CompletedTask;
         }
     }
 }

@@ -44,6 +44,26 @@ public sealed class JsonRuntimeStateRepositoryTests
         Assert.Equal(corrupt, await File.ReadAllTextAsync(recoveryPath));
     }
 
+    [Fact]
+    public async Task InvalidRuntimeStateIsRejectedBeforeWritingAFile()
+    {
+        using var directory = new TemporaryDirectory();
+        IRuntimeStateRepository repository = new JsonRuntimeStateRepository(directory.Path);
+        var invalid = new RuntimeStateDocument(
+            RuntimeStateDocument.CurrentSchemaVersion,
+            RoutingMode.SessionLock,
+            LockedTarget: null);
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(
+            () => repository.SaveAsync(invalid, CancellationToken.None).AsTask());
+
+        Assert.Contains(
+            "SessionLock runtime state requires a Locked Target.",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(System.IO.Path.Combine(directory.Path, "state.json")));
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()

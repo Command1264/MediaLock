@@ -47,6 +47,8 @@ Browser-specific regression tests additionally require same-tab reauthorization 
 publishing its replacement, any tab reload to remove temporary and exact-site targets without automatic rebind,
 stale document observations to be ignored, page-originated Play／Pause to refresh the desktop snapshot, and non-1×
 playback rate to reach WPF timeline interpolation.
+The Application gate also proves that the runtime-only Browser lock never enters the GSMTC runtime-state repository,
+whose Windows adapter rejects an invalid Session Lock document before writing.
 
 ## Manual candidate matrix
 
@@ -81,12 +83,14 @@ isolation. Temporary Browser Session Lock then passed one Pause, Play and in-ran
 Music remained unaffected. Reload removed the temporary target, preserved the unavailable locked identity and
 disabled commands without falling through. Explicit reauthorization correctly required a new lock.
 
-That run also exposed three candidate blockers before the remaining lanes:
+That run also exposed four candidate blockers before the remaining lanes:
 
 - authorizing the same tab repeatedly accumulated old opaque bindings in the desktop catalog;
 - page-originated Pause was not republished, leaving Browser playback state stale;
 - non-1× playback omitted its rate, so WPF interpolated at 1×.
+- Browser catalog／command updates attempted to persist the runtime-only direct lock through the GSMTC state schema,
+  producing `SessionLock runtime state requires a Locked Target.` and leaving an invalid `state.json`.
 
-The corrective implementation now has automated regression coverage for all three findings and the stricter
+The corrective implementation now has automated regression coverage for all four findings and the stricter
 reload-removes-all-bindings policy. Manual validation must restart from a rebuilt Extension／desktop candidate; these
 pre-fix observations do not qualify the corrective commit.
