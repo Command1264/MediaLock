@@ -460,8 +460,10 @@ metadata. Therefore installing an Extension does not hide unrelated or uncorrela
 
 The first production candidate composes the existing GSMTC Adapter as the primary provider with an optional Browser
 Adapter. The Browser Module owns protocol v2, authorization, profile／Page Binding／Endpoint state, event-driven
-playback／timeline／rate snapshots and one-shot command correlation. A minimal Native Host validates the fixed
-Extension launch origin and relays bounded frames over the
+playback／timeline／rate snapshots and one-shot command correlation. Generic Toggle Play／Pause resolves the exact
+Endpoint's live paused state into one explicit Play or Pause. The provider-neutral input coordinator checks the
+captured target through the shared target catalog, so a supported Browser Toggle is consumed without a GSMTC-only
+capability lookup. A minimal Native Host validates the fixed Extension launch origin and relays bounded frames over the
 fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
 [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
 

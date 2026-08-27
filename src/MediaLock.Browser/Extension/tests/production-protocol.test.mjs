@@ -13,7 +13,7 @@ const expected = Object.freeze({
   extensionNonce: '22222222-2222-4222-8222-222222222222',
   browserFamily: 'brave',
   profileId: '33333333-3333-4333-8333-333333333333',
-  capabilities: ['pause', 'play', 'seek'],
+  capabilities: ['pause', 'play', 'seek', 'toggle'],
 });
 
 test('negotiates one exact profile-qualified v2 connection', async () => {
@@ -57,7 +57,7 @@ test('accepts one exact Page Binding command and rejects its replay', async () =
       documentId: 'document-1',
       pageOrigin: 'https://example.com',
     },
-    command: { name: 'pause' },
+    command: { name: 'toggle' },
   };
 
   assert.equal(

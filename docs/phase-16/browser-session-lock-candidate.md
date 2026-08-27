@@ -3,8 +3,8 @@
 ## Scope and status
 
 This candidate is the first production Browser Adapter vertical slice. It adds runtime-only Session Lock for one
-explicitly authorized top-level HTTPS Page Binding, with Play, Pause and bounded absolute Seek. It includes a minimal
-target-detail／lock／revoke surface in the desktop UI and an unpacked Chromium Extension candidate.
+explicitly authorized top-level HTTPS Page Binding, with Play, Pause, Toggle Play／Pause and bounded absolute Seek. It
+includes a minimal target-detail／lock／revoke surface in the desktop UI and an unpacked Chromium Extension candidate.
 
 The candidate is not a packaged or released browser integration. Browser App Lock, Priority Rules, Windows Auto,
 settings persistence／migration, nested frames, DRM／Canvas／private players, Next／Previous／Stop and Extension-store
@@ -41,7 +41,9 @@ git diff --check
 
 The deterministic matrix covers provider absence, provider-specific one-shot dispatch, exact target loss／return,
 two same-title competitors, capability and Seek bounds, exact duplicate correlation, permission revocation, strict
-framing／identity／configuration, Extension protocol sequences and ownership-safe registration.
+framing／identity／configuration, Extension protocol sequences, provider-neutral physical-key capture and
+ownership-safe registration. Browser Toggle resolves the exact media element's live paused state and invokes exactly
+one Play or Pause; it never retries an unknown result.
 
 Browser-specific regression tests additionally require same-tab reauthorization to remove the prior binding before
 publishing its replacement, any tab reload to remove temporary and exact-site targets without automatic rebind,
@@ -60,7 +62,7 @@ delay／duplicate／error.
 1. **No Extension lane:** Extension disabled before startup; Media Lock starts with GSMTC targets, no installation
    prompt and no error. Lock YouTube Music and verify one Pause／Play while Nuevo remains unaffected.
 2. **Temporary Page Binding:** authorize Nuevo once, select the Browser page target in Media Lock, lock it, then verify
-   exactly one Pause, Play and in-range Seek while YouTube Music remains unaffected.
+   exactly one Pause, Play, UI Toggle, physical-key Toggle and in-range Seek while YouTube Music remains unaffected.
 3. **Exact target loss:** reload／navigate the locked page; every Browser target for that tab must disappear and no
    temporary or exact-site binding may be rebuilt automatically. Media Lock must show Recovering／Unavailable, its
    controls must fail closed and neither Nuevo's replacement nor YouTube Music may change. Explicit reauthorization
@@ -83,7 +85,7 @@ isolation. Temporary Browser Session Lock then passed one Pause, Play and in-ran
 Music remained unaffected. Reload removed the temporary target, preserved the unavailable locked identity and
 disabled commands without falling through. Explicit reauthorization correctly required a new lock.
 
-That run and the first corrective restart exposed five candidate blockers before the remaining lanes:
+That run and the corrective restarts exposed six candidate blockers before the remaining lanes:
 
 - authorizing the same tab repeatedly accumulated old opaque bindings in the desktop catalog;
 - page-originated Pause was not republished, leaving Browser playback state stale;
@@ -91,8 +93,10 @@ That run and the first corrective restart exposed five candidate blockers before
 - Browser catalog／command updates attempted to persist the runtime-only direct lock through the GSMTC state schema,
   producing `SessionLock runtime state requires a Locked Target.` and leaving an invalid `state.json`; and
 - after safe startup fallback, the already-selected Windows Auto action remained disabled while a stale startup lock
-  choice remained durable, and dismissing its warning allowed ordinary state refreshes to display it again.
+  choice remained durable, and dismissing its warning allowed ordinary state refreshes to display it again; and
+- the Browser target omitted Toggle Play／Pause, leaving the UI toggle disabled and causing the provider-neutral
+  physical Play／Pause key to pass through instead of routing to the exact Page Binding.
 
-The corrective implementation now has automated regression coverage for all five findings and the stricter
+The corrective implementation now has automated regression coverage for all six findings and the stricter
 reload-removes-all-bindings policy. Manual validation must restart from a rebuilt Extension／desktop candidate; these
 pre-fix observations do not qualify the corrective commit.

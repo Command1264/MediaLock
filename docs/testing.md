@@ -602,9 +602,10 @@ Every production candidate runs two independent compositions:
 
 1. with no Extension installed, the complete relevant `0.3.0` GSMTC regression remains available without a prompt,
    settings migration or Browser Adapter dependency; and
-2. with the Extension available, direct Session Lock routes Play, Pause and bounded Seek only to its exact Page
-   Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never controls a
-   competing page or GSMTC Session.
+2. with the Extension available, direct Session Lock routes Play, Pause, Toggle Play／Pause and bounded Seek only to
+   its exact Page Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never
+   controls a competing page or GSMTC Session. Provider-neutral input coverage proves a supported physical Toggle is
+   consumed and dispatched with the exact captured Browser target rather than being passed through to Windows.
 
 App Lock, Priority Rules and Windows Auto each require a later two-page routing-mode matrix before enablement.
 Settings migration, authorization UI, Native Host ownership, Extension update/removal and packaged upgrade／repair／

@@ -711,7 +711,8 @@ Exit criteria:
 
 Status: Phase 16A Gate A completed and merged through PR #56. Phase 16B has a final disposable Probe candidate: an
 explicit gesture creates a temporary or exact-site Page Binding for one unambiguous top-level media Endpoint, and
-routes Play, Pause and bounded Seek through the existing Native Messaging protocol. Exact-site reload Recovery,
+routes Play, Pause and bounded Seek through the existing Native Messaging protocol. The production candidate later
+adds exact live-state Toggle Play／Pause for the UI and physical media-key path. Exact-site reload Recovery,
 permission revocation, stale-target invalidation and fixed／generic Adapter coexistence have automated coverage. The
 real-browser final Gate passed on Chrome with temporary／exact-site authorization, command isolation, permission
 revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. A subsequent
@@ -734,9 +735,9 @@ or packaging.
 Status: the gate definition was accepted through PR #59 and the provider-neutral Core／Application seam is tracked by
 [GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). The seam is integrated, and
 [Issue #62](https://github.com/Command1264/MediaLock/issues/62) carries the first Browser Session Lock candidate:
-exact runtime Page Binding, Play／Pause／bounded Seek, explicit authorization／revoke UI, a current-user Native Messaging
-bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store distribution, installed
-package ownership and release qualification remain later independent gates. See the
+exact runtime Page Binding, Play／Pause／Toggle Play／Pause／bounded Seek, explicit authorization／revoke UI, a current-user
+Native Messaging bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store
+distribution, installed package ownership and release qualification remain later independent gates. See the
 [candidate runbook](phase-16/browser-session-lock-candidate.md) and [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
 
 ## Phase 17 — Localized warnings and stable error codes

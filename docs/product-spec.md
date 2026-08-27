@@ -357,6 +357,9 @@ It removes the targets immediately and does not recreate them from an exact-site
 authorizes the loaded document to receive a new binding. Reauthorizing one unchanged tab likewise replaces its old
 binding instead of accumulating opaque ghost targets. Direct presentation observes page-originated Play／Pause,
 timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback.
+The generic direct target also exposes Toggle Play／Pause: execution reads the exact bound media element's live paused
+state and performs one explicit Play or Pause. This enables the existing UI toggle and provider-neutral physical
+media-key path without adding generic Previous, Next or Stop semantics that `HTMLMediaElement` does not define.
 The candidate's Browser Session Lock remains runtime-only: later catalog observations and media commands must not
 serialize it through the GSMTC runtime-state schema. Persistence rejects any invalid mode／Locked Target combination
 before writing a file.

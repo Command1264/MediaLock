@@ -20,8 +20,9 @@ Native Messaging frames to the running Media Lock process through the fixed curr
 
 The bridge accepts only protocol v2 with exact schemas, a 64 KiB frame limit, bounded frame-completion and command
 deadlines, fresh nonces, a derived connection identity, strictly monotonic sequences, bounded pending commands and
-Play／Pause／bounded Seek. Unknown command outcomes are never retried. Diagnostics expose exception categories only;
-page URLs, titles and message payloads are not logged.
+Play／Pause／Toggle Play／Pause／bounded Seek. Toggle resolves the exact bound element's live paused state and performs
+one explicit action. Unknown command outcomes are never retried. Diagnostics expose exception categories only; page
+URLs, titles and message payloads are not logged.
 
 Browser presentation snapshots include bounded playback rate and are republished after exact-document
 `play`／`pause`／`ratechange`／timeline events. High-frequency timeline events are coalesced. The service worker accepts

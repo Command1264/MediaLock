@@ -30,7 +30,7 @@ public sealed class BrowserMediaAdapterTests
             extensionId = ExtensionId,
             browserFamily = "brave",
             profileId,
-            capabilities = new[] { "pause", "play", "seek" },
+            capabilities = new[] { "pause", "play", "seek", "toggle" },
         });
         var ack = await connection.ReadAsync();
         Assert.Equal(connectionId, ack.GetProperty("connectionId").GetString());
@@ -56,7 +56,7 @@ public sealed class BrowserMediaAdapterTests
                 sourceDisplayName = "Big Buck Bunny — Brave",
                 playbackStatus = "playing",
                 playbackRate = 1.75,
-                capabilities = new[] { "pause", "play", "seek" },
+                capabilities = new[] { "pause", "play", "seek", "toggle" },
                 observedAt = "2026-08-27T00:00:00Z",
                 timeline = new
                 {
@@ -77,11 +77,11 @@ public sealed class BrowserMediaAdapterTests
 
         var dispatch = adapter.TryExecuteAsync(
             target.Id,
-            MediaCommand.Pause,
+            MediaCommand.TogglePlayPause,
             CancellationToken.None).AsTask();
         var command = await connection.ReadAsync();
         Assert.Equal("command", command.GetProperty("type").GetString());
-        Assert.Equal("pause", command.GetProperty("command").GetProperty("name").GetString());
+        Assert.Equal("toggle", command.GetProperty("command").GetProperty("name").GetString());
         var requestId = command.GetProperty("requestId").GetString();
         await connection.WriteAsync(new
         {
@@ -117,7 +117,7 @@ public sealed class BrowserMediaAdapterTests
                 sourceDisplayName = "Big Buck Bunny — Brave",
                 playbackStatus = "paused",
                 playbackRate = 1.75,
-                capabilities = new[] { "pause", "play", "seek" },
+                capabilities = new[] { "pause", "play", "seek", "toggle" },
                 observedAt = "2026-08-27T00:00:01Z",
                 timeline = new
                 {
@@ -183,7 +183,7 @@ public sealed class BrowserMediaAdapterTests
         string profileId)
     {
         var bytes = Encoding.UTF8.GetBytes(
-            $"medialock.browser-direct.v2\n{ExtensionId}\n{hostNonce}\n{extensionNonce}\nbrave\n{profileId}\npause,play,seek");
+            $"medialock.browser-direct.v2\n{ExtensionId}\n{hostNonce}\n{extensionNonce}\nbrave\n{profileId}\npause,play,seek,toggle");
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 

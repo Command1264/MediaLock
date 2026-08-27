@@ -9,7 +9,7 @@ import {
 } from './production-protocol.mjs';
 
 const NATIVE_HOST_NAME = 'com.command1264.medialock.browser';
-const CAPABILITIES = Object.freeze(['pause', 'play', 'seek']);
+const CAPABILITIES = Object.freeze(['pause', 'play', 'seek', 'toggle']);
 const HANDSHAKE_TIMEOUT_MILLISECONDS = 5000;
 const browserAuthorization = createBrowserAuthorizationModule({
   tabs: chrome.tabs,

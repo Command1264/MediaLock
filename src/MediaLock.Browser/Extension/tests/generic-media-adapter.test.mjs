@@ -31,7 +31,7 @@ test('one compatible media element binds and receives one Pause command', () => 
 
   assert.equal(binding.accepted, true);
   assert.equal(binding.endpointId, 'endpoint-0123456789abcdef');
-  assert.deepEqual(binding.capabilities, ['pause', 'play']);
+  assert.deepEqual(binding.capabilities, ['pause', 'play', 'toggle']);
   assert.equal(binding.presentation.playbackStatus, 'playing');
   assert.equal(result.accepted, true);
   assert.equal(result.errorCode, null);
@@ -62,11 +62,51 @@ test('one compatible media element binds and receives one Play command', async (
 
   assert.equal(binding.accepted, true);
   assert.equal(binding.endpointId, 'endpoint-play-0123456789');
-  assert.deepEqual(binding.capabilities, ['pause', 'play']);
+  assert.deepEqual(binding.capabilities, ['pause', 'play', 'toggle']);
   assert.equal(binding.presentation.playbackStatus, 'playing');
   assert.equal(result.accepted, true);
   assert.equal(result.errorCode, null);
   assert.equal(result.presentation.playbackStatus, 'playing');
+  assert.equal(playCount, 1);
+});
+
+test('Toggle Play Pause performs exactly one action from the live media state', async () => {
+  let pauseCount = 0;
+  let playCount = 0;
+  const media = {
+    paused: false,
+    isConnected: true,
+    pause() {
+      pauseCount += 1;
+      this.paused = true;
+    },
+    async play() {
+      playCount += 1;
+      this.paused = false;
+    },
+  };
+  const adapter = createGenericMediaAdapter({
+    getCandidates: () => [media],
+    isMediaElement: (candidate) => candidate === media,
+    createEndpointId: () => 'endpoint-toggle-012345',
+  });
+
+  const binding = adapter.bindSingleEndpoint();
+  const paused = await adapter.execute({
+    endpointId: binding.endpointId,
+    command: { name: 'toggle' },
+  });
+  const playing = await adapter.execute({
+    endpointId: binding.endpointId,
+    command: { name: 'toggle' },
+  });
+
+  assert.deepEqual(binding.capabilities, ['pause', 'play', 'toggle']);
+  assert.equal(paused.accepted, true);
+  assert.equal(paused.presentation.playbackStatus, 'paused');
+  assert.equal(playing.accepted, true);
+  assert.equal(playing.presentation.playbackStatus, 'playing');
+  assert.equal(pauseCount, 1);
   assert.equal(playCount, 1);
 });
 
@@ -130,7 +170,7 @@ test('one compatible media element receives one bounded Seek command', () => {
     command: { name: 'seek', positionSeconds: 30 },
   });
 
-  assert.deepEqual(binding.capabilities, ['pause', 'play', 'seek']);
+  assert.deepEqual(binding.capabilities, ['pause', 'play', 'toggle', 'seek']);
   assert.equal(result.accepted, true);
   assert.equal(result.errorCode, null);
   assert.equal(result.presentation.timeline.positionSeconds, 30);

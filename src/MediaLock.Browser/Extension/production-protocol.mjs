@@ -1,5 +1,5 @@
 const PROTOCOL_VERSION = 2;
-const CAPABILITIES = new Set(['pause', 'play', 'seek']);
+const CAPABILITIES = new Set(['pause', 'play', 'seek', 'toggle']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CONNECTION_ID_PATTERN = /^[0-9a-f]{64}$/;
 const OPAQUE_PATTERN = /^[\x21-\x7e]+$/;
@@ -170,7 +170,7 @@ function validateCommand(value) {
 }
 
 function validateCapabilities(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 3) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 4) {
     throw new Error('Capabilities are invalid.');
   }
   const sorted = [...value].sort();

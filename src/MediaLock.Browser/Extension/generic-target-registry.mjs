@@ -1,5 +1,5 @@
 const OPAQUE_ENDPOINT_ID_PATTERN = /^[\x21-\x7e]{1,128}$/;
-const GENERIC_CAPABILITIES = new Set(['pause', 'play', 'seek']);
+const GENERIC_CAPABILITIES = new Set(['pause', 'play', 'seek', 'toggle']);
 const BINDING_ERRORS = new Set([
   'ambiguous-media-elements',
   'media-element-unavailable',

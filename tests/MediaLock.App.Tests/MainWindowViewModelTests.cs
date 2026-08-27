@@ -59,6 +59,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task BrowserToggleCommandUsesTheExactLockedTargetCapability()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-toggle",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.TogglePlayPause,
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+
+        await viewModel.TogglePlayPauseCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.Route>(Assert.Single(application.Intents));
+        Assert.Equal(MediaCommand.TogglePlayPause, intent.Command);
+    }
+
+    [Fact]
     public async Task KeepPlayingCanBeEnabledForThePlayingRoutedTarget()
     {
         var session = new MediaSessionSnapshot(

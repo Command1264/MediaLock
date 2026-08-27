@@ -54,7 +54,7 @@ public sealed class BrowserMediaAdapter :
     IMediaTargetAuthorizationController
 {
     private const int ProtocolVersion = 2;
-    private static readonly ImmutableArray<string> HostCapabilities = ["pause", "play", "seek"];
+    private static readonly ImmutableArray<string> HostCapabilities = ["pause", "play", "seek", "toggle"];
     private static readonly HashSet<string> BrowserFamilies = new(StringComparer.Ordinal)
     {
         "brave",
@@ -441,6 +441,7 @@ public sealed class BrowserMediaAdapter :
             {
                 "play" => MediaCommandCapabilities.Play,
                 "pause" => MediaCommandCapabilities.Pause,
+                "toggle" => MediaCommandCapabilities.TogglePlayPause,
                 "seek" => MediaCommandCapabilities.SeekAbsolute,
                 _ => MediaCommandCapabilities.None,
             };
@@ -502,7 +503,7 @@ public sealed class BrowserMediaAdapter :
                 ? item.GetString()
                 : null)
             .ToArray();
-        if (result.Length is < 1 or > 3 || result.Any(item => item is null) ||
+        if (result.Length is < 1 or > 4 || result.Any(item => item is null) ||
             result.Distinct(StringComparer.Ordinal).Count() != result.Length ||
             result.Any(item => !HostCapabilities.Contains(item!, StringComparer.Ordinal)))
         {
@@ -689,6 +690,7 @@ public sealed class BrowserMediaAdapter :
             {
                 MediaCommandKind.Play => "play",
                 MediaCommandKind.Pause => "pause",
+                MediaCommandKind.TogglePlayPause => "toggle",
                 MediaCommandKind.SeekAbsolute => "seek",
                 _ => null,
             };

@@ -49,7 +49,7 @@
           };
         }
 
-        const capabilities = ['pause', 'play'];
+        const capabilities = ['pause', 'play', 'toggle'];
         if (typeof isSeekAllowed === 'function'
             && Number.isFinite(candidates[0].duration)
             && Number.isSafeInteger(candidates[0].seekable?.length)
@@ -83,7 +83,8 @@
           return { accepted: false, errorCode: 'media-element-unavailable' };
         }
 
-        if (command.name === 'pause') {
+        if (command.name === 'pause'
+            || (command.name === 'toggle' && boundEndpoint.media.paused !== true)) {
           boundEndpoint.media.pause();
           return {
             accepted: true,
