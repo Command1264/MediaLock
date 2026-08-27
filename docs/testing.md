@@ -570,6 +570,31 @@ same-origin navigation, cross-origin navigation, tab duplication, tab replacemen
 silently rebind a saved lock or rule to the other page.
 See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
 
+### Phase 16C production integration
+
+Production integration follows the staged gates in the
+[Phase 16C plan](phase-16/production-integration-plan.md). The disposable Probe now has named Brave generic-media,
+cloud-hosted MP4, ordinary streaming and fail-closed unsupported-page evidence. Treat those rows only as entry
+evidence: every different production Extension, Native Host executable and package must rerun the named matrix.
+
+At the provider-neutral seam, deterministic tests use independent GSMTC and Browser Adapters and assert only
+observable target snapshots and command results. They cover provider-qualified identity, two same-title pages,
+capability enforcement, expected-target capture, stale Endpoint rejection, permission revocation, ambiguity,
+provider absence, bound-target loss and unknown outcomes without retry. Browser transport identifiers and permission
+state remain internal to the Browser Adapter Module and are not test inputs to Router policy.
+
+Every production candidate runs two independent compositions:
+
+1. with no Extension installed, the complete relevant `0.3.0` GSMTC regression remains available without a prompt,
+   settings migration or Browser Adapter dependency; and
+2. with the Extension available, direct Session Lock routes Play, Pause and bounded Seek only to its exact Page
+   Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never controls a
+   competing page or GSMTC Session.
+
+App Lock, Priority Rules and Windows Auto each require a later two-page routing-mode matrix before enablement.
+Settings migration, authorization UI, Native Host ownership, Extension update/removal and packaged upgrade／repair／
+uninstall evidence are independent gates and cannot be inferred from the Session Lock slice.
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected

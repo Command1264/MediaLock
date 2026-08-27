@@ -714,11 +714,26 @@ explicit gesture creates a temporary or exact-site Page Binding for one unambigu
 routes Play, Pause and bounded Seek through the existing Native Messaging protocol. Exact-site reload Recovery,
 permission revocation, stale-target invalidation and fixed／generic Adapter coexistence have automated coverage. The
 real-browser final Gate passed on Chrome with temporary／exact-site authorization, command isolation, permission
-revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. Nested-frame
-selection and production Router／persistence／release integration remain out of this Probe, and the no-Extension GSMTC
-path stays authoritative. See the
+revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. A subsequent
+Brave compatibility-closure Gate passed named direct MP4, cloud-hosted MP4, ordinary streaming, ambiguity,
+unsupported-item／iframe fail-closed, lifecycle and installed-`0.3.0` no-Extension GSMTC rows. Nested-frame selection and
+production Router／persistence／release integration remain out of this Probe, and the no-Extension GSMTC path stays
+authoritative. See the
 [`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
 [`Phase 16A browser-direct Probe evidence`](phase-16/browser-direct-probe-evidence.md),
 [`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
 [`Native Messaging security boundary`](research/phase-16-native-messaging-security-boundary.md) and
 [`direct-browser integration limits`](research/direct-browser-integration-and-gsmtc-limits.md).
+
+### Phase 16C — production integration gate
+
+Define and review the provider-neutral production seam, close or explicitly narrow the remaining generic-media
+compatibility rows, and stage Session Lock before any Browser Direct code enters production routing, persistence, UI
+or packaging.
+
+Status: gate definition proposed under
+[GitHub Issue #58](https://github.com/Command1264/MediaLock/issues/58). Production implementation remains blocked
+until the [Phase 16C plan](phase-16/production-integration-plan.md) and
+[ADR 0006](adr/0006-use-provider-neutral-media-targets-in-production-routing.md) are accepted. The first proposed code
+slice preserves the no-Extension GSMTC composition and adds only exact-Page-Binding Session Lock with Play, Pause and
+bounded Seek; other Routing Modes, schema migration and packaging remain later independent gates.

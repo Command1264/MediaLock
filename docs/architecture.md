@@ -403,13 +403,15 @@ it predictably. A production seam is justified only when both a Windows implemen
 by Application tests. Failure to influence Windows' current-session choice is a probe result, not a reason to introduce
 undocumented API calls or move routing policy into the Windows project.
 
-### Future browser target seam
+### Proposed production browser target seam
 
-Per [ADR 0005](adr/0005-use-page-bindings-for-browser-media-targets.md), Phase 16A／16B evidence may justify a neutral
-media-target seam only after both the existing GSMTC Adapter and a proven
-Browser Adapter exist. The Router-facing interface exposes immutable target identity, capabilities, observations and
-one-shot command results; it does not expose Extension IDs, Chrome tab IDs, frame IDs, document IDs, DOM selectors,
-site permissions or Native Messaging envelopes. Those facts remain inside one deep Browser Adapter Module.
+Phase 16A／16B established a proven disposable Browser Adapter, so the seam is no longer hypothetical. The
+[Phase 16C gate](phase-16/production-integration-plan.md) and
+[ADR 0006](adr/0006-use-provider-neutral-media-targets-in-production-routing.md) propose promoting it beside the
+existing GSMTC Adapter after production review. The Router-facing interface exposes immutable provider-qualified
+target identity, capabilities, observations and one-shot command results; it does not expose Extension IDs, Chrome
+tab IDs, frame IDs, document IDs, DOM selectors, site permissions or Native Messaging envelopes. Those facts remain
+inside one deep Browser Adapter Module.
 
 ```text
 Browser profile + explicit permission + Page Binding
