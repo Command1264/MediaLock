@@ -349,12 +349,22 @@ pairwise slopes, 10% published-rate tolerance and two consecutive same-direction
 with the window and an LRU cap retains at most 256 target states. These are private Module policy, not caller options.
 
 Application supplies timestamps from `TimeProvider.GetTimestamp()`, projects the resolved Effective Playback Rate and
-forgets estimator state when a target leaves the catalog. A valid reported value is authoritative. Missing or invalid
-values may use a confident estimate; otherwise the result is the 1× fallback. Seek, non-Playing state, Recovery,
+forgets estimator state when a target leaves the catalog. Composite catalog snapshots may contain cached targets from
+providers that did not publish the current update, so Application fingerprints the authoritative observation fields
+and preserves their previous monotonic anchor instead of sampling them again. Projected targets always cross the
+provider-neutral `MediaTargetsUpdated` path, including GSMTC-only catalogs, so Router／WPF cannot lose the projection.
+A valid reported value is authoritative. Missing or invalid values may use a confident estimate; otherwise the result
+is the 1× fallback. Seek, non-Playing state, Recovery,
 reconnect, invalid bounds, target／document replacement, non-monotonic time and discontinuous position reset the affected
 target before later samples can regain confidence. Reset and projection do not alter Router state, Media Target identity,
 command capability, Recovery correlation or persisted schemas. See
 [ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).
+
+If a cached provider observation remains unchanged for the full five-second estimator window, Application expires an
+Estimated result to Fallback. A monotonic Application confidence worker checks this independently of catalog traffic,
+so a completely silent provider cannot keep an estimate alive indefinitely. It rebases only the presentation timeline
+to the already-displayed bounded position so the visible timeline does not jump backward; the raw provider position
+remains the sole estimator input.
 
 Phase 8A keeps Seek inside the disposable Probe. A small immutable request parses invariant seconds and validates the
 absolute position against the selected live Session's current timeline before the Probe calls

@@ -11,6 +11,7 @@ namespace MediaLock.Application;
 public sealed class MediaLockApplication : IMediaLockApplication
 {
     private const int MaximumPlaybackStateCorrectionAttempts = 2;
+    private static readonly TimeSpan PlaybackRateObservationTimeout = TimeSpan.FromSeconds(5);
     private readonly IMediaTargetCatalog catalog;
     private readonly IMediaRouter router;
     private readonly ISettingsRepository? settingsRepository;
@@ -23,11 +24,14 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private readonly long playbackRateOriginTimestamp;
     private readonly PlaybackRateEstimator playbackRateEstimator = new();
     private readonly HashSet<MediaTargetId> playbackRateTargets = [];
+    private readonly Dictionary<MediaTargetId, PlaybackRateProjectionState>
+        playbackRateProjections = [];
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim dispatchGate = new(1, 1);
     private readonly Lock recoverySync = new();
     private readonly Dictionary<long, RecoveryDeadline> recoveryDeadlines = [];
     private Task? catalogWorker;
+    private Task? playbackRateConfidenceWorker;
     private Task? loginStartupWorker;
     private MediaLockApplicationState state = MediaLockApplicationState.Initial;
     private string? lastReportedProblemCode;
@@ -236,6 +240,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             TaskCreationOptions.RunContinuationsAsynchronously);
         catalogWorker = WatchCatalogAsync(initialized, lifetime.Token);
         await initialized.Task.WaitAsync(cancellationToken);
+        playbackRateConfidenceWorker = WatchPlaybackRateConfidenceAsync(lifetime.Token);
     }
 
     public async ValueTask<ApplicationResult> DispatchAsync(
@@ -640,6 +645,17 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
         }
 
+        if (playbackRateConfidenceWorker is not null)
+        {
+            try
+            {
+                await playbackRateConfidenceWorker;
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+            }
+        }
+
         if (loginStartupWorker is not null)
         {
             try
@@ -712,30 +728,33 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var firstSnapshot = true;
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
-                var nextVisibleTargets = ProjectPlaybackRates(snapshot.Targets, snapshot.Status);
-                var visibleWindowsCurrentTarget = snapshot.WindowsCurrentTarget is { } currentTarget &&
-                    nextVisibleTargets.Any(target => target.Id == currentTarget)
-                        ? currentTarget
-                        : (MediaTargetId?)null;
-                var containsOnlyGsmtcTargets = nextVisibleTargets.All(
-                    target => target.GsmtcSession is not null);
-                RouterIntent catalogIntent = containsOnlyGsmtcTargets
-                    ? new RouterIntent.CatalogUpdated(
-                        nextVisibleTargets
-                            .Select(target => target.GsmtcSession!)
-                            .ToImmutableArray(),
-                        visibleWindowsCurrentTarget is { Value: var currentValue }
-                            ? new SessionKey(currentValue)
-                            : null)
-                    : new RouterIntent.MediaTargetsUpdated(
+                await dispatchGate.WaitAsync(cancellationToken);
+                try
+                {
+                    var nextVisibleTargets = ProjectPlaybackRates(
+                        snapshot.Targets,
+                        snapshot.Status);
+                    var visibleWindowsCurrentTarget =
+                        snapshot.WindowsCurrentTarget is { } currentTarget &&
+                        nextVisibleTargets.Any(target => target.Id == currentTarget)
+                            ? currentTarget
+                            : (MediaTargetId?)null;
+                    RouterIntent catalogIntent = new RouterIntent.MediaTargetsUpdated(
                         nextVisibleTargets,
                         visibleWindowsCurrentTarget);
-                await DispatchRouterAsync(
-                    catalogIntent,
-                    cancellationToken,
-                    persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
-                    nextCatalogStatus: snapshot.Status,
-                    nextVisibleTargets: nextVisibleTargets);
+                    await DispatchRouterAsync(
+                        catalogIntent,
+                        cancellationToken,
+                        persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
+                        nextCatalogStatus: snapshot.Status,
+                        nextVisibleTargets: nextVisibleTargets,
+                        dispatchGateHeld: true);
+                }
+                finally
+                {
+                    dispatchGate.Release();
+                }
+
                 if (firstSnapshot && startupRestoreIntent is { } restoreIntent)
                 {
                     await DispatchRouterAsync(
@@ -771,6 +790,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable, exception),
                 cancellationToken);
         }
+
     }
 
     private ImmutableArray<MediaTargetSnapshot> ProjectPlaybackRates(
@@ -781,6 +801,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         foreach (var removed in playbackRateTargets.Except(currentTargets).ToArray())
         {
             playbackRateEstimator.Reset(removed, PlaybackRateResetReason.TargetRemoved);
+            playbackRateProjections.Remove(removed);
         }
 
         playbackRateTargets.Clear();
@@ -791,6 +812,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
             {
                 playbackRateEstimator.Reset(target, PlaybackRateResetReason.Recovery);
             }
+
+            playbackRateProjections.Clear();
 
             return targets
                 .Select(target => target.WithPresentation(
@@ -805,19 +828,221 @@ public sealed class MediaLockApplication : IMediaLockApplication
         var monotonicTime = timeProvider.GetElapsedTime(
             playbackRateOriginTimestamp,
             timestamp);
-        return targets
-            .Select(target => target.WithPresentation(
-                target.Presentation.WithPlaybackRateProjection(
-                    playbackRateEstimator.Observe(new PlaybackRateObservation(
-                        target.Id,
-                        target.Presentation.PlaybackStatus,
-                        target.Presentation.Timeline,
-                        monotonicTime,
-                        target.Presentation.ReportedPlaybackRate)),
-                    new MonotonicTimestamp(
-                        timestamp,
-                        timeProvider.TimestampFrequency))))
+        var observedAt = new MonotonicTimestamp(timestamp, timeProvider.TimestampFrequency);
+        return targets.Select(target => ProjectPlaybackRate(target, monotonicTime, observedAt))
             .ToImmutableArray();
+    }
+
+    private async Task WatchPlaybackRateConfidenceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), timeProvider);
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await ExpirePlaybackRateConfidenceAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await dispatchGate.WaitAsync(CancellationToken.None);
+            try
+            {
+                PublishProblem(MediaLockProblem.Warning(
+                    MediaLockProblemId.ApplicationOperationFailed,
+                    exception));
+            }
+            finally
+            {
+                dispatchGate.Release();
+            }
+        }
+    }
+
+    private async ValueTask ExpirePlaybackRateConfidenceAsync(
+        CancellationToken cancellationToken)
+    {
+        await dispatchGate.WaitAsync(cancellationToken);
+        try
+        {
+            var timestamp = timeProvider.GetTimestamp();
+            var monotonicTime = timeProvider.GetElapsedTime(
+                playbackRateOriginTimestamp,
+                timestamp);
+            var observedAt = new MonotonicTimestamp(
+                timestamp,
+                timeProvider.TimestampFrequency);
+            var changed = false;
+            var nextVisibleTargets = visibleTargets.Select(target =>
+            {
+                if (!playbackRateProjections.TryGetValue(target.Id, out var projection) ||
+                    projection.Resolution.Source != PlaybackRateResolutionSource.Estimated ||
+                    monotonicTime - projection.LastFreshObservationAt <
+                    PlaybackRateObservationTimeout)
+                {
+                    return target;
+                }
+
+                playbackRateEstimator.Reset(
+                    target.Id,
+                    PlaybackRateResetReason.ObservationExpired);
+                var expired = projection with
+                {
+                    Resolution = PlaybackRateResolution.Fallback,
+                    ObservedAt = observedAt,
+                    PresentationTimeline = AdvancePresentationTimeline(
+                        projection,
+                        monotonicTime),
+                    PresentationAnchorTime = monotonicTime,
+                    PreventBackwardProjection = true,
+                };
+                playbackRateProjections[target.Id] = expired;
+                changed = true;
+                return ApplyPlaybackRateProjection(target, expired);
+            }).ToImmutableArray();
+            if (!changed)
+            {
+                return;
+            }
+
+            var windowsCurrentTarget = State.Router.WindowsCurrentTarget is { } current &&
+                nextVisibleTargets.Any(target => target.Id == current)
+                    ? current
+                    : (MediaTargetId?)null;
+            await DispatchRouterAsync(
+                new RouterIntent.MediaTargetsUpdated(
+                    nextVisibleTargets,
+                    windowsCurrentTarget),
+                cancellationToken,
+                persistRuntimeState: false,
+                nextVisibleTargets: nextVisibleTargets,
+                dispatchGateHeld: true);
+        }
+        finally
+        {
+            dispatchGate.Release();
+        }
+    }
+
+    private MediaTargetSnapshot ProjectPlaybackRate(
+        MediaTargetSnapshot target,
+        TimeSpan monotonicTime,
+        MonotonicTimestamp observedAt)
+    {
+        var fingerprint = PlaybackRateObservationFingerprint.From(target.Presentation);
+        var identity = PlaybackRateObservationIdentity.From(target.Presentation);
+        if (playbackRateProjections.TryGetValue(target.Id, out var previous))
+        {
+            if (previous.Identity != identity)
+            {
+                playbackRateEstimator.Reset(
+                    target.Id,
+                    PlaybackRateResetReason.DocumentReplaced);
+            }
+            else if (previous.Fingerprint == fingerprint)
+            {
+                if (previous.Resolution.Source == PlaybackRateResolutionSource.Estimated &&
+                    monotonicTime - previous.LastFreshObservationAt >=
+                    PlaybackRateObservationTimeout)
+                {
+                    playbackRateEstimator.Reset(
+                        target.Id,
+                        PlaybackRateResetReason.ObservationExpired);
+                    previous = previous with
+                    {
+                        Resolution = PlaybackRateResolution.Fallback,
+                        ObservedAt = observedAt,
+                        PresentationTimeline = AdvancePresentationTimeline(
+                            previous,
+                            monotonicTime),
+                        PresentationAnchorTime = monotonicTime,
+                        PreventBackwardProjection = true,
+                    };
+                    playbackRateProjections[target.Id] = previous;
+                }
+
+                return ApplyPlaybackRateProjection(target, previous);
+            }
+        }
+
+        var resolution = playbackRateEstimator.Observe(new PlaybackRateObservation(
+            target.Id,
+            target.Presentation.PlaybackStatus,
+            target.Presentation.Timeline,
+            monotonicTime,
+            target.Presentation.ReportedPlaybackRate));
+        var presentationTimeline = target.Presentation.Timeline;
+        var preventBackwardProjection = false;
+        if (previous is { PreventBackwardProjection: true } &&
+            previous.Fingerprint.PlaybackStatus == PlaybackStatus.Playing &&
+            target.Presentation.PlaybackStatus == PlaybackStatus.Playing &&
+            previous.Fingerprint.Timeline is { } previousRawTimeline &&
+            target.Presentation.Timeline is { } currentRawTimeline &&
+            currentRawTimeline.Start == previousRawTimeline.Start &&
+            currentRawTimeline.End == previousRawTimeline.End &&
+            currentRawTimeline.Position >= previousRawTimeline.Position)
+        {
+            var projectedTimeline = AdvancePresentationTimeline(previous, monotonicTime);
+            if (projectedTimeline is not null &&
+                currentRawTimeline.Position < projectedTimeline.Position)
+            {
+                presentationTimeline = currentRawTimeline with
+                {
+                    Position = projectedTimeline.Position,
+                };
+                preventBackwardProjection = true;
+            }
+        }
+
+        var projection = new PlaybackRateProjectionState(
+            fingerprint,
+            identity,
+            resolution,
+            observedAt,
+            presentationTimeline,
+            monotonicTime,
+            monotonicTime,
+            preventBackwardProjection);
+        playbackRateProjections[target.Id] = projection;
+        return ApplyPlaybackRateProjection(target, projection);
+    }
+
+    private static MediaTargetSnapshot ApplyPlaybackRateProjection(
+        MediaTargetSnapshot target,
+        PlaybackRateProjectionState projection) => target.WithPresentation(
+        (target.Presentation with { Timeline = projection.PresentationTimeline })
+            .WithPlaybackRateProjection(projection.Resolution, projection.ObservedAt));
+
+    private static MediaTimeline? AdvancePresentationTimeline(
+        PlaybackRateProjectionState projection,
+        TimeSpan monotonicTime)
+    {
+        var timeline = projection.PresentationTimeline;
+        if (timeline is null ||
+            projection.Fingerprint.PlaybackStatus != PlaybackStatus.Playing)
+        {
+            return timeline;
+        }
+
+        var elapsed = monotonicTime - projection.PresentationAnchorTime;
+        if (elapsed <= TimeSpan.Zero)
+        {
+            return timeline;
+        }
+
+        var projectedPosition = timeline.Position + TimeSpan.FromSeconds(
+            elapsed.TotalSeconds * projection.Resolution.Rate);
+        return timeline with
+        {
+            Position = TimeSpan.FromTicks(Math.Clamp(
+                projectedPosition.Ticks,
+                timeline.Start.Ticks,
+                timeline.End.Ticks)),
+        };
     }
 
     private async ValueTask<(RouterResult Result, MediaLockApplicationState State)> DispatchRouterAsync(
@@ -829,14 +1054,32 @@ public sealed class MediaLockApplication : IMediaLockApplication
         bool suppressRuntimeStatePersistence = false,
         bool resumeRuntimeStatePersistence = false,
         bool clearPlaybackStateLock = false,
-        ImmutableArray<MediaTargetSnapshot>? nextVisibleTargets = null)
+        ImmutableArray<MediaTargetSnapshot>? nextVisibleTargets = null,
+        bool dispatchGateHeld = false)
     {
         using var dispatchCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             lifetime.Token);
-        await dispatchGate.WaitAsync(dispatchCancellation.Token);
+        if (!dispatchGateHeld)
+        {
+            await dispatchGate.WaitAsync(dispatchCancellation.Token);
+        }
+
         try
         {
+            if (intent is RouterIntent.Route
+                {
+                    Command.Kind: MediaCommandKind.SeekAbsolute,
+                } seek)
+            {
+                var target = seek.ExpectedTarget ?? State.Router.ActiveTarget;
+                if (target is { } seekTarget)
+                {
+                    playbackRateEstimator.Reset(seekTarget, PlaybackRateResetReason.Seek);
+                    playbackRateProjections.Remove(seekTarget);
+                }
+            }
+
             var previousRevision = State.Router.Revision;
             var previousCatalogStatus = catalogStatus;
             if (nextCatalogStatus is { } status)
@@ -946,7 +1189,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         finally
         {
-            dispatchGate.Release();
+            if (!dispatchGateHeld)
+            {
+                dispatchGate.Release();
+            }
         }
     }
 
@@ -1400,6 +1646,42 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
         Publish(result.State);
     }
+
+    private readonly record struct PlaybackRateObservationFingerprint(
+        PlaybackStatus PlaybackStatus,
+        DateTimeOffset ObservedAt,
+        MediaTimeline? Timeline,
+        double? ReportedPlaybackRate)
+    {
+        public static PlaybackRateObservationFingerprint From(
+            MediaTargetPresentation presentation) => new(
+            presentation.PlaybackStatus,
+            presentation.ObservedAt,
+            presentation.Timeline,
+            presentation.ReportedPlaybackRate);
+    }
+
+    private readonly record struct PlaybackRateObservationIdentity(
+        string SourceDisplayName,
+        MediaMetadata? Metadata,
+        MediaPlaybackType PlaybackType)
+    {
+        public static PlaybackRateObservationIdentity From(
+            MediaTargetPresentation presentation) => new(
+            presentation.SourceDisplayName,
+            presentation.Metadata,
+            presentation.PlaybackType);
+    }
+
+    private sealed record PlaybackRateProjectionState(
+        PlaybackRateObservationFingerprint Fingerprint,
+        PlaybackRateObservationIdentity Identity,
+        PlaybackRateResolution Resolution,
+        MonotonicTimestamp ObservedAt,
+        MediaTimeline? PresentationTimeline,
+        TimeSpan PresentationAnchorTime,
+        TimeSpan LastFreshObservationAt,
+        bool PreventBackwardProjection);
 
     private void ScheduleRecoveryTimeout(RouterEffect.ScheduleRecoveryTimeout effect)
     {

@@ -260,7 +260,7 @@ public sealed class PlaybackRateEstimatorTests
     }
 
     [Fact]
-    public void DuplicateOrOlderTimestampCannotChangeAConfidentEstimate()
+    public void DuplicateOrOlderTimestampDiscardsAConfidentEstimate()
     {
         var estimator = new PlaybackRateEstimator();
         var target = MediaTargetId.FromBrowserPageBinding("stale-time");
@@ -272,8 +272,40 @@ public sealed class PlaybackRateEstimatorTests
         var older = Observe(estimator, target, 3, 100);
 
         Assert.Equal(1d, established.Rate, precision: 6);
-        Assert.Equal(established, duplicate);
-        Assert.Equal(established, older);
+        Assert.Equal(PlaybackRateResolutionSource.Fallback, duplicate.Source);
+        Assert.Equal(PlaybackRateResolutionSource.Fallback, older.Source);
+    }
+
+    [Fact]
+    public void UnevenObservationIntervalsStillEstimateTheUnderlyingRate()
+    {
+        var estimator = new PlaybackRateEstimator();
+        var target = MediaTargetId.FromBrowserPageBinding("uneven-cadence");
+        PlaybackRateResolution result = default;
+        foreach (var second in new[] { 0d, 0.7d, 1.9d, 3.1d, 4.8d })
+        {
+            result = Observe(estimator, target, second, 10d + (1.5d * second));
+        }
+
+        Assert.Equal(PlaybackRateResolutionSource.Estimated, result.Source);
+        Assert.Equal(1.5d, result.Rate, precision: 6);
+    }
+
+    [Theory]
+    [InlineData(0.25d)]
+    [InlineData(4d)]
+    public void InclusiveEstimatedRateBoundariesAreAccepted(double rate)
+    {
+        var estimator = new PlaybackRateEstimator();
+        var target = MediaTargetId.FromBrowserPageBinding($"boundary-{rate}");
+        PlaybackRateResolution result = default;
+        foreach (var second in new[] { 0d, 2d, 4d })
+        {
+            result = Observe(estimator, target, second, 10d + (rate * second));
+        }
+
+        Assert.Equal(PlaybackRateResolutionSource.Estimated, result.Source);
+        Assert.Equal(rate, result.Rate, precision: 6);
     }
 
     [Fact]

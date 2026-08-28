@@ -17,6 +17,14 @@ state, timeline and optional Reported Playback Rate to a concrete Core `Playback
 finite Effective Playback Rate, source and confidence. Application stores that projection with the target snapshot;
 WPF reads it without understanding samples, slope fitting or hysteresis.
 
+Because a composite snapshot republishes cached targets when another provider changes, Application compares each
+target's authoritative observation fingerprint before sampling. An unchanged cached target retains its prior
+resolution and monotonic anchor while confidence is fresh; only a fresh provider observation advances its estimator
+window. If no fresh observation arrives for the full five-second window, Application expires an Estimated result to
+Fallback through an injected-monotonic-time confidence worker, even when the entire catalog is silent, and rebases
+only the presentation anchor to its bounded already-displayed position. That presentation value never becomes an
+estimator sample.
+
 The public shape is intentionally small:
 
 ```csharp
@@ -66,7 +74,8 @@ states as a second safety bound. These constants remain private to the Module an
 ### Slice 3 — Application projection
 
 1. Timestamp fresh provider observations at the catalog boundary; never timestamp a UI refresh as a new observation.
-2. Resolve all targets independently and remove state for targets that leave the catalog.
+2. Resolve all targets independently, preserve cached-provider anchors and remove state for targets that leave the
+   catalog.
 3. Prove reported override, fallback, Recovery and same-title cross-provider isolation.
 
 ### Slice 4 — WPF timeline

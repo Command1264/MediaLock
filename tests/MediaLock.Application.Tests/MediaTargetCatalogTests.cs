@@ -140,6 +140,287 @@ public sealed class MediaTargetCatalogTests
     }
 
     [Fact]
+    public async Task CachedProviderTargetIsNotResampledWhenOnlyAnotherProviderChanges()
+    {
+        var cachedGsmtc = GsmtcTimelineTarget("cached", positionSeconds: 10);
+        var changingBrowser = BrowserTimelineTarget("changing", positionSeconds: 50);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [cachedGsmtc, changingBrowser],
+            cachedGsmtc.Id,
+            []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        var originalAnchor = Assert.Single(
+            application.State.Targets,
+            target => target.Id == cachedGsmtc.Id).Presentation.MonotonicObservedAt;
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [cachedGsmtc, BrowserTimelineTarget("changing", positionSeconds: 54)],
+            cachedGsmtc.Id,
+            []));
+        await WaitUntilAsync(() => Assert.Single(
+            application.State.Targets,
+            target => target.Id == changingBrowser.Id).Presentation.Timeline?.Position ==
+            TimeSpan.FromSeconds(54));
+
+        var cachedProjection = Assert.Single(
+            application.State.Targets,
+            target => target.Id == cachedGsmtc.Id).Presentation;
+        Assert.Equal(originalAnchor, cachedProjection.MonotonicObservedAt);
+    }
+
+    [Fact]
+    public async Task SilentProviderEstimateExpiresToFallbackWithoutMovingPresentationBackward()
+    {
+        var estimated = BrowserTimelineTarget("silent", positionSeconds: 10);
+        var competitor = GsmtcTimelineTarget("competitor", positionSeconds: 50);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [estimated, competitor], competitor.Id, []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        estimated = BrowserTimelineTarget("silent", positionSeconds: 14);
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [estimated, competitor], competitor.Id, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        estimated = BrowserTimelineTarget("silent", positionSeconds: 18);
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [estimated, competitor], competitor.Id, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation.PlaybackRate.Source ==
+            PlaybackRateResolutionSource.Estimated);
+
+        clock.Advance(TimeSpan.FromSeconds(6));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation.PlaybackRate.Source ==
+            PlaybackRateResolutionSource.Fallback);
+        var expired = Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation;
+        Assert.Equal(TimeSpan.FromSeconds(30), expired.Timeline?.Position);
+        Assert.NotNull(expired.MonotonicObservedAt);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        estimated = BrowserTimelineTarget("silent", positionSeconds: 20);
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [estimated, GsmtcTimelineTarget("competitor", positionSeconds: 57)],
+            competitor.Id,
+            []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation.Timeline?.Position >=
+            TimeSpan.FromSeconds(31));
+
+        var resumed = Assert.Single(application.State.Targets, target =>
+            target.Id == estimated.Id).Presentation;
+        Assert.Equal(PlaybackRateResolutionSource.Fallback, resumed.PlaybackRate.Source);
+        Assert.True(resumed.Timeline?.Position >= TimeSpan.FromSeconds(31));
+    }
+
+    [Fact]
+    public async Task ConfidenceWorkerFailureIsReportedAndDoesNotBreakDisposal()
+    {
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("worker-failure", positionSeconds: 10)], null, []));
+        var clock = new ManualTimeProvider();
+        var application = new MediaLockApplication(
+            catalog,
+            new FailingAfterDispatchRouter(successfulDispatchCount: 3),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("worker-failure", positionSeconds: 14)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("worker-failure", positionSeconds: 18)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+
+        clock.Advance(TimeSpan.FromSeconds(6));
+
+        await WaitUntilAsync(() => application.State.Problem?.Id ==
+            MediaLockProblemId.ApplicationOperationFailed);
+        await application.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task PureGsmtcCatalogKeepsProjectedPlaybackRateInRouterState()
+    {
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [GsmtcTimelineTarget("gsmtc-only", positionSeconds: 10)],
+            MediaTargetId.FromGsmtc(new SessionKey("gsmtc-only")),
+            []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [GsmtcTimelineTarget("gsmtc-only", positionSeconds: 14)],
+            MediaTargetId.FromGsmtc(new SessionKey("gsmtc-only")),
+            []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [GsmtcTimelineTarget("gsmtc-only", positionSeconds: 18)],
+            MediaTargetId.FromGsmtc(new SessionKey("gsmtc-only")),
+            []));
+
+        await WaitUntilAsync(() => Assert.Single(application.State.Router.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+        var presentation = Assert.Single(application.State.Router.Targets).Presentation;
+        Assert.Equal(2d, presentation.PlaybackRate.Rate, precision: 6);
+        Assert.NotNull(presentation.MonotonicObservedAt);
+    }
+
+    [Fact]
+    public async Task RoutedSeekDiscardsThePreviousPlaybackRateEstimate()
+    {
+        var target = BrowserTimelineTarget("seek-reset", positionSeconds: 10);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot([target], null, []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        await application.DispatchAsync(new ApplicationIntent.LockTarget(target.Id), CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("seek-reset", positionSeconds: 14)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("seek-reset", positionSeconds: 18)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+
+        await application.DispatchAsync(
+            new ApplicationIntent.Route(
+                MediaCommand.SeekAbsolute(TimeSpan.FromSeconds(30)),
+                target.Id),
+            CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("seek-reset", positionSeconds: 30)], null, []));
+
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(30));
+        Assert.Equal(
+            PlaybackRateResolutionSource.Fallback,
+            Assert.Single(application.State.Targets).Presentation.PlaybackRate.Source);
+    }
+
+    [Fact]
+    public async Task RecoveryAndReconnectionRequireANewObservationWindow()
+    {
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("reconnect", positionSeconds: 10)], null, []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("reconnect", positionSeconds: 14)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("reconnect", positionSeconds: 18)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("reconnect", positionSeconds: 18)],
+            null,
+            [],
+            MediaSessionCatalogStatus.Reacquiring));
+        await WaitUntilAsync(() => application.State.CatalogStatus ==
+            MediaSessionCatalogStatus.Reacquiring);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("reconnect", positionSeconds: 20)], null, []));
+
+        await WaitUntilAsync(() => application.State.CatalogStatus ==
+            MediaSessionCatalogStatus.Available);
+        Assert.Equal(
+            PlaybackRateResolutionSource.Fallback,
+            Assert.Single(application.State.Targets).Presentation.PlaybackRate.Source);
+    }
+
+    [Fact]
+    public async Task DocumentIdentityChangeRequiresANewObservationWindow()
+    {
+        var initial = BrowserTimelineTarget("document", positionSeconds: 10);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot([initial], null, []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("document", positionSeconds: 14)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("document", positionSeconds: 18)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+
+        var replacement = MediaTargetSnapshot.FromProvider(
+            initial.Id,
+            BrowserTimelineTarget("document", positionSeconds: 20).Presentation with
+            {
+                Metadata = new MediaMetadata("Replacement document", null, null, null),
+            });
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot([replacement], null, []));
+
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Metadata?.Title == "Replacement document");
+        Assert.Equal(
+            PlaybackRateResolutionSource.Fallback,
+            Assert.Single(application.State.Targets).Presentation.PlaybackRate.Source);
+    }
+
+    [Fact]
     public async Task ReconciledTargetsRemainAvailableAcrossApplicationDispatches()
     {
         var braveSession = Session("brave-gsmtc", "Brave");
@@ -505,15 +786,106 @@ public sealed class MediaTargetCatalogTests
             TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
+    private sealed class FailingAfterDispatchRouter(int successfulDispatchCount) : IMediaRouter
+    {
+        private readonly MediaRouter inner = new(new SuccessfulTargetController());
+        private int dispatchCount;
+
+        public ValueTask<RouterResult> DispatchAsync(
+            RouterIntent intent,
+            CancellationToken cancellationToken) =>
+            Interlocked.Increment(ref dispatchCount) > successfulDispatchCount
+                ? ValueTask.FromException<RouterResult>(
+                    new InvalidOperationException("Injected confidence worker failure."))
+                : inner.DispatchAsync(intent, cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
     private sealed class ManualTimeProvider : TimeProvider
     {
         private long timestamp;
+        private readonly List<ManualTimer> timers = [];
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
         public override long GetTimestamp() => timestamp;
 
-        public void Advance(TimeSpan amount) => timestamp += amount.Ticks;
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
+        {
+            var timer = new ManualTimer(this, callback, state, dueTime, period);
+            timers.Add(timer);
+            return timer;
+        }
+
+        public void Advance(TimeSpan amount)
+        {
+            timestamp += amount.Ticks;
+            foreach (var timer in timers.ToArray())
+            {
+                timer.FireDue(timestamp);
+            }
+        }
+
+        private sealed class ManualTimer : ITimer
+        {
+            private readonly ManualTimeProvider owner;
+            private readonly TimerCallback callback;
+            private readonly object? state;
+            private long dueTimestamp;
+            private long periodTicks;
+            private bool disposed;
+
+            public ManualTimer(
+                ManualTimeProvider owner,
+                TimerCallback callback,
+                object? state,
+                TimeSpan dueTime,
+                TimeSpan period)
+            {
+                this.owner = owner;
+                this.callback = callback;
+                this.state = state;
+                Change(dueTime, period);
+            }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                if (disposed)
+                {
+                    return false;
+                }
+
+                dueTimestamp = dueTime == Timeout.InfiniteTimeSpan
+                    ? long.MaxValue
+                    : owner.timestamp + dueTime.Ticks;
+                periodTicks = period == Timeout.InfiniteTimeSpan ? 0 : period.Ticks;
+                return true;
+            }
+
+            public void Dispose() => disposed = true;
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+
+            public void FireDue(long now)
+            {
+                if (disposed || now < dueTimestamp)
+                {
+                    return;
+                }
+
+                dueTimestamp = periodTicks > 0 ? now + periodTicks : long.MaxValue;
+                callback(state);
+            }
+        }
     }
 
     private sealed class RecordingAuthorizationController : IMediaTargetAuthorizationController

@@ -19,6 +19,7 @@ public enum PlaybackRateResetReason
     DocumentReplaced,
     InvalidTimeline,
     PositionDiscontinuity,
+    ObservationExpired,
     TargetRemoved,
 }
 
@@ -63,8 +64,8 @@ public sealed class PlaybackRateEstimator
         if (states.TryGetValue(observation.Target, out var existing) &&
             sample.MonotonicTime <= existing.Samples[^1].MonotonicTime)
         {
-            Touch(observation.Target);
-            return existing.Resolution;
+            RemoveState(observation.Target);
+            return PlaybackRateResolution.Fallback;
         }
 
         if (existing is not null)

@@ -114,7 +114,13 @@ The candidate contract fixes a five-second window, three-second／three-observat
 median, 10% published-rate tolerance, two same-direction challenger observations and a 256-target LRU bound.
 
 Application tests feed independent same-title GSMTC and Browser targets through one catalog projection and prove their
-samples never mix. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
+samples never mix. They also republish one provider's cached target while another provider advances, verify the cached
+target retains its previous monotonic anchor, and prove GSMTC-only catalogs keep the provider-neutral projection in
+Router state. Routed Seek, Recovery／reconnect and same-ID document replacement each discard confidence before a new
+window begins. A fake monotonic timer proves a stale cached estimate expires after five seconds even with no catalog
+traffic, using a presentation-only rebased Fallback without moving the displayed position backward or feeding that
+position into Core. An injected worker failure must become an existing structured Application problem and cannot
+prevent orderly disposal. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
 confident estimate or 1× fallback. ViewModel tests use the projected Effective Playback Rate and monotonic anchor,
 clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. Existing Router,
 Recovery, persistence and exactly-once command tests remain unchanged.
