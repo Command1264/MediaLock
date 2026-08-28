@@ -4,6 +4,7 @@ import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.m
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 import { handleNativePortDisconnect } from './native-connection-lifecycle.mjs';
+import { createGrantedSiteBindingHandler } from './site-permission-binding.mjs';
 import {
   createInboundCommandGuard,
   validateHelloAck,
@@ -35,6 +36,14 @@ const pageBindingCoordinator = createAuthorizedPageBindingCoordinator({
   ),
   commitBinding: (result) => authorizedTargetLifecycle.replace(result),
   discardBinding: (target) => genericTargetRegistry.discard(target),
+});
+const handleGrantedSites = createGrantedSiteBindingHandler({
+  tabs: chrome.tabs,
+  bindCompletedTab: (tab) => pageBindingCoordinator.handleTabUpdated(
+    tab.id,
+    { status: 'complete' },
+    tab,
+  ),
 });
 
 let nativePort;
@@ -94,6 +103,15 @@ chrome.permissions.onRemoved.addListener((removed) => {
       });
     }
   }
+});
+
+chrome.permissions.onAdded.addListener((added) => {
+  handleGrantedSites(added).catch((error) => {
+    console.debug(
+      'Media Lock newly trusted-site binding did not complete.',
+      error instanceof Error ? error.name : 'UnknownError',
+    );
+  });
 });
 
 async function authorizeTarget(scope) {

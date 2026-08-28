@@ -620,6 +620,10 @@ result to be discarded, and proves that exact discard cannot remove a newer same
 Deterministic Extension tests also require same-tab repeated authorization to publish the old binding's removal
 before its replacement, reject stale-document observations, republish page-originated playback changes and carry
 bounded playback rate into desktop timeline interpolation.
+Exact-site permission acceptance must also be continued by the production Service Worker: Chromium may replace the
+Popup while displaying its permission prompt, so the first newly granted exact HTTPS origin must bind each matching
+completed tab without a second Popup action. Wildcard, broad, malformed, non-HTTPS and unrelated permission additions
+must never create a Browser target.
 Application tests lock and route an exact Browser target with a recording runtime repository and require zero
 post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
 creating or replacing `state.json`.
