@@ -1,0 +1,9 @@
+{
+  "name": "com.command1264.medialock.browser",
+  "description": "Media Lock page-level browser media bridge",
+  "path": "__MEDIA_LOCK_BROWSER_HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://kggfkkiifnclhhmibdglkbdfbacakemn/"
+  ]
+}

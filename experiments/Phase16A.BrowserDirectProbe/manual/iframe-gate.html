@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Media Lock Phase 16A Iframe Gate</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      body {
+        max-width: 900px;
+        margin: 32px auto;
+        padding: 0 20px;
+      }
+
+      iframe {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border: 1px solid GrayText;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Phase 16A cross-origin iframe gate</h1>
+      <p>The Probe must reject commands from this top-level loopback page and leave the embedded player unchanged.</p>
+      <iframe
+        src="https://www.youtube.com/embed/M7lc1UVf-VE"
+        title="YouTube IFrame API sample video"
+        allow="autoplay; encrypted-media"
+        allowfullscreen>
+      </iframe>
+    </main>
+  </body>
+</html>

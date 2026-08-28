@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Lifecycle;
@@ -10,13 +11,14 @@ namespace MediaLock.Application;
 public sealed class MediaLockApplication : IMediaLockApplication
 {
     private const int MaximumPlaybackStateCorrectionAttempts = 2;
-    private readonly IMediaSessionCatalog catalog;
+    private readonly IMediaTargetCatalog catalog;
     private readonly IMediaRouter router;
     private readonly ISettingsRepository? settingsRepository;
     private readonly ILoginStartupManager? loginStartupManager;
     private readonly IRuntimeStateRepository? runtimeStateRepository;
     private readonly IDiagnosticLog? diagnosticLog;
     private readonly IWorkstationLockState? workstationLockState;
+    private readonly IMediaTargetAuthorizationController? mediaTargetAuthorizationController;
     private readonly TimeProvider timeProvider;
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim dispatchGate = new(1, 1);
@@ -34,6 +36,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private RouterIntent? startupRestoreIntent;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
     private string? catalogStatusMessage;
+    private ImmutableArray<MediaTargetSnapshot> visibleTargets = [];
     private SessionFingerprint? playbackStateLockRecoveryFingerprint;
     private int playbackStateCorrectionAttempts;
     private int workstationLocked;
@@ -44,8 +47,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private PlaybackStatus? lastArmedPlaybackStatus;
 
     public MediaLockApplication(
-        IMediaSessionCatalog catalog,
-        IMediaRouter router)
+        IMediaTargetCatalog catalog,
+        IMediaRouter router,
+        IMediaTargetAuthorizationController? mediaTargetAuthorizationController = null)
         : this(
             catalog,
             router,
@@ -54,19 +58,21 @@ public sealed class MediaLockApplication : IMediaLockApplication
             runtimeStateRepository: null,
             diagnosticLog: null,
             workstationLockState: null,
-            timeProvider: null)
+            timeProvider: null,
+            mediaTargetAuthorizationController: mediaTargetAuthorizationController)
     {
     }
 
     public MediaLockApplication(
-        IMediaSessionCatalog catalog,
+        IMediaTargetCatalog catalog,
         IMediaRouter router,
         ISettingsRepository? settingsRepository,
         ILoginStartupManager? loginStartupManager,
         IRuntimeStateRepository? runtimeStateRepository = null,
         IDiagnosticLog? diagnosticLog = null,
         IWorkstationLockState? workstationLockState = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IMediaTargetAuthorizationController? mediaTargetAuthorizationController = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(router);
@@ -77,6 +83,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         this.runtimeStateRepository = runtimeStateRepository;
         this.diagnosticLog = diagnosticLog;
         this.workstationLockState = workstationLockState;
+        this.mediaTargetAuthorizationController = mediaTargetAuthorizationController;
         this.timeProvider = timeProvider ?? TimeProvider.System;
         if (workstationLockState is not null)
         {
@@ -118,6 +125,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 catalogStatusMessage)
             {
                 PlaybackStateLock = State.PlaybackStateLock,
+                Targets = visibleTargets,
             };
             if (loginStartupManager is not null &&
                 await loginStartupManager.IsEnabledAsync(cancellationToken) !=
@@ -223,11 +231,20 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 cancellationToken);
         }
 
+        if (intent is ApplicationIntent.RevokeTargetAuthorization revokeTargetAuthorization)
+        {
+            return await RevokeTargetAuthorizationAsync(
+                revokeTargetAuthorization.Target,
+                cancellationToken);
+        }
+
         (RouterIntent routerIntent, RoutingMode? startupRoutingMode, bool persistRuntimeState) =
             intent switch
             {
                 ApplicationIntent.LockSession lockSession =>
                     ((RouterIntent)new RouterIntent.LockSession(lockSession.Session), (RoutingMode?)RoutingMode.SessionLock, true),
+                ApplicationIntent.LockTarget lockTarget =>
+                    ((RouterIntent)new RouterIntent.LockTarget(lockTarget.Target), (RoutingMode?)null, false),
                 ApplicationIntent.LockApplication lockApplication =>
                     ((RouterIntent)new RouterIntent.LockApplication(lockApplication.SourceAppUserModelId), (RoutingMode?)RoutingMode.AppLock, true),
                 ApplicationIntent.UsePriorityRules =>
@@ -278,31 +295,70 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
 
             var activeTarget = State.Router.ActiveTarget;
-            var activeSession = activeTarget is { } target
-                ? State.Router.Sessions.FirstOrDefault(session => session.Key == target)
+            var activeSnapshot = activeTarget is { } target
+                ? State.Router.Targets.FirstOrDefault(candidate => candidate.Id == target)
                 : null;
-            if (activeSession is null ||
-                !PlaybackStateLockRules.CanArm(activeSession.PlaybackStatus))
+            if (activeSnapshot is null ||
+                !PlaybackStateLockRules.CanArm(activeSnapshot.Presentation.PlaybackStatus))
             {
                 throw new InvalidOperationException(
                     "Keep Playing can only be enabled while the current target is playing.");
             }
 
-            playbackStateLockRecoveryFingerprint =
-                State.Router.LockedTarget is { } lockedTarget &&
-                lockedTarget.ResolvedSession == activeSession.Key
-                    ? lockedTarget.Fingerprint
-                    : SessionFingerprint.From(activeSession);
+            var activeSession = activeSnapshot.GsmtcSession;
+            playbackStateLockRecoveryFingerprint = activeSession is null
+                ? null
+                : State.Router.LockedTarget is { } lockedTarget &&
+                    lockedTarget.ResolvedSession == activeSession.Key
+                        ? lockedTarget.Fingerprint
+                        : SessionFingerprint.From(activeSession);
             playbackStateCorrectionAttempts = 0;
             ResetRepeatedPauseObservations();
-            lastArmedPlaybackStatus = activeSession.PlaybackStatus;
+            lastArmedPlaybackStatus = activeSnapshot.Presentation.PlaybackStatus;
             Volatile.Write(
                 ref workstationObservationPending,
                 Volatile.Read(ref workstationLocked));
             PublishPlaybackStateLock(new PlaybackStateLockState(
                 PlaybackStateLockMode.KeepPlaying,
                 PlaybackStateLockStatus.Ready,
-                activeSession.Key));
+                activeSnapshot.Id));
+            return new ApplicationResult(State, RouteDecision.StateUpdated);
+        }
+        finally
+        {
+            dispatchGate.Release();
+        }
+    }
+
+    private async ValueTask<ApplicationResult> RevokeTargetAuthorizationAsync(
+        MediaTargetId target,
+        CancellationToken cancellationToken)
+    {
+        if (!target.IsValid || target.Provider == MediaTargetProviderId.Gsmtc)
+        {
+            throw new ArgumentException(
+                "Only a valid direct Media Target authorization can be revoked.",
+                nameof(target));
+        }
+        if (mediaTargetAuthorizationController is null)
+        {
+            throw new InvalidOperationException("Media Target authorization control is unavailable.");
+        }
+
+        using var revokeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            lifetime.Token);
+        await dispatchGate.WaitAsync(revokeCancellation.Token);
+        try
+        {
+            if (!await mediaTargetAuthorizationController.RevokeAsync(
+                    target,
+                    revokeCancellation.Token))
+            {
+                throw new InvalidOperationException(
+                    "The Media Target authorization could not be revoked.");
+            }
+
             return new ApplicationResult(State, RouteDecision.StateUpdated);
         }
         finally
@@ -624,14 +680,31 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var firstSnapshot = true;
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
+                var nextVisibleTargets = snapshot.Targets;
+                var visibleWindowsCurrentTarget = snapshot.WindowsCurrentTarget is { } currentTarget &&
+                    nextVisibleTargets.Any(target => target.Id == currentTarget)
+                        ? currentTarget
+                        : (MediaTargetId?)null;
+                var containsOnlyGsmtcTargets = nextVisibleTargets.All(
+                    target => target.GsmtcSession is not null);
+                RouterIntent catalogIntent = containsOnlyGsmtcTargets
+                    ? new RouterIntent.CatalogUpdated(
+                        nextVisibleTargets
+                            .Select(target => target.GsmtcSession!)
+                            .ToImmutableArray(),
+                        visibleWindowsCurrentTarget is { Value: var currentValue }
+                            ? new SessionKey(currentValue)
+                            : null)
+                    : new RouterIntent.MediaTargetsUpdated(
+                        nextVisibleTargets,
+                        visibleWindowsCurrentTarget);
                 await DispatchRouterAsync(
-                    new RouterIntent.CatalogUpdated(
-                        snapshot.Sessions,
-                        snapshot.WindowsCurrentSession),
+                    catalogIntent,
                     cancellationToken,
                     persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
                     nextCatalogStatus: snapshot.Status,
-                    nextCatalogStatusMessage: snapshot.StatusMessage);
+                    nextCatalogStatusMessage: snapshot.StatusMessage,
+                    nextVisibleTargets: nextVisibleTargets);
                 if (firstSnapshot && startupRestoreIntent is { } restoreIntent)
                 {
                     await DispatchRouterAsync(
@@ -678,7 +751,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
         RoutingMode? startupRoutingMode = null,
         bool suppressRuntimeStatePersistence = false,
         bool resumeRuntimeStatePersistence = false,
-        bool clearPlaybackStateLock = false)
+        bool clearPlaybackStateLock = false,
+        ImmutableArray<MediaTargetSnapshot>? nextVisibleTargets = null)
     {
         using var dispatchCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -705,8 +779,13 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
 
             var result = await router.DispatchAsync(intent, dispatchCancellation.Token);
+            if (nextVisibleTargets is { } targets)
+            {
+                visibleTargets = targets;
+            }
+
             Apply(result);
-            if (intent is RouterIntent.CatalogUpdated)
+            if (intent is RouterIntent.CatalogUpdated or RouterIntent.MediaTargetsUpdated)
             {
                 result = await CorrectPlaybackStateAsync(result, dispatchCancellation.Token);
             }
@@ -726,6 +805,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var previousPersistedRuntimeState = persistedRuntimeState;
             var shouldPersistRuntimeState =
                 persistRuntimeState &&
+                CanPersistRuntimeState(result.State) &&
                 (!runtimeStatePersistenceSuppressed || resumeRuntimeStatePersistence);
             var runtimeStatePersisted = !shouldPersistRuntimeState ||
                 await PersistRuntimeStateAsync(result.State, dispatchCancellation.Token);
@@ -830,31 +910,149 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return catalogResult;
         }
 
-        if (catalogResult.State.LockedTarget is
+        if (armedTarget.Provider != MediaTargetProviderId.Gsmtc)
+        {
+            if (catalogResult.State.ActiveTarget != armedTarget)
             {
-                ResolvedSession: { } resolvedSession,
-                Fingerprint: { } refreshedFingerprint,
-            } && resolvedSession == armedTarget)
+                playbackStateCorrectionAttempts = 0;
+                ResetRepeatedPauseObservations();
+                var exactTargetIsUnavailable =
+                    catalogResult.State.Mode == RoutingMode.SessionLock &&
+                    catalogResult.State.LockedMediaTarget == armedTarget &&
+                    catalogResult.State.Status is RouterStatus.Recovering or RouterStatus.Unavailable;
+                if (exactTargetIsUnavailable)
+                {
+                    PublishPlaybackStateLock(playbackStateLock with
+                    {
+                        Status = PlaybackStateLockStatus.Suspended,
+                        Message = null,
+                    });
+                }
+                else
+                {
+                    ClearPlaybackStateLock();
+                }
+
+                return catalogResult;
+            }
+        }
+        else if (catalogResult.State.LockedTarget is
+        {
+            ResolvedSession: { } resolvedSession,
+            Fingerprint: { } refreshedFingerprint,
+        } && resolvedSession == armedTarget)
         {
             playbackStateLockRecoveryFingerprint = refreshedFingerprint;
         }
 
-        var armedSession = catalogResult.State.Sessions.FirstOrDefault(
-            session => session.Key == armedTarget);
-        if (armedSession is not null &&
-            catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
-            catalogResult.State.ActiveTarget == armedTarget)
+        var armedSession = armedTarget.Provider == MediaTargetProviderId.Gsmtc
+            ? catalogResult.State.Sessions.FirstOrDefault(session => session.Key == armedTarget)
+            : null;
+        if (armedTarget.Provider == MediaTargetProviderId.Gsmtc)
         {
-            playbackStateLockRecoveryFingerprint = SessionFingerprint.From(armedSession);
+            if (armedSession is not null &&
+                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                catalogResult.State.ActiveTarget == armedTarget)
+            {
+                playbackStateLockRecoveryFingerprint = SessionFingerprint.From(armedSession);
+            }
+
+            var armedSessionIsMissing = armedSession is null;
+            if (armedSessionIsMissing &&
+                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                catalogResult.State.ActiveTarget == armedTarget)
+            {
+                playbackStateCorrectionAttempts = 0;
+                ResetRepeatedPauseObservations();
+                PublishPlaybackStateLock(playbackStateLock with
+                {
+                    Status = PlaybackStateLockStatus.Suspended,
+                    Message = null,
+                });
+                return catalogResult;
+            }
+
+            if (catalogResult.State.ActiveTarget != armedTarget)
+            {
+                if (Volatile.Read(ref workstationObservationPending) != 0)
+                {
+                    playbackStateCorrectionAttempts = 0;
+                    PublishPlaybackStateLock(playbackStateLock with
+                    {
+                        Status = PlaybackStateLockStatus.Suspended,
+                        Message = null,
+                    });
+                    return catalogResult;
+                }
+
+                var isRecoveringSameLockedTarget =
+                    catalogResult.State.Status == RouterStatus.Recovering &&
+                    playbackStateLockRecoveryFingerprint is { } fingerprint &&
+                    catalogResult.State.LockedTarget?.Fingerprint == fingerprint &&
+                    catalogResult.State.LockedTarget.ResolvedSession is null;
+                if (isRecoveringSameLockedTarget)
+                {
+                    playbackStateCorrectionAttempts = 0;
+                    PublishPlaybackStateLock(playbackStateLock with
+                    {
+                        Status = PlaybackStateLockStatus.Suspended,
+                        Message = null,
+                    });
+                    return catalogResult;
+                }
+
+                var acceptedSuccessor = catalogResult.State.ActiveTarget is { } successor &&
+                    playbackStateLock.Status == PlaybackStateLockStatus.Suspended &&
+                    playbackStateLockRecoveryFingerprint is not null &&
+                    catalogResult.State.Status == RouterStatus.Locked &&
+                    catalogResult.State.LockedTarget?.ResolvedSession == successor;
+                var acceptedAutomaticSuccessor =
+                    catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                    catalogResult.State.ActiveTarget is { } automaticSuccessor &&
+                    playbackStateLock.Status == PlaybackStateLockStatus.Suspended &&
+                    playbackStateLockRecoveryFingerprint is { } automaticFingerprint &&
+                    ResolveUniquePlaybackStateSuccessor(
+                        automaticFingerprint,
+                        catalogResult.State.Sessions) == automaticSuccessor;
+                if (acceptedSuccessor || acceptedAutomaticSuccessor)
+                {
+                    armedTarget = catalogResult.State.ActiveTarget!.Value;
+                    playbackStateCorrectionAttempts = 0;
+                    ResetRepeatedPauseObservations();
+                    playbackStateLock = playbackStateLock with
+                    {
+                        Status = PlaybackStateLockStatus.Ready,
+                        ArmedTarget = armedTarget,
+                        Message = null,
+                    };
+                    PublishPlaybackStateLock(playbackStateLock);
+                }
+                else if (
+                    catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
+                    armedSessionIsMissing)
+                {
+                    playbackStateCorrectionAttempts = 0;
+                    ResetRepeatedPauseObservations();
+                    PublishPlaybackStateLock(playbackStateLock with
+                    {
+                        Status = PlaybackStateLockStatus.Suspended,
+                        Message = null,
+                    });
+                    return catalogResult;
+                }
+                else
+                {
+                    ClearPlaybackStateLock();
+                    return catalogResult;
+                }
+            }
         }
 
-        var armedSessionIsMissing = armedSession is null;
-        if (armedSessionIsMissing &&
-            catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
-            catalogResult.State.ActiveTarget == armedTarget)
+        var observed = catalogResult.State.Targets.FirstOrDefault(
+            target => target.Id == armedTarget);
+        if (observed is null)
         {
             playbackStateCorrectionAttempts = 0;
-            ResetRepeatedPauseObservations();
             PublishPlaybackStateLock(playbackStateLock with
             {
                 Status = PlaybackStateLockStatus.Suspended,
@@ -863,98 +1061,18 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return catalogResult;
         }
 
-        if (catalogResult.State.ActiveTarget != armedTarget)
-        {
-            if (Volatile.Read(ref workstationObservationPending) != 0)
-            {
-                playbackStateCorrectionAttempts = 0;
-                PublishPlaybackStateLock(playbackStateLock with
-                {
-                    Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
-                });
-                return catalogResult;
-            }
-
-            var isRecoveringSameLockedTarget =
-                catalogResult.State.Status == RouterStatus.Recovering &&
-                playbackStateLockRecoveryFingerprint is { } fingerprint &&
-                catalogResult.State.LockedTarget?.Fingerprint == fingerprint &&
-                catalogResult.State.LockedTarget.ResolvedSession is null;
-            if (isRecoveringSameLockedTarget)
-            {
-                playbackStateCorrectionAttempts = 0;
-                PublishPlaybackStateLock(playbackStateLock with
-                {
-                    Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
-                });
-                return catalogResult;
-            }
-
-            var acceptedSuccessor = catalogResult.State.ActiveTarget is { } successor &&
-                playbackStateLock.Status == PlaybackStateLockStatus.Suspended &&
-                playbackStateLockRecoveryFingerprint is not null &&
-                catalogResult.State.Status == RouterStatus.Locked &&
-                catalogResult.State.LockedTarget?.ResolvedSession == successor;
-            var acceptedAutomaticSuccessor =
-                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
-                catalogResult.State.ActiveTarget is { } automaticSuccessor &&
-                playbackStateLock.Status == PlaybackStateLockStatus.Suspended &&
-                playbackStateLockRecoveryFingerprint is { } automaticFingerprint &&
-                ResolveUniquePlaybackStateSuccessor(
-                    automaticFingerprint,
-                    catalogResult.State.Sessions) == automaticSuccessor;
-            if (acceptedSuccessor || acceptedAutomaticSuccessor)
-            {
-                armedTarget = catalogResult.State.ActiveTarget!.Value;
-                playbackStateCorrectionAttempts = 0;
-                ResetRepeatedPauseObservations();
-                playbackStateLock = playbackStateLock with
-                {
-                    Status = PlaybackStateLockStatus.Ready,
-                    ArmedTarget = armedTarget,
-                    Message = null,
-                };
-                PublishPlaybackStateLock(playbackStateLock);
-            }
-            else if (
-                catalogResult.State.Mode is RoutingMode.WindowsAuto or RoutingMode.PriorityRules &&
-                armedSessionIsMissing)
-            {
-                playbackStateCorrectionAttempts = 0;
-                ResetRepeatedPauseObservations();
-                PublishPlaybackStateLock(playbackStateLock with
-                {
-                    Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
-                });
-                return catalogResult;
-            }
-            else
-            {
-                ClearPlaybackStateLock();
-                return catalogResult;
-            }
-        }
-
-        var observed = catalogResult.State.Sessions.FirstOrDefault(
-            session => session.Key == armedTarget);
-        if (observed is null)
-        {
-            return catalogResult;
-        }
+        var observedPlaybackStatus = observed.Presentation.PlaybackStatus;
 
         if (Volatile.Read(ref workstationObservationPending) != 0)
         {
-            if (observed.PlaybackStatus == PlaybackStatus.Playing)
+            if (observedPlaybackStatus == PlaybackStatus.Playing)
             {
                 if (Volatile.Read(ref workstationLocked) == 0)
                 {
                     Volatile.Write(ref workstationObservationPending, 0);
                 }
             }
-            else if (observed.PlaybackStatus is PlaybackStatus.Paused or
+            else if (observedPlaybackStatus is PlaybackStatus.Paused or
                 PlaybackStatus.Stopped or PlaybackStatus.Closed)
             {
                 Volatile.Write(ref workstationObservationPending, 0);
@@ -984,7 +1102,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             PublishPlaybackStateLock(playbackStateLock);
         }
 
-        if (observed.PlaybackStatus == PlaybackStatus.Playing)
+        if (observedPlaybackStatus == PlaybackStatus.Playing)
         {
             playbackStateCorrectionAttempts = 0;
             pausedEpisodeObserved = false;
@@ -1002,20 +1120,20 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return catalogResult;
         }
 
-        if (observed.PlaybackStatus != PlaybackStatus.Paused)
+        if (observedPlaybackStatus != PlaybackStatus.Paused)
         {
-            lastArmedPlaybackStatus = observed.PlaybackStatus;
+            lastArmedPlaybackStatus = observedPlaybackStatus;
         }
 
         if (PlaybackStateLockRules.Decide(
                 playbackStateLock.Mode,
-                observed.PlaybackStatus) != PlaybackStateCorrection.Play ||
+                observedPlaybackStatus) != PlaybackStateCorrection.Play ||
             playbackStateLock.Status == PlaybackStateLockStatus.Failed)
         {
             return catalogResult;
         }
 
-        if (observed.PlaybackStatus == PlaybackStatus.Paused)
+        if (observedPlaybackStatus == PlaybackStatus.Paused)
         {
             var shouldRelease = ShouldReleaseForRepeatedPause();
             lastArmedPlaybackStatus = PlaybackStatus.Paused;
@@ -1152,6 +1270,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             catalogStatusMessage)
         {
             PlaybackStateLock = State.PlaybackStateLock,
+            Targets = visibleTargets,
         };
         StateChanged?.Invoke(this, new MediaLockApplicationStateChangedEventArgs(State));
         await TryWriteDiagnosticAsync(
@@ -1169,7 +1288,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new RouterIntent.CatalogUpdated([], null),
                 cancellationToken,
                 nextCatalogStatus: MediaSessionCatalogStatus.Unavailable,
-                nextCatalogStatusMessage: message);
+                nextCatalogStatusMessage: message,
+                nextVisibleTargets: []);
             PublishError(message);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1265,6 +1385,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             catalogStatusMessage)
         {
             PlaybackStateLock = playbackStateLock,
+            Targets = visibleTargets,
         };
         StateChanged?.Invoke(
             this,
@@ -1318,6 +1439,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return false;
         }
     }
+
+    private static bool CanPersistRuntimeState(RouterState routerState) =>
+        routerState.Mode is not RoutingMode.AppLock and not RoutingMode.SessionLock ||
+        routerState.LockedTarget is not null;
 
     private static SessionFingerprint ToSessionFingerprint(
         PersistedSessionFingerprint persisted) => new(

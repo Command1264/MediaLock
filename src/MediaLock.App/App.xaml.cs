@@ -15,8 +15,10 @@ using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Input;
+using MediaLock.Core.Media;
 using MediaLock.Windows.Input;
 using MediaLock.Windows;
+using MediaLock.Browser;
 using Microsoft.Win32;
 
 namespace MediaLock.App;
@@ -39,6 +41,9 @@ public partial class App : System.Windows.Application
     private string activeThemePreference = UiThemePreference.System;
     private bool systemThemeSubscribed;
     private bool mediaInputFaultReported;
+    private readonly object sourceMetadataDiagnosticGate = new();
+    private readonly HashSet<Task> sourceMetadataDiagnosticTasks = [];
+    private BrowserMediaBridgeServer? browserMediaBridgeServer;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -77,7 +82,21 @@ public partial class App : System.Windows.Application
             }
 
             systemLifecycle = new SystemLifecycle();
-            var adapter = new GsmtcMediaAdapter(systemLifecycle);
+            var gsmtcAdapter = new GsmtcMediaAdapter(systemLifecycle);
+            var browserAdapter = new BrowserMediaAdapter(
+                new BrowserMediaAdapterOptions(
+                    BrowserMediaAdapterOptions.ProductionExtensionId));
+            browserMediaBridgeServer = new BrowserMediaBridgeServer(browserAdapter);
+            browserMediaBridgeServer.Start();
+            var adapter = new CompositeMediaTargetAdapter(
+                new MediaTargetAdapterRegistration(
+                    MediaTargetProviderId.Gsmtc,
+                    gsmtcAdapter,
+                    gsmtcAdapter),
+                new MediaTargetAdapterRegistration(
+                    MediaTargetProviderId.Browser,
+                    browserAdapter,
+                    browserAdapter));
             var router = new MediaRouter(adapter);
             diagnosticLog = new JsonLinesDiagnosticLog();
             mediaApplication = new MediaLock.Application.MediaLockApplication(
@@ -87,7 +106,8 @@ public partial class App : System.Windows.Application
                 new RegistryLoginStartupManager(),
                 new JsonRuntimeStateRepository(),
                 diagnosticLog,
-                systemLifecycle);
+                systemLifecycle,
+                mediaTargetAuthorizationController: adapter);
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
@@ -127,7 +147,10 @@ public partial class App : System.Windows.Application
                 environmentInfoProvider: new WindowsAppEnvironmentInfoProvider(),
                 desktopSupportActions: new DesktopSupportActions(),
                 isMediaInputRunning: () => mediaInputCoordinator?.IsRunning == true,
-                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback());
+                playbackStateLockFeedback: new SystemPlaybackStateLockFeedback(),
+                sourceApplicationMetadataResolver:
+                    new WindowsSourceApplicationMetadataResolver(
+                        QueueSourceMetadataDiagnostic));
             var window = new MainWindow(mainWindowViewModel);
             mainWindow = window;
             MainWindow = window;
@@ -383,6 +406,51 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private void QueueSourceMetadataDiagnostic(DiagnosticEvent diagnosticEvent)
+    {
+        ArgumentNullException.ThrowIfNull(diagnosticEvent);
+        Task diagnosticTask;
+        lock (sourceMetadataDiagnosticGate)
+        {
+            if (shutdownStarted)
+            {
+                return;
+            }
+
+            diagnosticTask = Task.Run(async () =>
+            {
+                try
+                {
+                    if (diagnosticLog is not null)
+                    {
+                        await diagnosticLog.WriteAsync(
+                            diagnosticEvent,
+                            CancellationToken.None).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    var exceptionType = exception.GetType().FullName ?? exception.GetType().Name;
+                    System.Diagnostics.Trace.TraceError(
+                        $"Source metadata diagnostic write failed: {exceptionType}.");
+                }
+            });
+            sourceMetadataDiagnosticTasks.Add(diagnosticTask);
+        }
+
+        _ = diagnosticTask.ContinueWith(
+            completedTask =>
+            {
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    sourceMetadataDiagnosticTasks.Remove(completedTask);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
     internal static async ValueTask TryWriteInputHookStartedDiagnosticAsync(
         IDiagnosticLog diagnosticLog,
         bool enabled)
@@ -407,12 +475,15 @@ public partial class App : System.Windows.Application
 
     private async ValueTask ShutdownAsync()
     {
-        if (shutdownStarted)
+        lock (sourceMetadataDiagnosticGate)
         {
-            return;
-        }
+            if (shutdownStarted)
+            {
+                return;
+            }
 
-        shutdownStarted = true;
+            shutdownStarted = true;
+        }
         if (systemThemeSubscribed)
         {
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
@@ -481,6 +552,20 @@ public partial class App : System.Windows.Application
         mainWindowViewModel = null;
         mainWindow = null;
 
+        if (browserMediaBridgeServer is not null)
+        {
+            try
+            {
+                await browserMediaBridgeServer.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            browserMediaBridgeServer = null;
+        }
+
         if (mediaApplication is not null)
         {
             try
@@ -499,6 +584,14 @@ public partial class App : System.Windows.Application
         {
             try
             {
+                Task[] pendingSourceMetadataDiagnostics;
+                lock (sourceMetadataDiagnosticGate)
+                {
+                    pendingSourceMetadataDiagnostics =
+                        sourceMetadataDiagnosticTasks.ToArray();
+                }
+
+                await Task.WhenAll(pendingSourceMetadataDiagnostics);
                 await diagnosticLog.DisposeAsync();
             }
             catch (Exception exception)

@@ -9,6 +9,35 @@ Media Lock 的領域是選擇、鎖定、恢復及控制 Windows 媒體工作階
 一個由支援 System Media Transport Controls 的來源應用程式公開、可觀察且可能可遠端控制的播放工作階段。
 _Avoid_: Player instance, tab
 
+**Media Target**:
+Router 在單次 Route Decision 中可解析並控制的 provider-qualified 目標；目前可由 Media Session 或
+Browser Media Target 提供。它不是需要跨失效狀態保存的 Locked Target。
+_Avoid_: Player, Locked Target, generic Media Session
+
+**Authoritative Media Target Correlation**:
+provider 對一個 Browser Media Target 與一個 GSMTC Media Target 是同一播放來源所提出的精確證據。
+只有此證據可以在可見 target projection 中隱藏該 GSMTC duplicate；瀏覽器 executable、title、URL、
+origin 相似、tab order 與 track metadata 都不是 correlation evidence。
+_Avoid_: title match, browser deduplication, heuristic correlation
+
+**Browser Media Target**:
+使用者明確授權、可由 Browser Adapter 解析成特定網頁播放端點的頁面級媒體目標；它不等於瀏覽器程序、
+網站名稱或當前分頁標題。
+_Avoid_: Browser Session, Chrome target, website player
+
+**Page Binding**:
+Browser Media Target 跨文件重建時保持的邏輯頁面身分；只有同一 binding 的後繼文件可以延續鎖定或規則。
+_Avoid_: Tab ID, URL match, page title
+
+**Browser Media Endpoint**:
+Browser Media Target 在目前文件與 frame 中實際接收命令的短生命週期播放端點；重新整理或導覽會使它失效。
+_Avoid_: Browser Media Target, saved tab
+
+**Browser Application Scope**:
+由特定瀏覽器設定檔與網站／已安裝 Web App 身分共同界定的應用程式範圍；它不能只由 Chrome、Brave 等
+瀏覽器程序名稱表示。
+_Avoid_: Browser executable, all browser tabs
+
 **Windows Current Session**:
 Windows 目前判定最適合接收媒體控制的 Media Session；它可以隨系統活動而改變。
 _Avoid_: Active player, default player
@@ -52,6 +81,11 @@ _Avoid_: Selection, dispatch
 **Media Command**:
 使用者意圖執行的播放、暫停、切換播放狀態、上一首、下一首、停止或未來支援的定位操作。
 _Avoid_: Key press, hotkey
+
+**Media Command Outcome**:
+Adapter 對單次 Media Command dispatch 回報的 one-shot 結果；正式值為 Succeeded、Unsupported、
+Rejected、Failed 與 Outcome Unknown。Outcome Unknown 表示命令可能已跨越 provider boundary，不得重送。
+_Avoid_: retry status, transport response
 
 **Playback State Lock**:
 針對當前控制目標提供單向播放保護的執行期政策；正式值為 Off 與 Keep Playing。Keep Playing 只能在

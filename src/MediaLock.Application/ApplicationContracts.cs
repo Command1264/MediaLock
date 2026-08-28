@@ -13,6 +13,10 @@ public abstract record ApplicationIntent
 
     public sealed record LockSession(SessionKey Session) : ApplicationIntent;
 
+    public sealed record LockTarget(MediaTargetId Target) : ApplicationIntent;
+
+    public sealed record RevokeTargetAuthorization(MediaTargetId Target) : ApplicationIntent;
+
     public sealed record LockApplication(string SourceAppUserModelId) : ApplicationIntent;
 
     public sealed record UsePriorityRules : ApplicationIntent;
@@ -23,7 +27,7 @@ public abstract record ApplicationIntent
 
     public sealed record Route(
         MediaCommand Command,
-        SessionKey? ExpectedTarget = null) : ApplicationIntent;
+        MediaTargetId? ExpectedTarget = null) : ApplicationIntent;
 
     public sealed record SetPlaybackStateLock(
         PlaybackStateLockMode Mode) : ApplicationIntent;

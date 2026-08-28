@@ -23,7 +23,7 @@ Cover:
 
 Use a fake clock and immutable fixtures. Every state transition should assert both new state and requested effects.
 
-Phase 1 tests the router through `IMediaRouter.DispatchAsync` with an in-memory `IMediaController` adapter. The
+Phase 1 tests the router through `IMediaRouter.DispatchAsync` with an in-memory `IMediaTargetController` Adapter. The
 suite covers Windows Auto, App Lock and Session Lock decisions; unique and ambiguous recovery; all Fallback Policy
 values; stable Recovery epochs and stale deadlines; fingerprint confidence ranking; idempotent immutable catalog
 refreshes; unsupported commands and failed controls; submission ordering, maximum concurrency and queued
@@ -31,8 +31,8 @@ cancellation. Tests do not call reducer helpers or inspect the router's internal
 
 Phase 2 tests application coordination through `IMediaLockApplication`: catalog snapshots enter the real router,
 UI intents lock and route, and Recovery deadline effects apply fallback without ViewModel coordination. ViewModel
-tests use only public binding properties and async commands. Windows adapter tests cross `IMediaSessionCatalog` and
-`IMediaController`, replacing only the external WinRT manager/Session boundary. Regression coverage also verifies
+tests use only public binding properties and async commands. Windows Adapter tests cross `IMediaTargetCatalog` and
+`IMediaTargetController`, replacing only the external WinRT manager/Session boundary. Regression coverage also verifies
 ordered application projection under concurrent dispatch, stale-target removal after terminal catalog failure and
 capacity-one coalescing of burst GSMTC events, including cancellation of a blocked refresh during disposal.
 
@@ -63,6 +63,13 @@ commands, and restores the prior runtime document if the startup-settings commit
 Saving reordered, enabled, disabled or removed Priority Rules while Priority Rules is active must immediately
 recalculate the routed target through `IMediaLockApplication`; restarting or reselecting the Routing Mode is not part
 of acceptance.
+
+Phase 15 tests the source-name Module through its presentation Interface. Coverage proves trusted display/host
+composition, raw-ID fallback, deterministic collision disambiguation, Main and Settings projection, accessible raw
+details and preservation of the exact identity in App Lock and saved Priority Rules. Windows Adapter tests replace
+AppsFolder enumeration with deterministic metadata and prove exact, case-sensitive lookup, one-time loading and safe
+catalog failure. Named desktop evidence separately verifies the real Brave YouTube Music PWA and ordinary Brave／Chrome
+entries because a fake cannot prove Shell registration.
 
 Settings tests maintain a runtime-consumer matrix. Recovery and Priority Rules must reach the Router immediately,
 including cancellation and replacement of an active Recovery deadline when its timeout changes. Login startup must
@@ -120,7 +127,12 @@ missing or out-of-range requests. Application coverage proves the exact command 
 Windows adapter coverage proves capability mapping and ticks translation. ViewModel and WPF coverage proves local
 preview, one commit per gesture, asynchronous timeline confirmation, bounded rollback, target-change cancellation,
 disabled states, localization, theme and accessibility without adding a Seek media-key mapping.
-WPF and ViewModel coverage also verifies that the localized error card has an explicit dismiss action.
+WPF and ViewModel coverage also verifies that the localized error card has an explicit dismiss action, that an
+ordinary Application state refresh does not redisplay the same dismissed error, and that the message becomes visible
+again after the underlying condition clears and recurs. A startup-lock fallback also keeps its already-selected mode
+action enabled when the saved startup mode differs, allowing one explicit click to persist the safe fallback.
+Resolved-target command coverage keeps Play disabled while Playing, Pause disabled while Paused and Toggle enabled
+when advertised; Unknown presentation falls back to capability-only enablement.
 Selection-bookmark coverage publishes repeated catalog and Recovery snapshots across all four Routing Modes. It replaces
 the locked Session Key, verifies both lock modes select the Router-resolved successor, and proves explicit selections are
 never overridden. WPF coverage also replaces the ephemeral Key of a still-present, unrelated selected row while another
@@ -355,6 +367,20 @@ Record results in [Phase 5A manual smoke](phase-5/manual-smoke.md).
 
 Record results in [Phase 5B manual smoke](phase-5/priority-rules-smoke.md).
 
+### Phase 15 human-readable source identity smoke test
+
+1. Run the Phase 15 candidate with ordinary Brave YouTube and the installed Brave YouTube Music PWA both publishing
+   Sessions. Verify the Main list and current target use distinct friendly names while raw IDs remain available as
+   details.
+2. Open Settings and verify the add-rule choice and existing Priority Rules use the same names. Add／reorder／save the
+   YouTube Music rule and confirm the exact raw ID remains in `settings.json`.
+3. Activate each Routing Mode, route Play/Pause once and verify the intended source changes once while the competing
+   source remains unchanged. Refresh the PWA and verify Recovery still follows the original identity.
+4. Repeat the presentation check in English／Traditional Chinese, Light／Dark and the supported minimum main-window
+   size. Missing metadata must visibly fall back to the raw ID without error or routing loss.
+
+Record results in [Phase 15 source identity evidence](phase-15/human-readable-source-identities.md).
+
 ## 4. Compatibility matrix
 
 Record Windows build, application version, input device/backend and result for:
@@ -494,6 +520,128 @@ Record stable `0.2.0` evidence independently in
 [Phase 10D packaged validation](phase-10/stable-release-smoke.md).
 Record stable `0.3.0` evidence independently in
 [Phase 14 packaged validation](phase-14/stable-release-smoke.md).
+
+### Phase 16A browser-direct Probe
+
+Phase 16A remains outside production packaging. Run its C# framing／protocol tests and dependency-free Node Extension
+tests explicitly, run its PowerShell registration contract test under Windows PowerShell 5.1, then syntax-check every
+executable Extension script. The fixed public manifest key／Extension ID,
+least-privilege permissions and exact Native Host `allowed_origins` are test contracts. A failure is a Prototype
+blocker rather than permission to weaken the origin or site allowlists.
+
+After first loading or reloading the unpacked Phase 16A Extension, an eligible page that predates that load must first
+reject as `target-unavailable`; reload the page once, then require the next command to be accepted exactly once. This
+documents Chrome's declarative content-script lifecycle and must not be hidden by retrying a mutating command.
+
+The named Chrome／Brave／Brave YouTube Music PWA matrix must distinguish command acceptance from observed movement and
+record duplicate count, reload／navigation target continuity, Native Host disconnect and competing-source isolation.
+Timeout or an unknown outcome must not retry a mutating command. See the
+[Phase 16A Probe plan](phase-16/browser-direct-probe-plan.md).
+
+The Extension protocol test also owns the initial-handshake readiness gate: a command may wait for negotiation only
+before dispatch, must proceed once after readiness, and must fail on bounded timeout or disconnect. It may never use
+that gate to retry a command already posted to the Host.
+
+On Windows, the Probe's Chrome and Brave registration commands share one Chrome-compatible current-user Native
+Messaging registry seam. The PowerShell contract test must invoke both public scripts against an isolated registry
+root, require the same manifest／registry identity, migrate only an exact legacy Probe-owned value and preserve a
+foreign value. It must also remove an exact obsolete Brave-specific Probe value without claiming or deleting a
+foreign value at that location. Registration output is content-addressed: the contract must keep one Host process
+running while an unchanged registration reuses its output, then switch a simulated new build to a different
+executable path without stopping or overwriting the running Host. Manual Brave evidence additionally verifies that
+the launched Host's process ancestry reaches `brave.exe`; a matching unused Brave-specific registry value is not
+acceptance evidence.
+
+Every future production integration gate also runs two independent compatibility lanes:
+
+1. **No Extension installed** — the complete stable `0.3.0` regression suite remains available through GSMTC, with no
+   blocking prompt or browser-integration dependency.
+2. **Extension available** — supported browser targets gain exact identity and direct capabilities, while unsupported
+   targets and applications retain their existing GSMTC behavior.
+
+Removing or disabling an Extension before startup must behave like provider absence. Disconnecting it after a direct
+target was bound must instead exercise explicit target-preserving Recovery and prove that no competing Session is
+controlled.
+
+Phase 16B adds a generic Adapter matrix for a directly hosted MP4, cloud-drive MP4, ordinary streaming page, multiple
+media elements, same-origin and cross-origin iframe, unsupported／DRM player and revoked site permission. For every
+supported row, record the browser profile, Page Binding, document generation, frame and selected Endpoint separately;
+page title, media title, origin and browser executable are presentation／scope inputs rather than sufficient identity.
+
+Routing-mode tests use two playable pages in the same browser. Session Lock and page-scoped Priority Rules must route
+only to the bound page. App Lock must use its explicit Browser Application Scope and refuse an ambiguous candidate.
+Windows Auto may change targets by policy, but its visible selection must still identify the exact page. Reload,
+same-origin navigation, cross-origin navigation, tab duplication, tab replacement and browser restart must never
+silently rebind a saved lock or rule to the other page.
+For the first production Browser Session Lock candidate, any tab `loading` event removes every old temporary or
+exact-site binding for that tab. Temporary authorization never automatically rebinds. A completed top-level HTTPS
+document under a retained exact-site grant may publish exactly one new opaque target, but Router and Playback State
+Lock tests require the predecessor identity to remain unavailable until the user explicitly locks the successor.
+An intervening `loading` generation or tab close invalidates any pending permission check before it can bind.
+The same generation must be revalidated after Endpoint binding／Native Host negotiation and immediately before target
+publication. A deterministic delayed-bind test invalidates the tab while binding is pending, requires the stale
+result to be discarded, and proves that exact discard cannot remove a newer same-tab successor.
+Deterministic Extension tests also require same-tab repeated authorization to publish the old binding's removal
+before its replacement, reject stale-document observations, republish page-originated playback changes and carry
+bounded playback rate into desktop timeline interpolation.
+Application tests lock and route an exact Browser target with a recording runtime repository and require zero
+post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
+creating or replacing `state.json`.
+See the [Phase 16B generic web media Adapter plan](phase-16/generic-web-media-adapter-plan.md).
+
+### Phase 16C production integration
+
+Production integration follows the staged gates in the
+[Phase 16C plan](phase-16/production-integration-plan.md). The disposable Probe now has named Brave generic-media,
+cloud-hosted MP4, ordinary streaming and fail-closed unsupported-page evidence. Treat those rows only as entry
+evidence: every different production Extension, Native Host executable and package must rerun the named matrix.
+
+At the provider-neutral seam, deterministic tests use independent GSMTC and Browser Adapters and assert only
+observable target snapshots and command results. They cover provider-qualified identity, two same-title pages,
+capability enforcement, expected-target capture, stale Endpoint rejection, permission revocation, ambiguity,
+provider absence, bound-target loss and unknown outcomes without retry. Browser transport identifiers and permission
+state remain internal to the Browser Adapter Module and are not test inputs to Router policy.
+
+The Core／Application seam slice additionally proves that an authoritative exact correlation suppresses only its
+named GSMTC duplicate, while same-title pages and uncorrelated Brave GSMTC targets remain distinct. Capability and
+expected-target rejection perform zero Adapter calls; every returned outcome performs exactly one call and Outcome
+Unknown is never retried. These are deterministic seam tests, not evidence that a production Browser Adapter exists.
+
+Every production candidate runs two independent compositions:
+
+1. with no Extension installed, the complete relevant `0.3.0` GSMTC regression remains available without a prompt,
+   settings migration or Browser Adapter dependency; and
+2. with the Extension available, direct Session Lock routes Play, Pause, Toggle Play／Pause and bounded Seek only to
+   its exact Page Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never
+   controls a competing page or GSMTC Session. Provider-neutral input coverage proves a supported physical Toggle is
+   consumed and dispatched with the exact captured Browser target rather than being passed through to Windows.
+   Provider-neutral Playback State Lock coverage arms a playing Browser target, corrects an external Pause with one
+   explicit Play to that exact target, applies repeated-pause release and suspends without correcting a replacement
+   binding or GSMTC competitor when the armed target disappears.
+   Popup contract coverage opens the real Popup entry with a fake DOM, requires an active Binding to display
+   Authorized, requires a retained exact-site permission without a Binding to display trusted-site waiting, and
+   requires a page with neither state to display Not authorized. The top-level document Endpoint status message fails
+   closed when no live Binding can answer. Controller coverage proves a Popup reopened against the same bound
+   document receives only authorization state and scope; locale and layout contracts cover English fallback,
+   Traditional Chinese projection and the vertically spaced action group. A revoked exact-site permission overrides
+   any stale live-document status response and projects Not authorized. Exact temporary or site revocation sends an
+   exact-document unbind, after which the same document reports Not authorized and rejects later commands. Popup
+   failures must render localized actionable prose and a stable `ML-BR-*` support code rather than a raw internal
+   kebab-case identifier. The content-script runtime boundary test must include `unbindGenericEndpoint`; testing only
+   the controller is insufficient because the outer message allowlist can otherwise drop a valid revoke request.
+   Extension lifecycle coverage proves Native Messaging disconnect consumes Chromium's scoped last error and never
+   calls `disconnect()` on the already-closed port.
+
+App Lock, Priority Rules and Windows Auto each require a later two-page routing-mode matrix before enablement.
+Settings migration, authorization UI, Native Host ownership, Extension update/removal and packaged upgrade／repair／
+uninstall evidence are independent gates and cannot be inferred from the Session Lock slice.
+
+The Issue #62 candidate now owns the focused .NET Browser tests, dependency-free Extension tests and isolated
+current-user registration contract in
+[the Browser Session Lock runbook](phase-16/browser-session-lock-candidate.md). The full solution gate remains
+mandatory because the no-Extension composition must preserve every GSMTC test. Manual acceptance then runs the six
+named lanes in that runbook; Probe results do not transfer. Until those rows pass, the candidate must not be described
+as packaged, distributed or production-qualified.
 
 ## 7. Manual evidence
 

@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Routing;
@@ -22,6 +23,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private readonly AppEnvironmentInfo environmentInfo;
     private readonly IDesktopSupportActions? desktopSupportActions;
     private readonly Func<bool> isMediaInputRunning;
+    private readonly ISourceApplicationMetadataResolver? sourceApplicationMetadataResolver;
     private readonly AsyncCommand saveCommand;
     private bool closeToTray;
     private bool startWithWindows;
@@ -57,7 +59,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         Action<string>? applyTheme = null,
         IAppEnvironmentInfoProvider? environmentInfoProvider = null,
         IDesktopSupportActions? desktopSupportActions = null,
-        Func<bool>? isMediaInputRunning = null)
+        Func<bool>? isMediaInputRunning = null,
+        ISourceApplicationMetadataResolver? sourceApplicationMetadataResolver = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         this.application = application;
@@ -74,6 +77,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             IsSigned: false);
         this.desktopSupportActions = desktopSupportActions;
         this.isMediaInputRunning = isMediaInputRunning ?? (() => false);
+        this.sourceApplicationMetadataResolver = sourceApplicationMetadataResolver;
         saveCommand = new AsyncCommand(_ => SaveAsync(), _ => !HasErrors);
         SaveCommand = saveCommand;
         CancelCommand = new AsyncCommand(_ => CancelAsync());
@@ -112,7 +116,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
     public ObservableCollection<PriorityRuleItemViewModel> PriorityRules { get; } = [];
 
-    public ObservableCollection<string> AvailableApplications { get; } = [];
+    public ObservableCollection<SourceApplicationOptionViewModel> AvailableApplications { get; } = [];
 
     public string? SelectedAvailableApplication
     {
@@ -650,10 +654,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         RepeatedPauseCountText = playbackSettings.RepeatedPauseCount
             .ToString(CultureInfo.InvariantCulture);
         PlayRepeatedPauseOverrideSound = playbackSettings.PlayOverrideSound;
+        var presentations = ResolvePresentations(
+            application.State,
+            settings.PriorityRules.Select(rule => rule.SourceAppUserModelId));
         PriorityRules.Clear();
         foreach (var rule in settings.PriorityRules)
         {
-            PriorityRules.Add(new PriorityRuleItemViewModel(rule));
+            PriorityRules.Add(new PriorityRuleItemViewModel(
+                rule,
+                presentations[rule.SourceAppUserModelId]));
         }
 
         RefreshAvailableApplications(application.State);
@@ -763,8 +772,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             return Task.CompletedTask;
         }
 
+        var presentation = ResolvePresentations(
+            application.State,
+            [SelectedAvailableApplication])[SelectedAvailableApplication];
         PriorityRules.Add(new PriorityRuleItemViewModel(
-            new PriorityRule(SelectedAvailableApplication)));
+            new PriorityRule(SelectedAvailableApplication),
+            presentation));
         SelectedAvailableApplication = null;
         RefreshAvailableApplications(application.State);
         return Task.CompletedTask;
@@ -811,16 +824,29 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
 
     private void RefreshAvailableApplications(MediaLockApplicationState state)
     {
-        var available = state.Router.Sessions
+        var presentations = ResolvePresentations(state);
+        foreach (var rule in PriorityRules)
+        {
+            rule.ApplyPresentation(presentations[rule.SourceAppUserModelId]);
+        }
+
+        var availableSourceIds = state.Router.Sessions
             .Select(session => session.SourceAppUserModelId)
             .Distinct(StringComparer.Ordinal)
             .Where(source => !PriorityRules.Any(rule => string.Equals(
                 rule.SourceAppUserModelId,
                 source,
                 StringComparison.Ordinal)))
-            .OrderBy(source => source, StringComparer.Ordinal)
             .ToArray();
-        if (AvailableApplications.SequenceEqual(available, StringComparer.Ordinal))
+        var available = availableSourceIds
+            .Select(source => new SourceApplicationOptionViewModel(
+                source,
+                presentations[source].DisplayName,
+                presentations[source].Details))
+            .OrderBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(option => option.SourceAppUserModelId, StringComparer.Ordinal)
+            .ToArray();
+        if (AvailableApplications.SequenceEqual(available))
         {
             return;
         }
@@ -832,11 +858,28 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             AvailableApplications.Add(source);
         }
 
-        SelectedAvailableApplication = selected is not null && available.Contains(
+        SelectedAvailableApplication = selected is not null && availableSourceIds.Contains(
             selected,
             StringComparer.Ordinal)
                 ? selected
                 : null;
+    }
+
+    private IReadOnlyDictionary<string, SourceApplicationPresentation> ResolvePresentations(
+        MediaLockApplicationState state,
+        IEnumerable<string>? extraSourceIds = null)
+    {
+        var sourceIds = state.Router.Sessions
+            .Select(session => session.SourceAppUserModelId)
+            .Concat(PriorityRules.Select(rule => rule.SourceAppUserModelId));
+        if (extraSourceIds is not null)
+        {
+            sourceIds = sourceIds.Concat(extraSourceIds);
+        }
+
+        return SourceApplicationPresentationCatalog.Resolve(
+            sourceIds,
+            sourceApplicationMetadataResolver);
     }
 
     private void SetField<T>(

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Media Lock Phase 16B Probe</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Generic Web Media Probe</h1>
+      <p>Authorize this HTTPS page once, always allow its exact site, or use a fixed YouTube adapter.</p>
+      <button id="authorize-temporary" type="button">Authorize this page</button>
+      <button id="authorize-site" type="button">Always allow this site</button>
+      <div class="actions">
+        <button type="button" data-command="play">Play</button>
+        <button type="button" data-command="pause">Pause</button>
+      </div>
+      <label for="seek-seconds">Seek position (seconds)</label>
+      <div class="seek-row">
+        <input id="seek-seconds" type="number" min="0" step="0.1" value="30">
+        <button id="seek" type="button">Seek</button>
+      </div>
+      <div class="status-row">
+        <p id="status" role="status" aria-live="polite">Ready.</p>
+        <button id="copy-status" type="button">Copy</button>
+        <p id="copy-feedback" role="status" aria-live="polite" hidden></p>
+      </div>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

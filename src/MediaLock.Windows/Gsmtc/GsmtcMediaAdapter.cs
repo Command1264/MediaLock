@@ -6,7 +6,7 @@ using MediaLock.Core.Media;
 
 namespace MediaLock.Windows.Gsmtc;
 
-public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
+public sealed class GsmtcMediaAdapter : IMediaTargetCatalog, IMediaTargetController
 {
     private readonly IGsmtcSessionManagerFactory managerFactory;
     private readonly TimeProvider timeProvider;
@@ -14,8 +14,8 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
     private readonly IWorkstationLockState? workstationLockState;
     private readonly IReadOnlyList<TimeSpan> reacquisitionDelays;
     private readonly HashSet<string> excludedSourceApplicationIds;
-    private readonly Channel<MediaSessionCatalogSnapshot> snapshots =
-        Channel.CreateUnbounded<MediaSessionCatalogSnapshot>(new UnboundedChannelOptions
+    private readonly Channel<MediaTargetCatalogSnapshot> snapshots =
+        Channel.CreateUnbounded<MediaTargetCatalogSnapshot>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = false,
@@ -104,7 +104,7 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         }
     }
 
-    public async IAsyncEnumerable<MediaSessionCatalogSnapshot> WatchAsync(
+    public async IAsyncEnumerable<MediaTargetCatalogSnapshot> WatchAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -136,20 +136,38 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         }
     }
 
-    public ValueTask<MediaControlResult> TryExecuteAsync(
-        SessionKey target,
+    public async ValueTask<MediaCommandOutcome> TryExecuteAsync(
+        MediaTargetId target,
         MediaCommand command,
         CancellationToken cancellationToken)
     {
+        if (target.Provider != MediaTargetProviderId.Gsmtc)
+        {
+            return MediaCommandOutcome.Unsupported;
+        }
+
         IGsmtcSession? session;
         lock (sessionsSync)
         {
-            liveSessions.TryGetValue(target, out session);
+            liveSessions.TryGetValue(new SessionKey(target.Value), out session);
         }
 
-        return session is null
-            ? ValueTask.FromResult(MediaControlResult.Failed)
-            : session.TryExecuteAsync(command, cancellationToken);
+        if (session is null)
+        {
+            return MediaCommandOutcome.Failed;
+        }
+
+        var result = await session.TryExecuteAsync(command, cancellationToken);
+        return result switch
+        {
+            MediaControlResult.Succeeded => MediaCommandOutcome.Succeeded,
+            MediaControlResult.Rejected => MediaCommandOutcome.Rejected,
+            MediaControlResult.Failed => MediaCommandOutcome.Failed,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(result),
+                result,
+                "Unknown GSMTC media control result."),
+        };
     }
 
     public async ValueTask DisposeAsync()
@@ -491,16 +509,20 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
             .ToArray();
         ReconcileSessions(sessions);
         var observedAt = timeProvider.GetUtcNow();
-        var builder = ImmutableArray.CreateBuilder<MediaSessionSnapshot>(sessions.Length);
+        var builder = ImmutableArray.CreateBuilder<MediaTargetSnapshot>(sessions.Length);
         foreach (var session in sessions)
         {
-            builder.Add(await session.ReadAsync(GetKey(session), observedAt, cancellationToken));
+            builder.Add(MediaTargetSnapshot.FromGsmtc(
+                await session.ReadAsync(GetKey(session), observedAt, cancellationToken)));
         }
 
         var current = currentManager.GetCurrentSession();
         var currentKey = ResolveCurrentSessionKey(current, sessions);
         await snapshots.Writer.WriteAsync(
-            new MediaSessionCatalogSnapshot(builder.MoveToImmutable(), currentKey),
+            new MediaTargetCatalogSnapshot(
+                builder.MoveToImmutable(),
+                currentKey is { } key ? MediaTargetId.FromGsmtc(key) : null,
+                []),
             cancellationToken);
     }
 
@@ -508,7 +530,7 @@ public sealed class GsmtcMediaAdapter : IMediaSessionCatalog, IMediaController
         MediaSessionCatalogStatus status,
         string message,
         CancellationToken cancellationToken) => snapshots.Writer.WriteAsync(
-            new MediaSessionCatalogSnapshot([], null, status, message),
+            new MediaTargetCatalogSnapshot([], null, [], status, message),
             cancellationToken);
 
     private async ValueTask ReleaseManagerAsync()

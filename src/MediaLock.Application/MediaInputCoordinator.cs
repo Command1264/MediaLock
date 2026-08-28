@@ -138,13 +138,13 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
             return false;
         }
 
-        var target = router.Sessions.FirstOrDefault(session => session.Key == targetKey.Value);
+        var target = router.Targets.FirstOrDefault(candidate => candidate.Id == targetKey.Value);
         return target is not null &&
-            target.Capabilities.Supports(command) &&
+            target.Presentation.Capabilities.Supports(command) &&
             inputs.Writer.TryWrite(new PendingInput(
                 Interlocked.Increment(ref nextSequence),
                 command,
-                target.Key));
+                target.Id));
     }
 
     private async Task ProcessInputsAsync()
@@ -237,5 +237,5 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
     private sealed record PendingInput(
         long Sequence,
         MediaCommand Command,
-        SessionKey ExpectedTarget);
+        MediaTargetId ExpectedTarget);
 }

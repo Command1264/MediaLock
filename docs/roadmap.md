@@ -621,7 +621,7 @@ provenance remain unchanged.
 Replace raw source-application identifiers in user-facing Session and Priority Rules surfaces with a trustworthy,
 human-readable presentation while preserving the exact GSMTC identity used by routing. For example, an installed
 YouTube Music PWA currently exposed as `Brave._crx_cinhimbnkkghhklpknlkffjgod` may display as
-`YouTube Music — Brave Web App` when Windows application metadata can verify both parts.
+`YouTube Music — Brave` when Windows application metadata can verify both parts.
 
 This is a presentation resolver, not browser URL detection and not an identity migration. App Lock, Priority Rules,
 Recovery and persisted state continue comparing the complete `SourceAppUserModelId`; the friendly name may change
@@ -641,4 +641,122 @@ Exit criteria:
 - Unit tests cover resolver precedence, collisions, fallback and localization; a named Brave YouTube Music PWA plus
   ordinary Brave YouTube smoke confirms that display improvements do not alter routed commands or Recovery.
 
-Status: planned after the `0.3.0` stable-release work; it is not part of the current stable artifact.
+Status: implementation and named desktop acceptance complete on 2026-08-26 after the `0.3.0` stable release. The
+candidate uses exact Windows AppsFolder AUMID/display-name metadata with raw-ID fallback and does not alter routing
+identity. All 383 automated tests, Release build, formatting, packaging regression and two-axis review passed. A named
+Brave YouTube Music PWA／ordinary Brave YouTube smoke confirmed shared Main／Settings presentation, raw-ID details,
+physical Play／Pause isolation and Session Lock Recovery without rebinding. It is not part of the current stable
+artifact. See
+[`phase-15/human-readable-source-identities.md`](phase-15/human-readable-source-identities.md).
+
+## Phase 16 — Direct browser integration
+
+Add an optional, support-bounded browser-control path for standards-based web media that can address an exact page or
+installed PWA without using that source's GSMTC Session as the command transport. A generic Adapter covers compatible
+`HTMLMediaElement` pages such as directly hosted／cloud MP4 and ordinary streaming media; site Adapters add richer
+capabilities where a documented platform contract exists. The existing GSMTC adapter remains the universal fallback
+for unsupported sites, browsers and desktop media applications. This phase does not promise to replace Windows GSMTC,
+suppress Sessions owned by other processes or force Media Lock to remain Windows Current Session.
+
+The intended shape is a peer browser adapter behind a neutral media-target seam, not browser-specific behavior inside
+the existing GSMTC adapter:
+
+```text
+Authorized web media ──▶ browser extension ──▶ native messaging ──▶ browser adapter
+GSMTC applications ──────────────────────────────────────────────▶ GSMTC adapter
+                                                                       │
+                                                                       ▼
+                                                         existing routing semantics
+                                                                       │
+                                                                       ├─▶ physical media keys
+                                                                       └─▶ optional Media Lock SMTC mirror
+```
+
+The work is divided into three independent evidence gates. Passing direct control does not imply that Chromium's own
+SMTC publication was suppressed, and neither result implies that Windows will select the Media Lock mirror:
+
+1. **Direct-control gate** — identify and control the intended YouTube／YouTube Music tab, observe metadata, playback
+   state and timeline, and survive navigation, reload, browser restart and native-host reconnect without duplicate
+   commands.
+2. **Source-publication gate** — determine whether each supported browser can voluntarily disable its own Windows
+   media integration through a documented, user-reversible mechanism. Chromium feature flags may be measured as an
+   experimental controlled-browser option, but are not a stable cross-browser product contract.
+3. **Windows-projection gate** — separately evaluate a best-effort Media Lock-owned SMTC mirror. Phase 11B's Limit
+   decision remains authoritative: public Windows APIs cannot guarantee that the mirror is Current or the only card.
+
+Exit criteria:
+
+- A disposable extension/native-host prototype passes Chrome, ordinary Brave and installed Brave YouTube Music PWA
+  tests before production architecture or packaging is approved.
+- Play, Pause and Seek use stable web media primitives where available; site-specific Next／Previous behavior is
+  isolated, version-detected and fails closed when the page contract changes.
+- Browser messages validate extension origin, site origin, target identity, schema, size and a command allowlist;
+  native-host access is limited to approved extension identities.
+- Direct targets have explicit identity, capability and Recovery semantics that do not silently rebind existing
+  GSMTC App Lock, Session Lock or Priority Rules.
+- Session Lock and page-scoped Priority Rules retain an exact Page Binding. Browser App Lock uses an exact Browser
+  Application Scope plus deterministic page selection; no mode treats a browser executable as the complete target or
+  silently merges two pages into one rule.
+- Extension absence, permission denial, unsupported pages, disconnects and adapter failures fall back safely to the
+  established GSMTC-only operation without claiming that a command succeeded.
+- A clean profile with no Media Lock Extension installed passes the complete `0.3.0` regression matrix without an
+  installation prompt, disabled GSMTC feature or settings migration. Installing the Extension only adds finer browser
+  identity and direct capabilities for explicitly supported targets.
+- Tests distinguish provider absence from loss of an already-bound direct target: absence starts and remains
+  GSMTC-only, while bound-target loss preserves identity and follows Recovery without rerouting to a competitor.
+- No process injection, Windows component replacement, undocumented Current Session setter or system-wide Session
+  suppression enters production scope.
+- User-facing documentation distinguishes "Media Lock controls the selected browser target directly" from
+  "Windows shows only Media Lock"; the latter is never promised without separate source-by-source evidence.
+
+Status: Phase 16A Gate A completed and merged through PR #56. Phase 16B has a final disposable Probe candidate: an
+explicit gesture creates a temporary or exact-site Page Binding for one unambiguous top-level media Endpoint, and
+routes Play, Pause and bounded Seek through the existing Native Messaging protocol. The production candidate later
+adds exact live-state Toggle Play／Pause for the UI and physical media-key path. Exact-site reload Recovery,
+permission revocation, stale-target invalidation and fixed／generic Adapter coexistence have automated coverage. The
+real-browser final Gate passed on Chrome with temporary／exact-site authorization, command isolation, permission
+revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. A subsequent
+Brave compatibility-closure Gate passed named direct MP4, cloud-hosted MP4, ordinary streaming, ambiguity,
+unsupported-item／iframe fail-closed, lifecycle and installed-`0.3.0` no-Extension GSMTC rows. Nested-frame selection and
+production Router／persistence／release integration remain out of this Probe, and the no-Extension GSMTC path stays
+authoritative. See the
+[`Phase 16A browser-direct Probe plan`](phase-16/browser-direct-probe-plan.md),
+[`Phase 16A browser-direct Probe evidence`](phase-16/browser-direct-probe-evidence.md),
+[`Phase 16B generic web media Adapter plan`](phase-16/generic-web-media-adapter-plan.md),
+[`Native Messaging security boundary`](research/phase-16-native-messaging-security-boundary.md) and
+[`direct-browser integration limits`](research/direct-browser-integration-and-gsmtc-limits.md).
+
+### Phase 16C — production integration gate
+
+Define and review the provider-neutral production seam, close or explicitly narrow the remaining generic-media
+compatibility rows, and stage Session Lock before any Browser Direct code enters production routing, persistence, UI
+or packaging.
+
+Status: the gate definition was accepted through PR #59 and the provider-neutral Core／Application seam is tracked by
+[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). The seam is integrated, and
+[Issue #62](https://github.com/Command1264/MediaLock/issues/62) carries the first Browser Session Lock candidate:
+exact runtime Page Binding, Play／Pause／Toggle Play／Pause／bounded Seek, explicit authorization／revoke UI, a current-user
+Native Messaging bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store
+distribution, installed package ownership and release qualification remain later independent gates. See the
+[candidate runbook](phase-16/browser-session-lock-candidate.md) and [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+## Phase 17 — Localized warnings and stable error codes
+
+Replace user-facing raw warning and error strings with a structured presentation contract. Every semantic warning or
+error receives one stable public code, resolves through the active English or Traditional Chinese UI language and
+uses that same code in the UI, structured logs, privacy-safe diagnostics and support guidance. Raw exception details
+remain bounded technical context rather than the primary user message.
+
+Exit criteria:
+
+- Every known user-facing warning and error has exactly one unique, documented and compatibility-stable code.
+- Main window, Settings and tray surfaces resolve messages from the active UI language without parsing English text.
+- English and Traditional Chinese resource parity, code uniqueness, fallback and immediate language changes have
+  automated coverage.
+- Structured logs and privacy-safe diagnostics carry the same code shown to the user without exposing media metadata,
+  complete target identity, secrets or unrelated full paths.
+- Missing translations and unknown codes fail to a safe, identifiable fallback while routing and recovery behavior
+  remain unchanged.
+
+Status: planned in [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
+telemetry or automatic remote reporting.

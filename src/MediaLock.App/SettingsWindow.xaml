@@ -144,7 +144,18 @@
                             <Button DockPanel.Dock="Right" Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}"
                                     AutomationProperties.Name="{loc:Translate Settings_AddRuleAutomation}" Command="{Binding AddPriorityRuleCommand}" Content="{loc:Translate Settings_Add}" />
                             <ComboBox MinWidth="280" AutomationProperties.Name="{loc:Translate Settings_AvailableAppsAutomation}"
-                                      ItemsSource="{Binding AvailableApplications}" SelectedItem="{Binding SelectedAvailableApplication}" />
+                                      ItemsSource="{Binding AvailableApplications}"
+                                      SelectedValuePath="SourceAppUserModelId"
+                                      SelectedValue="{Binding SelectedAvailableApplication}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   ToolTip="{Binding Details}"
+                                                   AutomationProperties.HelpText="{Binding Details}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </DockPanel>
                         <ItemsControl AutomationProperties.Name="{loc:Translate Settings_RulesAutomation}" ItemsSource="{Binding PriorityRules}">
                             <ItemsControl.ItemTemplate>
@@ -156,7 +167,11 @@
                                                 <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <CheckBox Margin="0,0,10,0" VerticalAlignment="Center" AutomationProperties.Name="{loc:Translate Settings_EnableRuleAutomation}" IsChecked="{Binding IsEnabled}" />
-                                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding SourceAppUserModelId}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                       Text="{Binding DisplayName}"
+                                                       ToolTip="{Binding Details}"
+                                                       AutomationProperties.HelpText="{Binding Details}"
+                                                       TextTrimming="CharacterEllipsis" />
                                             <Button Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource CompactButtonStyle}" AutomationProperties.Name="{loc:Translate Settings_MoveRuleUpAutomation}" Command="{Binding DataContext.MovePriorityRuleUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Content="↑" />
                                             <Button Grid.Column="3" Margin="4,0,0,0" Style="{StaticResource CompactButtonStyle}" AutomationProperties.Name="{loc:Translate Settings_MoveRuleDownAutomation}" Command="{Binding DataContext.MovePriorityRuleDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Content="↓" />
                                             <Button Grid.Column="4" Margin="4,0,0,0" Style="{StaticResource CompactButtonStyle}" AutomationProperties.Name="{loc:Translate Settings_RemoveRuleAutomation}" Command="{Binding DataContext.RemovePriorityRuleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Content="{loc:Translate Settings_Remove}" />

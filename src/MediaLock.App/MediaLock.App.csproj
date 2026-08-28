@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MediaLock.Application\MediaLock.Application.csproj" />
+    <ProjectReference Include="..\MediaLock.Browser\MediaLock.Browser.csproj" />
     <ProjectReference Include="..\MediaLock.Core\MediaLock.Core.csproj" />
     <ProjectReference Include="..\MediaLock.Windows\MediaLock.Windows.csproj" />
   </ItemGroup>

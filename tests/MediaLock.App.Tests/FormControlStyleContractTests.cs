@@ -86,6 +86,36 @@ public sealed class FormControlStyleContractTests
         });
     }
 
+    [Fact]
+    public void ListBoxItemDoesNotChangeItsBorderThicknessWhenSelectedOrFocused()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var item = new ListBoxItem { Content = "Media target" };
+            var list = new ListBox { Items = { item } };
+            var window = ShowControl(list);
+
+            try
+            {
+                var chrome = Assert.Single(
+                    WpfTestHost.FindVisualChildren<Border>(item),
+                    candidate => candidate.Name == "Chrome");
+                var originalThickness = chrome.BorderThickness;
+
+                item.IsSelected = true;
+                Assert.True(item.Focus());
+                item.UpdateLayout();
+
+                Assert.Equal(new Thickness(1), originalThickness);
+                Assert.Equal(originalThickness, chrome.BorderThickness);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
     private static Window ShowControl(Control control)
     {
         var window = new Window

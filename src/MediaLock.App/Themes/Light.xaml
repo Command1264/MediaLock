@@ -24,4 +24,5 @@
     <SolidColorBrush x:Key="DangerBrush" Color="#FFC42B1C" />
     <SolidColorBrush x:Key="DangerSurfaceBrush" Color="#FFFDE7E9" />
     <SolidColorBrush x:Key="FocusBrush" Color="#FF005FB8" />
+    <Color x:Key="OverflowGlyphShadowColor">#7A000000</Color>
 </ResourceDictionary>

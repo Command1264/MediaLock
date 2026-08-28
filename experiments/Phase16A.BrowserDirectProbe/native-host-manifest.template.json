@@ -1,0 +1,9 @@
+{
+  "name": "com.command1264.medialock.phase16a",
+  "description": "Media Lock Phase 16A disposable Native Messaging probe",
+  "path": "<ABSOLUTE_NATIVE_HOST_PATH>",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://kggfkkiifnclhhmibdglkbdfbacakemn/"
+  ]
+}
