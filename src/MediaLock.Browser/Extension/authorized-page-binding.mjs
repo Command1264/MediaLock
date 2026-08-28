@@ -7,12 +7,29 @@ export function createAuthorizedPageBindingCoordinator({
 }) {
   const pendingTabs = new Map();
   const generations = new Map();
+  const operationTails = new Map();
   const invalidate = (tabId) => {
     if (!Number.isSafeInteger(tabId)) {
       return;
     }
     generations.set(tabId, (generations.get(tabId) ?? 0) + 1);
     pendingTabs.delete(tabId);
+  };
+
+  const enqueue = (tabId, action) => {
+    const previous = operationTails.get(tabId) ?? Promise.resolve();
+    const operation = previous
+      .catch(() => undefined)
+      .then(action);
+    const tail = operation
+      .catch(() => undefined)
+      .finally(() => {
+        if (operationTails.get(tabId) === tail) {
+          operationTails.delete(tabId);
+        }
+      });
+    operationTails.set(tabId, tail);
+    return operation;
   };
 
   const bindCurrent = async ({
@@ -61,11 +78,8 @@ export function createAuthorizedPageBindingCoordinator({
         return Promise.resolve({ accepted: false, errorCode: 'target-unavailable' });
       }
       invalidate(tab.id);
-      return bindCurrent({
-        tab,
-        scope,
-        generation: generations.get(tab.id),
-      });
+      const generation = generations.get(tab.id);
+      return enqueue(tab.id, () => bindCurrent({ tab, scope, generation }));
     },
 
     handleTabUpdated(tabId, changeInfo, tab) {
@@ -95,8 +109,7 @@ export function createAuthorizedPageBindingCoordinator({
       if (pending?.generation === generation) {
         return pending.promise;
       }
-      const operation = Promise.resolve()
-        .then(async () => {
+      const operation = enqueue(tabId, async () => {
           if (await hasSitePermission(pageUrl.origin) !== true
               || (generations.get(tabId) ?? 0) !== generation
               || hasTarget(tabId)) {

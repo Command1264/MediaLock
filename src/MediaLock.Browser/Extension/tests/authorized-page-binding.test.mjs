@@ -222,3 +222,68 @@ test('page loading during explicit authorization discards the uncommitted target
   assert.deepEqual(committed, []);
   assert.deepEqual(discarded, ['stale-explicit-binding']);
 });
+
+test('a late stale bind cannot overwrite its newer document successor', async () => {
+  let resolveStaleBinding;
+  const staleBinding = new Promise((resolve) => {
+    resolveStaleBinding = resolve;
+  });
+  let bindCount = 0;
+  let registeredTarget;
+  const committed = [];
+  const discarded = [];
+  const coordinator = createAuthorizedPageBindingCoordinator({
+    hasTarget: () => committed.length > 0,
+    async hasSitePermission() {
+      return true;
+    },
+    async bindTab(tab) {
+      bindCount += 1;
+      const result = bindCount === 1
+        ? await staleBinding
+        : {
+          accepted: true,
+          target: { tabId: tab.id, bindingId: 'successor-binding' },
+        };
+      registeredTarget = result.target;
+      return result;
+    },
+    async commitBinding(result) {
+      committed.push(result.target.bindingId);
+    },
+    discardBinding(target) {
+      discarded.push(target.bindingId);
+      if (registeredTarget?.bindingId === target.bindingId) {
+        registeredTarget = undefined;
+      }
+    },
+  });
+
+  const stale = coordinator.authorizeTab({
+    scope: 'temporary',
+    tab: { id: 42, url: 'https://media.example.test/old-document' },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await coordinator.handleTabUpdated(42, { status: 'loading' }, {
+    id: 42,
+    url: 'https://media.example.test/new-document',
+  });
+  const successor = coordinator.handleTabUpdated(42, { status: 'complete' }, {
+    id: 42,
+    url: 'https://media.example.test/new-document',
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  resolveStaleBinding({
+    accepted: true,
+    target: { tabId: 42, bindingId: 'stale-binding' },
+  });
+
+  assert.deepEqual(await stale, {
+    accepted: false,
+    errorCode: 'document-replaced',
+  });
+  assert.deepEqual(await successor, { accepted: true });
+  assert.equal(registeredTarget?.bindingId, 'successor-binding');
+  assert.deepEqual(committed, ['successor-binding']);
+  assert.deepEqual(discarded, ['stale-binding']);
+});

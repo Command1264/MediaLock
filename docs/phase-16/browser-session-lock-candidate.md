@@ -206,10 +206,11 @@ Extension error or crash.
 
 Final two-axis review found one remaining pre-publication race: explicit authorization did not share the tab-generation
 guard, and trusted-site binding did not revalidate its permission after the asynchronous Endpoint／Native Host work.
-The production paths now share one guarded coordinator. RED regressions prove that reload during explicit
-authorization and permission loss during trusted-site binding both discard the exact uncommitted target instead of
-publishing it. The complete Extension suite passes 61／61 after this correction; it changes no visible interaction, so
-the accepted rapid-reload and revoke rows above remain the corresponding manual evidence.
+The production paths now share one guarded coordinator that serializes binding work per tab. RED regressions prove
+that reload during explicit authorization and permission loss during trusted-site binding both discard the exact
+uncommitted target instead of publishing it, and that a late stale bind cannot overwrite its newer document successor.
+The complete Extension suite passes 62／62 after this correction; it changes no visible interaction, so the accepted
+rapid-reload and revoke rows above remain the corresponding manual evidence.
 
 The grouped Browser row's overflow revocation was then exercised once against the locked Nuevo target. The exact
 Browser target disappeared, Router retained the unavailable provider-qualified identity, transport controls failed
