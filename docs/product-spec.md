@@ -79,10 +79,17 @@ For each available Session, collect available values including:
 - playback status and supported controls
 - title, artist, album title, track number and playback type
 - timeline position and bounds
+- an optional Reported Playback Rate when the provider supplies a finite value in the supported product range
 
 Prefer `SessionsChanged`, `CurrentSessionChanged`, `MediaPropertiesChanged`, `PlaybackInfoChanged` and
 `TimelinePropertiesChanged` over continuous polling. Event handlers schedule refresh work; they do not directly
 mutate UI-bound collections from arbitrary threads.
+
+A missing, invalid or out-of-range playback-rate observation remains absent rather than being normalized to 1× at the
+provider boundary. Presentation resolves one Effective Playback Rate in this order: valid reported value, sufficiently
+confident estimate from authoritative same-target timeline observations, then 1× fallback. The estimate is continuously
+re-evaluated while Playing so a sustained mid-play rate change can replace the prior value. It is presentation-only and
+must not influence identity, routing, Recovery, persistence or media-command capability.
 
 ## 6. Identity and Recovery
 
@@ -216,8 +223,11 @@ Motion is short, non-blocking and disabled when Windows client-area animation is
 The current-target surface may show optional Now Playing artwork and a read-only timeline. Both are projections of
 the Session that would receive a command at that moment; selecting a different list row does not change them. Artwork
 failure falls back to a neutral placeholder and never changes routing state. Timeline interpolation is presentation
-only, clamps to the last observed GSMTC bounds and resets when the routed target disappears or changes. The progress
-indicator is not seekable until player-specific GSMTC capability and acceptance evidence is documented.
+only, clamps to the last observed provider bounds and resets when the routed target disappears or changes. Playing
+interpolation uses the Effective Playback Rate and a monotonic observation anchor. It never feeds an interpolated UI
+position back into rate estimation. The slider may refresh smoothly while localized `mm:ss` text changes only when its
+displayed unit changes; an occasional bounded label step is not equivalent to a frozen timeline. The progress indicator
+is not seekable until player-specific capability and acceptance evidence is documented.
 
 Phase 8A may request absolute playback positions only from the disposable Console Probe. It does not add Seek to the
 production router, input backend, persisted settings or WPF interaction model. A Session advertising playback-position
