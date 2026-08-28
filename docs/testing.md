@@ -110,6 +110,8 @@ reported values, 0.5×／1×／1.5×／2× convergence, insufficient samples, du
 quantization, jitter, outliers, accepted-rate bounds, bounded memory and continuous 1×→2×→0.5× changes with hysteresis.
 Every discontinuity row—Seek, Pause, Stop, Changing, Recovery, reconnect, invalid bounds, position jump, target removal
 and document／target replacement—must lose confidence before later samples can establish a new estimate.
+The candidate contract fixes a five-second window, three-second／three-observation confidence floor, pairwise-slope
+median, 10% published-rate tolerance, two same-direction challenger observations and a 256-target LRU bound.
 
 Application tests feed independent same-title GSMTC and Browser targets through one catalog projection and prove their
 samples never mix. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a

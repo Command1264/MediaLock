@@ -139,7 +139,8 @@ internal sealed class WindowsGsmtcSession : IGsmtcSession, IDisposable
                 timeline.Position,
                 timeline.LastUpdatedTime),
             PlaybackType: MapPlaybackType(properties.PlaybackType),
-            Artwork: artwork);
+            Artwork: artwork,
+            ReportedPlaybackRate: playback?.PlaybackRate);
     }
 
     public async ValueTask<MediaControlResult> TryExecuteAsync(

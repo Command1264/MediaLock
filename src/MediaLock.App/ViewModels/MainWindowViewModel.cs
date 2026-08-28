@@ -988,11 +988,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         var position = timeline.Position - timeline.Start;
         if (target!.Presentation.PlaybackStatus == PlaybackStatus.Playing)
         {
-            var elapsed = timeProvider.GetUtcNow() - timeline.LastUpdatedAt;
+            var elapsed = target.Presentation.MonotonicObservedAt is { } monotonic &&
+                monotonic.TryGetElapsed(
+                    timeProvider.GetTimestamp(),
+                    timeProvider.TimestampFrequency,
+                    out var monotonicElapsed)
+                    ? monotonicElapsed
+                    : timeProvider.GetUtcNow() - timeline.LastUpdatedAt;
             if (elapsed > TimeSpan.Zero)
             {
-                var playbackRate = target.Presentation.PlaybackRate;
-                if (!double.IsFinite(playbackRate) || playbackRate < 0 || playbackRate > 16)
+                var playbackRate = target.Presentation.PlaybackRate.Rate;
+                if (!double.IsFinite(playbackRate) || playbackRate <= 0 || playbackRate > 16)
                 {
                     playbackRate = 1;
                 }

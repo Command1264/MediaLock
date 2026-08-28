@@ -53,6 +53,93 @@ public sealed class MediaTargetCatalogTests
     }
 
     [Fact]
+    public async Task CatalogProjectionEstimatesAMissingRateFromMonotonicObservations()
+    {
+        var target = BrowserTimelineTarget("estimated-page", positionSeconds: 10);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [target],
+            null,
+            []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("estimated-page", positionSeconds: 14)],
+            null,
+            []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("estimated-page", positionSeconds: 18)],
+            null,
+            []));
+
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+        var projected = Assert.Single(application.State.Targets).Presentation.PlaybackRate;
+        Assert.Equal(2d, projected.Rate, precision: 6);
+    }
+
+    [Fact]
+    public async Task SameTitleGsmtcAndBrowserRatesAreEstimatedIndependently()
+    {
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot(
+            [
+                GsmtcTimelineTarget("same-title", positionSeconds: 10),
+                BrowserTimelineTarget("same-title", positionSeconds: 50),
+            ],
+            null,
+            []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [
+                GsmtcTimelineTarget("same-title", positionSeconds: 12),
+                BrowserTimelineTarget("same-title", positionSeconds: 54),
+            ],
+            null,
+            []));
+        await WaitUntilAsync(() => application.State.Targets.All(target =>
+            target.Presentation.Timeline?.Position is var position &&
+            position is not null &&
+            position != TimeSpan.FromSeconds(10) &&
+            position != TimeSpan.FromSeconds(50)));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [
+                GsmtcTimelineTarget("same-title", positionSeconds: 14),
+                BrowserTimelineTarget("same-title", positionSeconds: 58),
+            ],
+            null,
+            []));
+
+        await WaitUntilAsync(() => application.State.Targets.All(target =>
+            target.Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated));
+        var gsmtc = Assert.Single(application.State.Targets, target =>
+            target.Id.Provider == MediaTargetProviderId.Gsmtc);
+        var browser = Assert.Single(application.State.Targets, target =>
+            target.Id.Provider == MediaTargetProviderId.Browser);
+        Assert.Equal(1d, gsmtc.Presentation.PlaybackRate.Rate, precision: 6);
+        Assert.Equal(2d, browser.Presentation.PlaybackRate.Rate, precision: 6);
+    }
+
+    [Fact]
     public async Task ReconciledTargetsRemainAvailableAcrossApplicationDispatches()
     {
         var braveSession = Session("brave-gsmtc", "Brave");
@@ -301,6 +388,37 @@ public sealed class MediaTargetCatalogTests
                 DateTimeOffset.Parse("2026-08-27T00:00:00Z"),
                 new MediaMetadata(title, null, null, null)));
 
+    private static MediaTargetSnapshot BrowserTimelineTarget(
+        string bindingId,
+        double positionSeconds) => MediaTargetSnapshot.FromBrowserPageBinding(
+            bindingId,
+            new MediaTargetPresentation(
+                "Brave",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.All,
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z"),
+                Metadata: new MediaMetadata("Same title", null, null, null),
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(positionSeconds),
+                    DateTimeOffset.Parse("2026-08-28T00:00:00Z"))));
+
+    private static MediaTargetSnapshot GsmtcTimelineTarget(
+        string key,
+        double positionSeconds) => MediaTargetSnapshot.FromGsmtc(new MediaSessionSnapshot(
+            new SessionKey(key),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.All,
+            DateTimeOffset.Parse("2026-08-28T00:00:00Z"),
+            Metadata: new MediaMetadata("Same title", null, null, null),
+            Timeline: new MediaTimeline(
+                TimeSpan.Zero,
+                TimeSpan.FromMinutes(10),
+                TimeSpan.FromSeconds(positionSeconds),
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z"))));
+
     private static async Task<MediaLockApplication> StartAsync(MediaTargetCatalogSnapshot snapshot)
     {
         var application = new MediaLockApplication(
@@ -385,6 +503,17 @@ public sealed class MediaTargetCatalogTests
 
         private static TaskCompletionSource NewSignal() => new(
             TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => timestamp;
+
+        public void Advance(TimeSpan amount) => timestamp += amount.Ticks;
     }
 
     private sealed class RecordingAuthorizationController : IMediaTargetAuthorizationController

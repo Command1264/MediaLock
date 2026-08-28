@@ -537,7 +537,7 @@ public sealed class MainWindowViewModelTests
                     TimeSpan.FromMinutes(4),
                     TimeSpan.FromSeconds(30),
                     observedAt),
-                PlaybackRate: 1.75));
+                ReportedPlaybackRate: 1.75));
         var application = new FakeApplication(MediaLockApplicationState.Initial with
         {
             Router = RouterState.Initial with
@@ -558,6 +558,53 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:37", viewModel.NowPlayingElapsed);
         Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
+    }
+
+    [Fact]
+    public void MonotonicTimelineAnchorIgnoresUtcClockAdjustment()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var clock = new TestTimeProvider(observedAt);
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "monotonic-timeline",
+            new MediaTargetPresentation(
+                "Monotonic media",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(4),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                ReportedPlaybackRate: 1d).WithPlaybackRateProjection(
+                    PlaybackRateResolution.FromReported(1d),
+                    new MonotonicTimestamp(0, TimeSpan.TicksPerSecond)));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+            Targets = [target],
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            timeProvider: clock);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        viewModel.RefreshTimeline();
+        var beforeClockAdjustment = viewModel.NowPlayingPositionSeconds;
+
+        clock.AdjustUtc(TimeSpan.FromHours(1));
+        viewModel.RefreshTimeline();
+
+        Assert.Equal(34d, beforeClockAdjustment, precision: 6);
+        Assert.Equal(beforeClockAdjustment, viewModel.NowPlayingPositionSeconds, precision: 6);
     }
 
     [Fact]
@@ -1767,10 +1814,21 @@ public sealed class MainWindowViewModelTests
     private sealed class TestTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset current = utcNow;
+        private long timestamp;
 
         public override DateTimeOffset GetUtcNow() => current;
 
-        public void Advance(TimeSpan amount) => current += amount;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => timestamp;
+
+        public void Advance(TimeSpan amount)
+        {
+            current += amount;
+            timestamp += amount.Ticks;
+        }
+
+        public void AdjustUtc(TimeSpan amount) => current += amount;
     }
 
     private sealed class RecordingPlaybackStateLockFeedback : IPlaybackStateLockFeedback

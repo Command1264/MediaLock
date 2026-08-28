@@ -2,7 +2,7 @@
 
 Issue: [#65](https://github.com/Command1264/MediaLock/issues/65)
 
-Status: planned; implementation requires separate approval.
+Status: implementation candidate in validation; not yet merged.
 
 ## Goal and boundary
 
@@ -35,18 +35,19 @@ Exact names may change during RED tests, but the boundary must preserve these in
 
 ## Algorithm contract
 
-Start with a bounded rolling window covering approximately three to five seconds and at least three useful deltas.
-Derive candidate slopes from position delta divided by monotonic elapsed time, reject invalid or implausible deltas and
-select a robust center such as median slope. Publish Estimated only after sustained agreement within tolerance. Continue
-sampling for the entire Playing interval; replace a prior estimate only after consecutive evidence crosses hysteresis.
+Use a five-second rolling window spanning at least three seconds and three useful observations. Derive all valid
+pairwise position／monotonic-time slopes and publish their median, which tolerates quantized 0.5× timelines and isolated
+jitter better than adjacent-only deltas. Continue sampling for the entire Playing interval. Once an estimate is
+published, retain it while a candidate remains within 10%; a larger change must appear twice consecutively in the same
+direction before replacing it.
 
 The initial accepted rate range is 0.25× through 4×. This is an estimator validation range, not a provider capability
 claim. Explicit reported values remain subject to the product's documented provider bound. Duplicate／reversed time,
 negative elapsed time, position reversal without Seek, bounds change and large unexplained jumps invalidate the sample
 or reset the target. Until confidence is sufficient, publish 1× Fallback.
 
-The implementation task must choose and test exact window, tolerance, consecutive-evidence and jump thresholds before
-GREEN. These constants remain private to the Module and may be tuned without changing callers.
+Per-target samples retain only the five-second window, and the estimator retains at most 256 least-recently-used target
+states as a second safety bound. These constants remain private to the Module and may be tuned without changing callers.
 
 ## Delivery slices
 

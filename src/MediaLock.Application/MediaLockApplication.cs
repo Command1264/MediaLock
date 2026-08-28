@@ -20,6 +20,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private readonly IWorkstationLockState? workstationLockState;
     private readonly IMediaTargetAuthorizationController? mediaTargetAuthorizationController;
     private readonly TimeProvider timeProvider;
+    private readonly long playbackRateOriginTimestamp;
+    private readonly PlaybackRateEstimator playbackRateEstimator = new();
+    private readonly HashSet<MediaTargetId> playbackRateTargets = [];
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim dispatchGate = new(1, 1);
     private readonly Lock recoverySync = new();
@@ -86,6 +89,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         this.workstationLockState = workstationLockState;
         this.mediaTargetAuthorizationController = mediaTargetAuthorizationController;
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        playbackRateOriginTimestamp = this.timeProvider.GetTimestamp();
         if (workstationLockState is not null)
         {
             workstationLocked = workstationLockState.IsLocked ? 1 : 0;
@@ -708,7 +712,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             var firstSnapshot = true;
             await foreach (var snapshot in catalog.WatchAsync(cancellationToken))
             {
-                var nextVisibleTargets = snapshot.Targets;
+                var nextVisibleTargets = ProjectPlaybackRates(snapshot.Targets, snapshot.Status);
                 var visibleWindowsCurrentTarget = snapshot.WindowsCurrentTarget is { } currentTarget &&
                     nextVisibleTargets.Any(target => target.Id == currentTarget)
                         ? currentTarget
@@ -767,6 +771,53 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable, exception),
                 cancellationToken);
         }
+    }
+
+    private ImmutableArray<MediaTargetSnapshot> ProjectPlaybackRates(
+        ImmutableArray<MediaTargetSnapshot> targets,
+        MediaSessionCatalogStatus status)
+    {
+        var currentTargets = targets.Select(target => target.Id).ToHashSet();
+        foreach (var removed in playbackRateTargets.Except(currentTargets).ToArray())
+        {
+            playbackRateEstimator.Reset(removed, PlaybackRateResetReason.TargetRemoved);
+        }
+
+        playbackRateTargets.Clear();
+        playbackRateTargets.UnionWith(currentTargets);
+        if (status != MediaSessionCatalogStatus.Available)
+        {
+            foreach (var target in currentTargets)
+            {
+                playbackRateEstimator.Reset(target, PlaybackRateResetReason.Recovery);
+            }
+
+            return targets
+                .Select(target => target.WithPresentation(
+                    target.Presentation.WithPlaybackRateProjection(
+                        PlaybackRateResolution.FromReported(
+                            target.Presentation.ReportedPlaybackRate),
+                        monotonicObservedAt: null)))
+                .ToImmutableArray();
+        }
+
+        var timestamp = timeProvider.GetTimestamp();
+        var monotonicTime = timeProvider.GetElapsedTime(
+            playbackRateOriginTimestamp,
+            timestamp);
+        return targets
+            .Select(target => target.WithPresentation(
+                target.Presentation.WithPlaybackRateProjection(
+                    playbackRateEstimator.Observe(new PlaybackRateObservation(
+                        target.Id,
+                        target.Presentation.PlaybackStatus,
+                        target.Presentation.Timeline,
+                        monotonicTime,
+                        target.Presentation.ReportedPlaybackRate)),
+                    new MonotonicTimestamp(
+                        timestamp,
+                        timeProvider.TimestampFrequency))))
+            .ToImmutableArray();
     }
 
     private async ValueTask<(RouterResult Result, MediaLockApplicationState State)> DispatchRouterAsync(

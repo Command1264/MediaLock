@@ -344,6 +344,10 @@ timeline, playback state, monotonic timestamp and optional Reported Playback Rat
 samples, robust slope calculation, confidence, hysteresis, numerical tolerances and bounded state retention. It never
 accepts a WPF-interpolated position.
 
+The candidate uses a five-second window, at least three observations spanning three seconds, the median of all valid
+pairwise slopes, 10% published-rate tolerance and two consecutive same-direction challengers. Per-target samples expire
+with the window and an LRU cap retains at most 256 target states. These are private Module policy, not caller options.
+
 Application supplies timestamps from `TimeProvider.GetTimestamp()`, projects the resolved Effective Playback Rate and
 forgets estimator state when a target leaves the catalog. A valid reported value is authoritative. Missing or invalid
 values may use a confident estimate; otherwise the result is the 1× fallback. Seek, non-Playing state, Recovery,
