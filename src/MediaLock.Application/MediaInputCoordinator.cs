@@ -204,7 +204,7 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("input.route_diagnostic", exception);
         }
     }
 
@@ -216,7 +216,7 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
         var subscribers = Faulted;
         if (subscribers is null)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("input.source", exception);
             return;
         }
 
@@ -229,7 +229,9 @@ public sealed class MediaInputCoordinator : IAsyncDisposable
             }
             catch (Exception subscriberException)
             {
-                System.Diagnostics.Trace.TraceError(subscriberException.ToString());
+                BoundedDiagnosticTrace.WriteFailure(
+                    "input.fault_subscriber",
+                    subscriberException);
             }
         }
     }

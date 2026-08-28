@@ -81,10 +81,10 @@ public sealed class ProblemPresentationTests
         var exception = new InvalidOperationException(privateMessage);
         var problems = new[]
         {
-            AppProblemFactory.Startup(exception),
-            AppProblemFactory.Shutdown(exception),
-            AppProblemFactory.MediaInputStartup(exception),
-            AppProblemFactory.MediaInputStopped(exception),
+            AppProblemFactory.Create(AppFailureKind.Startup, exception),
+            AppProblemFactory.Create(AppFailureKind.Shutdown, exception),
+            AppProblemFactory.Create(AppFailureKind.MediaInputStartup, exception),
+            AppProblemFactory.Create(AppFailureKind.MediaInputStopped, exception),
         };
 
         Assert.Equal(

@@ -59,7 +59,7 @@ public partial class App : System.Windows.Application
             }
             catch (Exception exception)
             {
-                System.Diagnostics.Trace.TraceError(exception.ToString());
+                BoundedDiagnosticTrace.WriteFailure("app.uninstall_cleanup", exception);
                 Shutdown(1);
             }
 
@@ -124,7 +124,9 @@ public partial class App : System.Windows.Application
             }
             catch (Exception exception)
             {
-                mediaInputStartupProblem = AppProblemFactory.MediaInputStartup(exception);
+                mediaInputStartupProblem = AppProblemFactory.Create(
+                    AppFailureKind.MediaInputStartup,
+                    exception);
                 await RecordProblemAsync(
                     "input.hook.start_failed",
                     mediaInputStartupProblem);
@@ -183,7 +185,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            var problem = AppProblemFactory.Startup(exception);
+            var problem = AppProblemFactory.Create(AppFailureKind.Startup, exception);
             await RecordProblemAsync("app.startup.failed", problem);
             try
             {
@@ -193,7 +195,7 @@ public partial class App : System.Windows.Application
             {
                 await RecordProblemAsync(
                     "app.startup.cleanup_failed",
-                    AppProblemFactory.Shutdown(cleanupException));
+                    AppProblemFactory.Create(AppFailureKind.Shutdown, cleanupException));
             }
 
             System.Windows.MessageBox.Show(
@@ -239,7 +241,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            var problem = AppProblemFactory.Shutdown(exception);
+            var problem = AppProblemFactory.Create(AppFailureKind.Shutdown, exception);
             await RecordProblemAsync("app.shutdown.failed", problem);
             System.Windows.MessageBox.Show(
                 ProblemPresentation.Describe(problem),
@@ -366,7 +368,9 @@ public partial class App : System.Windows.Application
 
         try
         {
-            var problem = AppProblemFactory.MediaInputStopped(args.Exception);
+            var problem = AppProblemFactory.Create(
+                AppFailureKind.MediaInputStopped,
+                args.Exception);
             await RecordProblemAsync(
                 "input.hook.faulted",
                 problem);
@@ -388,7 +392,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("input.hook.fault_handler", exception);
         }
     }
 
@@ -421,10 +425,10 @@ public partial class App : System.Windows.Application
         }
         catch (Exception diagnosticException)
         {
-            System.Diagnostics.Trace.TraceError(
-                "Problem diagnostic write failed for {0}. ExceptionType={1}",
-                problem.Code,
-                diagnosticException.GetType().FullName ?? diagnosticException.GetType().Name);
+            BoundedDiagnosticTrace.WriteFailure(
+                "problem.diagnostic_write",
+                diagnosticException,
+                problem.Code);
         }
     }
 
@@ -491,7 +495,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("settings.startup_sync_diagnostic", exception);
         }
     }
 

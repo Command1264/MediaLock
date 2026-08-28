@@ -1449,12 +1449,20 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new DiagnosticEvent(eventName, properties, problem.Code),
                 cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(
-                "Problem diagnostic write failed for {0}. ExceptionType={1}",
-                problem.Code,
-                exception.GetType().FullName ?? exception.GetType().Name);
+            var diagnosticProblem = MediaLockProblem.Warning(
+                MediaLockProblemId.DiagnosticLoggingUnavailable,
+                exception);
+            PublishProblem(diagnosticProblem, recordDiagnostic: false);
+            BoundedDiagnosticTrace.WriteFailure(
+                "problem.diagnostic_write",
+                exception,
+                problem.Code);
         }
     }
 

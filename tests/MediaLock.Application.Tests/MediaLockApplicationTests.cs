@@ -1827,6 +1827,46 @@ public sealed class MediaLockApplicationTests
     }
 
     [Fact]
+    public async Task ProblemDiagnosticFailurePublishesANonRecursiveDiagnosticProblem()
+    {
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([], null)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: new FailingDiagnosticLog());
+
+        await application.ReportProblemAsync(
+            MediaLockProblem.Error(MediaLockProblemId.CommandFailed),
+            CancellationToken.None);
+
+        Assert.Equal(
+            MediaLockProblemId.DiagnosticLoggingUnavailable,
+            application.State.Problem?.Id);
+        Assert.Equal("ML-DIAG-001", application.LastReportedProblemCode);
+    }
+
+    [Fact]
+    public async Task ProblemDiagnosticWritePreservesCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([], null)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: new CancellingDiagnosticLog());
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            application.ReportProblemAsync(
+                MediaLockProblem.Error(MediaLockProblemId.CommandFailed),
+                cancellation.Token).AsTask());
+    }
+
+    [Fact]
     public async Task RouterTransitionsArePersistedWithoutRestoringThePreviousLock()
     {
         var session = Session("music", "Brave");
@@ -2583,6 +2623,22 @@ public sealed class MediaLockApplicationTests
             Events.Add(diagnosticEvent);
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FailingDiagnosticLog : IDiagnosticLog
+    {
+        public ValueTask WriteAsync(
+            DiagnosticEvent diagnosticEvent,
+            CancellationToken cancellationToken) => ValueTask.FromException(
+                new IOException(@"C:\Users\PrivateAccount\diagnostics.jsonl"));
+    }
+
+    private sealed class CancellingDiagnosticLog : IDiagnosticLog
+    {
+        public ValueTask WriteAsync(
+            DiagnosticEvent diagnosticEvent,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromCanceled(cancellationToken);
     }
 
     private sealed class FailingRuntimeStateRepository : IRuntimeStateRepository
