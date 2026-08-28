@@ -1730,6 +1730,8 @@ public sealed class MainWindowViewModelTests
 
         public MediaLockApplicationState State { get; private set; } = state;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask<ApplicationResult> DispatchAsync(
@@ -1743,6 +1745,14 @@ public sealed class MainWindowViewModelTests
 
             Intents.Add(intent);
             return ValueTask.FromResult(new ApplicationResult(State, Decision));
+        }
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
         }
 
         public void Publish(MediaLockApplicationState next)

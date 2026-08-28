@@ -75,6 +75,34 @@ public sealed class ProblemPresentationTests
     }
 
     [Fact]
+    public void AppFailureSurfacesUseTheExpectedCodesWithoutRawExceptionMessages()
+    {
+        const string privateMessage = "private path C:\\Users\\example\\secret.txt";
+        var exception = new InvalidOperationException(privateMessage);
+        var problems = new[]
+        {
+            AppProblemFactory.Startup(exception),
+            AppProblemFactory.Shutdown(exception),
+            AppProblemFactory.MediaInputStartup(exception),
+            AppProblemFactory.MediaInputStopped(exception),
+        };
+
+        Assert.Equal(
+            ["ML-APP-001", "ML-APP-002", "ML-INPUT-001", "ML-INPUT-002"],
+            problems.Select(problem => problem.Code));
+        foreach (var problem in problems)
+        {
+            var message = ProblemPresentation.Describe(
+                problem,
+                CultureInfo.GetCultureInfo("en-US"));
+
+            Assert.Contains(problem.Code, message, StringComparison.Ordinal);
+            Assert.DoesNotContain(privateMessage, message, StringComparison.Ordinal);
+            Assert.Equal(typeof(InvalidOperationException).FullName, problem.ExceptionType);
+        }
+    }
+
+    [Fact]
     public void ActiveProblemFollowsAnImmediateLanguageChange()
     {
         var problem = MediaLockProblem.Error(MediaLockProblemId.RuntimeStateSaveFailed);

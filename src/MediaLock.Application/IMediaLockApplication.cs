@@ -6,7 +6,7 @@ public interface IMediaLockApplication : IAsyncDisposable
 
     MediaLockApplicationState State { get; }
 
-    string? LastReportedProblemCode => State.Problem?.Code;
+    string? LastReportedProblemCode { get; }
 
     ValueTask StartAsync(CancellationToken cancellationToken);
 
@@ -16,10 +16,5 @@ public interface IMediaLockApplication : IAsyncDisposable
 
     ValueTask ReportProblemAsync(
         MediaLockProblem problem,
-        CancellationToken cancellationToken) => ValueTask.CompletedTask;
-
-    ValueTask ReportProblemEventAsync(
-        string eventName,
-        MediaLockProblem problem,
-        CancellationToken cancellationToken) => ReportProblemAsync(problem, cancellationToken);
+        CancellationToken cancellationToken);
 }

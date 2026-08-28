@@ -101,17 +101,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     public async ValueTask ReportProblemAsync(
         MediaLockProblem problem,
-        CancellationToken cancellationToken) => await ReportProblemEventAsync(
-            "problem.reported",
-            problem,
-            cancellationToken);
-
-    public async ValueTask ReportProblemEventAsync(
-        string eventName,
-        MediaLockProblem problem,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         ArgumentNullException.ThrowIfNull(problem);
         Volatile.Write(ref lastReportedProblemCode, problem.Code);
         if (diagnosticLog is null)
@@ -119,7 +110,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             return;
         }
 
-        await WriteProblemDiagnosticAsync(eventName, problem, cancellationToken);
+        await WriteProblemDiagnosticAsync("problem.reported", problem, cancellationToken);
     }
 
     public MediaLockApplicationState State
@@ -1460,7 +1451,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            System.Diagnostics.Trace.TraceError(
+                "Problem diagnostic write failed for {0}. ExceptionType={1}",
+                problem.Code,
+                exception.GetType().FullName ?? exception.GetType().Name);
         }
     }
 

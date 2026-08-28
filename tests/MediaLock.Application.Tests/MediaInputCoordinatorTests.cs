@@ -290,6 +290,8 @@ public sealed class MediaInputCoordinatorTests
 
         public MediaLockApplicationState State { get; private set; } = state;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public TaskCompletionSource<ApplicationIntent> NextIntent { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -301,6 +303,14 @@ public sealed class MediaInputCoordinatorTests
         {
             NextIntent.TrySetResult(intent);
             return ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
+        }
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -321,6 +331,8 @@ public sealed class MediaInputCoordinatorTests
 
         public int StateReadCount => Volatile.Read(ref stateReadCount);
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public MediaLockApplicationState State
         {
             get
@@ -337,6 +349,14 @@ public sealed class MediaInputCoordinatorTests
             CancellationToken cancellationToken) =>
             ValueTask.FromResult(new ApplicationResult(state, RouteDecision.StateUpdated));
 
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
@@ -349,6 +369,8 @@ public sealed class MediaInputCoordinatorTests
         }
 
         public MediaLockApplicationState State { get; } = state;
+
+        public string? LastReportedProblemCode { get; private set; }
 
         public TaskCompletionSource DispatchStarted { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -367,6 +389,14 @@ public sealed class MediaInputCoordinatorTests
             return new ApplicationResult(State, RouteDecision.StateUpdated);
         }
 
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
@@ -381,6 +411,8 @@ public sealed class MediaInputCoordinatorTests
         }
 
         public MediaLockApplicationState State { get; } = state;
+
+        public string? LastReportedProblemCode { get; private set; }
 
         public TaskCompletionSource SecondDispatch { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -399,6 +431,14 @@ public sealed class MediaInputCoordinatorTests
 
             SecondDispatch.TrySetResult();
             return ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
+        }
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

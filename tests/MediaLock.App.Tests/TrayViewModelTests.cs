@@ -126,6 +126,8 @@ public sealed class TrayViewModelTests
 
         public MediaLockApplicationState State { get; private set; } = initial;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public void Publish(MediaLockApplicationState state)
         {
             State = state;
@@ -145,6 +147,14 @@ public sealed class TrayViewModelTests
 
             Intents.Add(intent);
             return ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
+        }
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
