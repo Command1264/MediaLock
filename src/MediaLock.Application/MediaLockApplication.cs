@@ -27,15 +27,16 @@ public sealed class MediaLockApplication : IMediaLockApplication
     private Task? catalogWorker;
     private Task? loginStartupWorker;
     private MediaLockApplicationState state = MediaLockApplicationState.Initial;
+    private string? lastReportedProblemCode;
     private bool disposed;
     private MediaLockSettings settings = MediaLockSettings.Default;
-    private string? settingsLoadWarning;
-    private string? runtimeStateLoadWarning;
+    private MediaLockProblem? settingsLoadProblem;
+    private MediaLockProblem? runtimeStateLoadProblem;
     private RuntimeStateDocument? persistedRuntimeState;
     private bool runtimeStatePersistenceSuppressed;
     private RouterIntent? startupRestoreIntent;
     private MediaSessionCatalogStatus catalogStatus = MediaSessionCatalogStatus.Available;
-    private string? catalogStatusMessage;
+    private MediaLockProblem? catalogProblem;
     private ImmutableArray<MediaTargetSnapshot> visibleTargets = [];
     private SessionFingerprint? playbackStateLockRecoveryFingerprint;
     private int playbackStateCorrectionAttempts;
@@ -96,6 +97,31 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     public event EventHandler<MediaLockApplicationStateChangedEventArgs>? StateChanged;
 
+    public string? LastReportedProblemCode => Volatile.Read(ref lastReportedProblemCode);
+
+    public async ValueTask ReportProblemAsync(
+        MediaLockProblem problem,
+        CancellationToken cancellationToken) => await ReportProblemEventAsync(
+            "problem.reported",
+            problem,
+            cancellationToken);
+
+    public async ValueTask ReportProblemEventAsync(
+        string eventName,
+        MediaLockProblem problem,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(problem);
+        Volatile.Write(ref lastReportedProblemCode, problem.Code);
+        if (diagnosticLog is null)
+        {
+            return;
+        }
+
+        await WriteProblemDiagnosticAsync(eventName, problem, cancellationToken);
+    }
+
     public MediaLockApplicationState State
     {
         get => Volatile.Read(ref state);
@@ -114,19 +140,22 @@ public sealed class MediaLockApplication : IMediaLockApplication
         {
             var loaded = await settingsRepository.LoadAsync(cancellationToken);
             settings = loaded.Value;
-            settingsLoadWarning = loaded.Issues.Length == 0
+            settingsLoadProblem = loaded.Issues.Length == 0
                 ? null
-                : string.Join(" ", loaded.Issues.Select(issue => issue.Message));
+                : MediaLockProblem.Warning(MediaLockProblemId.SettingsLoadFailed);
             State = new MediaLockApplicationState(
                 State.Router,
-                PersistenceWarnings,
+                PersistenceProblem,
                 settings,
-                catalogStatus,
-                catalogStatusMessage)
+                catalogStatus)
             {
                 PlaybackStateLock = State.PlaybackStateLock,
                 Targets = visibleTargets,
             };
+            if (settingsLoadProblem is not null)
+            {
+                await ReportProblemAsync(settingsLoadProblem, cancellationToken);
+            }
             if (loginStartupManager is not null &&
                 await loginStartupManager.IsEnabledAsync(cancellationToken) !=
                 settings.Desktop!.StartWithWindows)
@@ -154,12 +183,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
             if (loadedRuntimeState.Issues.Length > 0)
             {
-                runtimeStateLoadWarning = string.Join(
-                    " ",
-                    loadedRuntimeState.Issues.Select(issue => issue.Message));
+                runtimeStateLoadProblem = MediaLockProblem.Warning(
+                    MediaLockProblemId.RuntimeStateLoadFailed);
                 State = State with
                 {
-                    ErrorMessage = PersistenceWarnings,
+                    Problem = PersistenceProblem,
                 };
             }
             else if (settings.DefaultRoutingMode is RoutingMode.SessionLock or RoutingMode.AppLock)
@@ -176,17 +204,24 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 }
                 else
                 {
-                    runtimeStateLoadWarning = settings.DefaultRoutingMode == RoutingMode.SessionLock
-                        ? "Default Session Lock requires a valid persisted Session Lock target; Windows Auto is active."
-                        : "Default App Lock requires a valid persisted App Lock target; Windows Auto is active.";
+                    runtimeStateLoadProblem = MediaLockProblem.Warning(
+                        settings.DefaultRoutingMode == RoutingMode.SessionLock
+                            ? MediaLockProblemId.DefaultSessionLockTargetInvalid
+                            : MediaLockProblemId.DefaultAppLockTargetInvalid);
                 }
             }
         }
         else if (settings.DefaultRoutingMode is RoutingMode.SessionLock or RoutingMode.AppLock)
         {
-            runtimeStateLoadWarning = settings.DefaultRoutingMode == RoutingMode.SessionLock
-                ? "Default Session Lock requires runtime-state persistence; Windows Auto is active."
-                : "Default App Lock requires runtime-state persistence; Windows Auto is active.";
+            runtimeStateLoadProblem = MediaLockProblem.Warning(
+                settings.DefaultRoutingMode == RoutingMode.SessionLock
+                    ? MediaLockProblemId.SessionLockPersistenceUnavailable
+                    : MediaLockProblemId.AppLockPersistenceUnavailable);
+        }
+
+        if (runtimeStateLoadProblem is not null)
+        {
+            await ReportProblemAsync(runtimeStateLoadProblem, cancellationToken);
         }
 
         if (settings.DefaultRoutingMode == RoutingMode.PriorityRules)
@@ -495,7 +530,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
             settings = updated;
             ResetRepeatedPauseObservations();
-            settingsLoadWarning = null;
+            settingsLoadProblem = null;
             if (State.PlaybackStateLock is
                 {
                     Mode: PlaybackStateLockMode.KeepPlaying,
@@ -667,7 +702,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         catch (Exception exception)
         {
-            PublishError($"Login startup monitoring is unavailable: {exception.Message}");
+            PublishProblem(MediaLockProblem.Warning(
+                MediaLockProblemId.LoginStartupMonitoringUnavailable,
+                exception));
         }
     }
 
@@ -703,7 +740,6 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     cancellationToken,
                     persistRuntimeState: !firstSnapshot || startupRestoreIntent is null,
                     nextCatalogStatus: snapshot.Status,
-                    nextCatalogStatusMessage: snapshot.StatusMessage,
                     nextVisibleTargets: nextVisibleTargets);
                 if (firstSnapshot && startupRestoreIntent is { } restoreIntent)
                 {
@@ -721,7 +757,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 "Media Session catalog completed before publishing an initial snapshot.")))
             {
                 await TransitionCatalogUnavailableAsync(
-                    "Media Session catalog stopped unexpectedly.",
+                    MediaLockProblem.Error(MediaLockProblemId.CatalogStopped),
                     cancellationToken);
             }
         }
@@ -737,7 +773,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             }
 
             await TransitionCatalogUnavailableAsync(
-                $"GSMTC catalog became unavailable: {exception.Message}",
+                MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable, exception),
                 cancellationToken);
         }
     }
@@ -747,7 +783,6 @@ public sealed class MediaLockApplication : IMediaLockApplication
         CancellationToken cancellationToken,
         bool persistRuntimeState = true,
         MediaSessionCatalogStatus? nextCatalogStatus = null,
-        string? nextCatalogStatusMessage = null,
         RoutingMode? startupRoutingMode = null,
         bool suppressRuntimeStatePersistence = false,
         bool resumeRuntimeStatePersistence = false,
@@ -765,7 +800,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
             if (nextCatalogStatus is { } status)
             {
                 catalogStatus = status;
-                catalogStatusMessage = nextCatalogStatusMessage;
+                if (status != MediaSessionCatalogStatus.Unavailable)
+                {
+                    catalogProblem = null;
+                }
             }
 
             if (clearPlaybackStateLock &&
@@ -827,8 +865,8 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     runtimeStatePersistenceSuppressed = true;
                     if (runtimeStateRepository is null)
                     {
-                        PublishError(
-                            "Runtime state persistence is unavailable; startup routing mode was not changed.");
+                        PublishProblem(MediaLockProblem.Error(
+                            MediaLockProblemId.RuntimeStatePersistenceUnavailable));
                     }
                 }
             }
@@ -898,12 +936,12 @@ public sealed class MediaLockApplication : IMediaLockApplication
             playbackStateCorrectionAttempts = 0;
             ResetRepeatedPauseObservations();
             if (playbackStateLock.Status != PlaybackStateLockStatus.Suspended ||
-                playbackStateLock.Message is not null)
+                playbackStateLock.Problem is not null)
             {
                 PublishPlaybackStateLock(playbackStateLock with
                 {
                     Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
+                    Problem = null,
                 });
             }
 
@@ -925,7 +963,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     PublishPlaybackStateLock(playbackStateLock with
                     {
                         Status = PlaybackStateLockStatus.Suspended,
-                        Message = null,
+                        Problem = null,
                     });
                 }
                 else
@@ -967,7 +1005,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 PublishPlaybackStateLock(playbackStateLock with
                 {
                     Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
+                    Problem = null,
                 });
                 return catalogResult;
             }
@@ -980,7 +1018,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     PublishPlaybackStateLock(playbackStateLock with
                     {
                         Status = PlaybackStateLockStatus.Suspended,
-                        Message = null,
+                        Problem = null,
                     });
                     return catalogResult;
                 }
@@ -996,7 +1034,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     PublishPlaybackStateLock(playbackStateLock with
                     {
                         Status = PlaybackStateLockStatus.Suspended,
-                        Message = null,
+                        Problem = null,
                     });
                     return catalogResult;
                 }
@@ -1023,7 +1061,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     {
                         Status = PlaybackStateLockStatus.Ready,
                         ArmedTarget = armedTarget,
-                        Message = null,
+                        Problem = null,
                     };
                     PublishPlaybackStateLock(playbackStateLock);
                 }
@@ -1036,7 +1074,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     PublishPlaybackStateLock(playbackStateLock with
                     {
                         Status = PlaybackStateLockStatus.Suspended,
-                        Message = null,
+                        Problem = null,
                     });
                     return catalogResult;
                 }
@@ -1056,7 +1094,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             PublishPlaybackStateLock(playbackStateLock with
             {
                 Status = PlaybackStateLockStatus.Suspended,
-                Message = null,
+                Problem = null,
             });
             return catalogResult;
         }
@@ -1085,7 +1123,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 PublishPlaybackStateLock(playbackStateLock with
                 {
                     Status = PlaybackStateLockStatus.Suspended,
-                    Message = null,
+                    Problem = null,
                 });
                 return catalogResult;
             }
@@ -1097,7 +1135,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             playbackStateLock = playbackStateLock with
             {
                 Status = PlaybackStateLockStatus.Ready,
-                Message = null,
+                Problem = null,
             };
             PublishPlaybackStateLock(playbackStateLock);
         }
@@ -1108,12 +1146,12 @@ public sealed class MediaLockApplication : IMediaLockApplication
             pausedEpisodeObserved = false;
             lastArmedPlaybackStatus = PlaybackStatus.Playing;
             if (playbackStateLock.Status != PlaybackStateLockStatus.Ready ||
-                playbackStateLock.Message is not null)
+                playbackStateLock.Problem is not null)
             {
                 PublishPlaybackStateLock(playbackStateLock with
                 {
                     Status = PlaybackStateLockStatus.Ready,
-                    Message = null,
+                    Problem = null,
                 });
             }
 
@@ -1148,7 +1186,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
             PublishPlaybackStateLock(playbackStateLock with
             {
                 Status = PlaybackStateLockStatus.Failed,
-                Message = "Keep Playing could not be confirmed after two correction attempts.",
+                Problem = MediaLockProblem.Warning(MediaLockProblemId.PlaybackCorrectionFailed),
             });
             return catalogResult;
         }
@@ -1214,7 +1252,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
         bool runtimeStateWasPersisted,
         CancellationToken cancellationToken)
     {
-        var currentError = preserveCurrentError ? State.ErrorMessage : null;
+        var currentProblem = preserveCurrentError ? State.Problem : null;
         var updated = settings with { DefaultRoutingMode = mode };
         if (settingsRepository is not null)
         {
@@ -1244,30 +1282,26 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     }
                 }
 
-                var rollbackStatus = runtimeRollbackSucceeded
-                    ? " The previous runtime state was restored."
-                    : runtimeStateWasPersisted
-                        ? " The previous runtime state could not be restored."
-                        : string.Empty;
-                var message =
-                    $"Routing mode changed for this run, but the startup mode could not be saved: {exception.Message}{rollbackStatus}";
                 runtimeStatePersistenceSuppressed = true;
-                PublishError(message);
+                PublishProblem(MediaLockProblem.Error(
+                    MediaLockProblemId.StartupRoutingModeSaveFailed,
+                    exception));
                 throw new InvalidOperationException(
-                    message,
+                    runtimeRollbackSucceeded
+                        ? "The startup routing mode could not be saved; runtime state was restored."
+                        : "The startup routing mode could not be saved.",
                     failures.Count == 1 ? exception : new AggregateException(failures));
             }
         }
 
         settings = updated;
-        settingsLoadWarning = null;
-        runtimeStateLoadWarning = null;
+        settingsLoadProblem = null;
+        runtimeStateLoadProblem = null;
         State = new MediaLockApplicationState(
             State.Router,
-            currentError ?? PersistenceWarnings,
+            currentProblem ?? PersistenceProblem,
             settings,
-            catalogStatus,
-            catalogStatusMessage)
+            catalogStatus)
         {
             PlaybackStateLock = State.PlaybackStateLock,
             Targets = visibleTargets,
@@ -1279,7 +1313,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
     }
 
     private async Task TransitionCatalogUnavailableAsync(
-        string message,
+        MediaLockProblem problem,
         CancellationToken cancellationToken)
     {
         try
@@ -1288,9 +1322,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 new RouterIntent.CatalogUpdated([], null),
                 cancellationToken,
                 nextCatalogStatus: MediaSessionCatalogStatus.Unavailable,
-                nextCatalogStatusMessage: message,
                 nextVisibleTargets: []);
-            PublishError(message);
+            catalogProblem = problem;
+            PublishProblem(problem);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1298,7 +1332,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         catch (Exception exception)
         {
-            PublishError($"{message} State transition failed: {exception.Message}");
+            catalogProblem = MediaLockProblem.Error(
+                MediaLockProblemId.CatalogTransitionFailed,
+                exception);
+            PublishProblem(catalogProblem);
         }
     }
 
@@ -1379,10 +1416,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
         var playbackStateLock = State.PlaybackStateLock;
         State = new MediaLockApplicationState(
             routerState,
-            PersistenceWarnings,
+            ActiveProblem,
             settings,
-            catalogStatus,
-            catalogStatusMessage)
+            catalogStatus)
         {
             PlaybackStateLock = playbackStateLock,
             Targets = visibleTargets,
@@ -1392,12 +1428,40 @@ public sealed class MediaLockApplication : IMediaLockApplication
             new MediaLockApplicationStateChangedEventArgs(State));
     }
 
-    private void PublishError(string message)
+    private void PublishProblem(MediaLockProblem problem, bool recordDiagnostic = true)
     {
-        State = State with { ErrorMessage = message };
+        Volatile.Write(ref lastReportedProblemCode, problem.Code);
+        State = State with { Problem = problem };
         StateChanged?.Invoke(
             this,
             new MediaLockApplicationStateChangedEventArgs(State));
+        if (recordDiagnostic && diagnosticLog is not null)
+        {
+            _ = ReportProblemAsync(problem, CancellationToken.None);
+        }
+    }
+
+    private async ValueTask WriteProblemDiagnosticAsync(
+        string eventName,
+        MediaLockProblem problem,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var properties = problem.ExceptionType is null
+                ? null
+                : new Dictionary<string, string>
+                {
+                    ["exceptionType"] = problem.ExceptionType,
+                };
+            await diagnosticLog!.WriteAsync(
+                new DiagnosticEvent(eventName, properties, problem.Code),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError(exception.ToString());
+        }
     }
 
     private async ValueTask<bool> PersistRuntimeStateAsync(
@@ -1435,7 +1499,9 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         catch (Exception exception)
         {
-            PublishError($"Runtime state could not be saved: {exception.Message}");
+            PublishProblem(MediaLockProblem.Error(
+                MediaLockProblemId.RuntimeStateSaveFailed,
+                exception));
             return false;
         }
     }
@@ -1455,13 +1521,10 @@ public sealed class MediaLockApplication : IMediaLockApplication
         persisted.Title,
         persisted.Artist);
 
-    private string? PersistenceWarnings =>
-        string.Join(
-            " ",
-            new[] { settingsLoadWarning, runtimeStateLoadWarning }
-                .Where(message => !string.IsNullOrWhiteSpace(message))) is { Length: > 0 } warnings
-            ? warnings
-            : null;
+    private MediaLockProblem? ActiveProblem => catalogProblem ?? PersistenceProblem;
+
+    private MediaLockProblem? PersistenceProblem =>
+        runtimeStateLoadProblem ?? settingsLoadProblem;
 
     private async ValueTask TryWriteDiagnosticAsync(
         DiagnosticEvent diagnosticEvent,
@@ -1482,7 +1545,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
         }
         catch (Exception exception)
         {
-            PublishError($"Diagnostic logging is unavailable: {exception.Message}");
+            PublishProblem(
+                MediaLockProblem.Warning(
+                    MediaLockProblemId.DiagnosticLoggingUnavailable,
+                    exception),
+                recordDiagnostic: false);
         }
     }
 

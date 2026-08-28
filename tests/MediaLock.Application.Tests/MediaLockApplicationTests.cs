@@ -794,7 +794,9 @@ public sealed class MediaLockApplicationTests
         Assert.Equal(2, controller.Commands.Count);
         Assert.All(controller.Commands, command =>
             Assert.Equal((session.Key, MediaCommand.Play), command));
-        Assert.Contains("could not be confirmed", state.PlaybackStateLock.Message);
+        Assert.Equal(
+            MediaLockProblemId.PlaybackCorrectionFailed,
+            state.PlaybackStateLock.Problem?.Id);
     }
 
     [Fact]
@@ -1384,7 +1386,7 @@ public sealed class MediaLockApplicationTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => application.DispatchAsync(
             new ApplicationIntent.UsePriorityRules(),
             CancellationToken.None).AsTask());
-        var persistenceError = application.State.ErrorMessage;
+        var persistenceProblem = application.State.Problem;
         await application.DispatchAsync(
             new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
             CancellationToken.None);
@@ -1393,10 +1395,7 @@ public sealed class MediaLockApplicationTests
         Assert.Equal(RoutingMode.AppLock, application.State.Settings.DefaultRoutingMode);
         Assert.Equal(runtimeSaveCount + 2, runtimeStateRepository.Saved.Count);
         Assert.Equal(persistedAppLock, runtimeStateRepository.Saved.Last());
-        Assert.Contains(
-            "previous runtime state was restored",
-            persistenceError,
-            StringComparison.Ordinal);
+        Assert.Equal(MediaLockProblemId.StartupRoutingModeSaveFailed, persistenceProblem?.Id);
     }
 
     [Fact]
@@ -1491,7 +1490,7 @@ public sealed class MediaLockApplicationTests
         var result = await application.DispatchAsync(
             new ApplicationIntent.LockApplication("Brave"),
             CancellationToken.None);
-        var persistenceError = result.State.ErrorMessage;
+        var persistenceProblem = result.State.Problem;
         await application.DispatchAsync(
             new ApplicationIntent.Route(MediaCommand.TogglePlayPause),
             CancellationToken.None);
@@ -1500,7 +1499,7 @@ public sealed class MediaLockApplicationTests
         Assert.Equal(RoutingMode.WindowsAuto, result.State.Settings.DefaultRoutingMode);
         Assert.Empty(settingsRepository.Saved);
         Assert.Equal(runtimeSaveAttempts + 1, runtimeStateRepository.SaveAttempts);
-        Assert.Contains("state.json", persistenceError, StringComparison.Ordinal);
+        Assert.Equal(MediaLockProblemId.RuntimeStateSaveFailed, persistenceProblem?.Id);
     }
 
     [Fact]
@@ -1521,8 +1520,9 @@ public sealed class MediaLockApplicationTests
 
         Assert.Equal(RoutingMode.PriorityRules, application.State.Router.Mode);
         Assert.Equal(RoutingMode.WindowsAuto, application.State.Settings.DefaultRoutingMode);
-        Assert.Contains("startup mode could not be saved", application.State.ErrorMessage, StringComparison.Ordinal);
-        Assert.Contains("settings.json", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(
+            MediaLockProblemId.StartupRoutingModeSaveFailed,
+            application.State.Problem?.Id);
     }
 
     [Fact]
@@ -1544,7 +1544,7 @@ public sealed class MediaLockApplicationTests
 
         Assert.Equal(RoutingMode.PriorityRules, result.State.Router.Mode);
         Assert.Equal(RoutingMode.PriorityRules, result.State.Settings.DefaultRoutingMode);
-        Assert.Contains("state.json", result.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(MediaLockProblemId.RuntimeStateSaveFailed, result.State.Problem?.Id);
         Assert.Equal(RoutingMode.PriorityRules, Assert.Single(settingsRepository.Saved).DefaultRoutingMode);
     }
 
@@ -1659,7 +1659,9 @@ public sealed class MediaLockApplicationTests
         await application.StartAsync(CancellationToken.None);
 
         Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
-        Assert.Contains("persisted App Lock target", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(
+            MediaLockProblemId.DefaultAppLockTargetInvalid,
+            application.State.Problem?.Id);
     }
 
     [Fact]
@@ -1680,7 +1682,9 @@ public sealed class MediaLockApplicationTests
         await application.StartAsync(CancellationToken.None);
 
         Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
-        Assert.Contains("persisted Session Lock target", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(
+            MediaLockProblemId.DefaultSessionLockTargetInvalid,
+            application.State.Problem?.Id);
     }
 
     [Fact]
@@ -1709,7 +1713,7 @@ public sealed class MediaLockApplicationTests
 
         Assert.Equal(RoutingMode.WindowsAuto, application.State.Router.Mode);
         Assert.Null(application.State.Router.LockedTarget);
-        Assert.Null(application.State.ErrorMessage);
+        Assert.Null(application.State.Problem);
     }
 
     [Fact]
@@ -1765,7 +1769,7 @@ public sealed class MediaLockApplicationTests
 
         await application.StartAsync(CancellationToken.None);
 
-        Assert.Contains("settings.json", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(MediaLockProblemId.SettingsLoadFailed, application.State.Problem?.Id);
         Assert.Single(application.State.Router.Sessions);
     }
 
@@ -1795,6 +1799,31 @@ public sealed class MediaLockApplicationTests
         Assert.DoesNotContain(log.Events.SelectMany(entry => entry.Properties?.Keys ?? []), key =>
             key.Contains("title", StringComparison.OrdinalIgnoreCase) ||
             key.Contains("artist", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ReportedProblemWritesTheSameCodeAndOnlyBoundedTechnicalContext()
+    {
+        var log = new RecordingDiagnosticLog();
+        await using var application = new MediaLockApplication(
+            new InMemoryCatalog(new MediaSessionCatalogSnapshot([], null)),
+            new MediaRouter(new SuccessfulController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            runtimeStateRepository: null,
+            diagnosticLog: log);
+        var problem = MediaLockProblem.Error(
+            MediaLockProblemId.RuntimeStateSaveFailed,
+            new IOException(@"C:\Users\PrivateAccount\state.json"));
+
+        await application.ReportProblemAsync(problem, CancellationToken.None);
+
+        var diagnostic = Assert.Single(log.Events);
+        Assert.Equal("problem.reported", diagnostic.Name);
+        Assert.Equal(problem.Code, diagnostic.ProblemCode);
+        Assert.Equal(problem.Code, application.LastReportedProblemCode);
+        Assert.Equal(typeof(IOException).FullName, diagnostic.Properties?["exceptionType"]);
+        Assert.DoesNotContain("PrivateAccount", diagnostic.Properties?.Values ?? []);
     }
 
     [Fact]
@@ -1839,7 +1868,7 @@ public sealed class MediaLockApplicationTests
             CancellationToken.None);
 
         Assert.Equal(RouteDecisionKind.Routed, result.Decision.Kind);
-        Assert.Contains("state.json", application.State.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(MediaLockProblemId.RuntimeStateSaveFailed, application.State.Problem?.Id);
     }
 
     [Fact]
@@ -1993,7 +2022,7 @@ public sealed class MediaLockApplicationTests
         var state = await observed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.Equal(MediaSessionCatalogStatus.Reacquiring, state.CatalogStatus);
-        Assert.Equal("Reacquiring GSMTC after Windows resumed.", state.CatalogStatusMessage);
+        Assert.Null(state.Problem);
         Assert.Equal(RouterStatus.Recovering, state.Router.Status);
         Assert.Empty(state.Router.Sessions);
         var diagnostic = Assert.Single(log.Events, entry => entry.Name == "catalog.status");
@@ -2136,7 +2165,7 @@ public sealed class MediaLockApplicationTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         application.StateChanged += (_, args) =>
         {
-            if (args.State.ErrorMessage is not null)
+            if (args.State.Problem is not null)
             {
                 errorObserved.TrySetResult(args.State);
             }
@@ -2145,7 +2174,7 @@ public sealed class MediaLockApplicationTests
         catalog.Complete();
         var failed = await errorObserved.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Media Session catalog stopped unexpectedly.", failed.ErrorMessage);
+        Assert.Equal(MediaLockProblemId.CatalogStopped, failed.Problem?.Id);
         Assert.Equal(MediaSessionCatalogStatus.Unavailable, failed.CatalogStatus);
         Assert.Empty(failed.Router.Sessions);
         Assert.Empty(failed.Targets);

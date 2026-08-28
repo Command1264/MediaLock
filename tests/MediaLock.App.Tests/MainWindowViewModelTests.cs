@@ -381,13 +381,14 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void FailedKeepPlayingHasAnActionableLocalizedNotice()
     {
+        var problem = MediaLockProblem.Warning(MediaLockProblemId.PlaybackCorrectionFailed);
         var application = new FakeApplication(MediaLockApplicationState.Initial with
         {
             PlaybackStateLock = new PlaybackStateLockState(
                 PlaybackStateLockMode.KeepPlaying,
                 PlaybackStateLockStatus.Failed,
                 new SessionKey("music"),
-                "diagnostic detail"),
+                problem),
         });
         using var viewModel = new MainWindowViewModel(
             application,
@@ -395,7 +396,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.HasPlaybackStateLockNotice);
         Assert.Equal(
-            UiText.Get("Main_KeepPlayingFailed"),
+            ProblemPresentation.Describe(problem),
             viewModel.PlaybackStateLockNotice);
     }
 
@@ -724,7 +725,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:30", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Equal("The requested playback position was not confirmed.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-008", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -790,8 +791,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.CanSeek);
         Assert.True(viewModel.HasError);
-        Assert.Equal("Seeking was interrupted because the media target changed or became unavailable.",
-            viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-009", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -880,7 +880,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:30", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Contains(nameof(RouteReason.SeekTimelineUnavailable), viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-006", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -921,8 +921,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:20", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Equal("Seeking was interrupted because the media target changed or became unavailable.",
-            viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-009", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1033,7 +1032,7 @@ public sealed class MainWindowViewModelTests
     {
         var application = new FakeApplication(new MediaLockApplicationState(
             RouterState.Initial,
-            "Default App Lock target is unavailable.",
+            MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid),
             MediaLockSettings.Default with
             {
                 DefaultRoutingMode = RoutingMode.AppLock,
@@ -1466,7 +1465,6 @@ public sealed class MainWindowViewModelTests
         application.Publish(MediaLockApplicationState.Initial with
         {
             CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
-            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
         });
 
         Assert.Equal("Reacquiring", viewModel.RoutingStatus);
@@ -1585,10 +1583,35 @@ public sealed class MainWindowViewModelTests
 
         application.Publish(new MediaLockApplicationState(
             RouterState.Initial,
-            "GSMTC catalog became unavailable."));
+            MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable)));
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("GSMTC catalog became unavailable.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CAT-002", viewModel.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VisibleApplicationProblemImmediatelyFollowsTheUiLanguage()
+    {
+        UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        try
+        {
+            var problem = MediaLockProblem.Error(MediaLockProblemId.RuntimeStateSaveFailed);
+            var application = new FakeApplication(
+                new MediaLockApplicationState(RouterState.Initial, problem));
+            using var viewModel = new MainWindowViewModel(
+                application,
+                synchronizationContext: null);
+
+            Assert.Contains("runtime state", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+            UiText.Apply(UiLanguagePreference.TraditionalChinese);
+
+            Assert.Contains("執行期狀態", viewModel.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains("ML-CFG-009", viewModel.ErrorMessage, StringComparison.Ordinal);
+        }
+        finally
+        {
+            UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        }
     }
 
     [Fact]
@@ -1598,7 +1621,7 @@ public sealed class MainWindowViewModelTests
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         application.Publish(new MediaLockApplicationState(
             RouterState.Initial,
-            "GSMTC catalog became unavailable."));
+            MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable)));
 
         await viewModel.DismissErrorCommand.ExecuteAsync(null);
 
@@ -1609,7 +1632,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task DismissedApplicationErrorDoesNotReturnUntilItClearsAndRecurs()
     {
-        const string warning = "Default App Lock target is unavailable.";
+        var warning = MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid);
         var initial = new MediaLockApplicationState(RouterState.Initial, warning);
         var application = new FakeApplication(initial);
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
@@ -1626,15 +1649,16 @@ public sealed class MainWindowViewModelTests
         application.Publish(initial with
         {
             Router = initial.Router with { Revision = 2 },
-            ErrorMessage = null,
+            Problem = null,
         });
         application.Publish(initial with
         {
             Router = initial.Router with { Revision = 3 },
+            Problem = MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid),
         });
 
         Assert.True(viewModel.HasError);
-        Assert.Equal(warning, viewModel.ErrorMessage);
+        Assert.Contains("ML-CFG-004", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1653,14 +1677,15 @@ public sealed class MainWindowViewModelTests
                 RouteReason.ControlFailed,
                 MediaCommand.Next,
                 session.Key,
-                Error: "GSMTC control failed."),
+                ExceptionType: typeof(InvalidOperationException).FullName),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
 
         await viewModel.NextCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("GSMTC control failed.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-001", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("GSMTC control failed", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1681,7 +1706,8 @@ public sealed class MainWindowViewModelTests
         await viewModel.NextCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("Session changed before lock.", viewModel.ErrorMessage);
+        Assert.Contains("ML-APP-003", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Session changed before lock", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     private static MediaLockApplicationState StateWith(MediaSessionSnapshot session) => new(

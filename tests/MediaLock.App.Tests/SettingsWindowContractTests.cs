@@ -90,13 +90,14 @@ public sealed class SettingsWindowContractTests
     {
         WpfTestHost.Run(() =>
         {
+            var originalLanguage = UiText.CurrentCulture.Name == "zh-TW"
+                ? UiLanguagePreference.TraditionalChinese
+                : UiLanguagePreference.EnglishUnitedStates;
+            UiText.Apply(UiLanguagePreference.TraditionalChinese);
             using var viewModel = new SettingsViewModel(
                 new FakeMediaLockApplication(),
                 environmentInfoProvider: new FixedEnvironmentInfoProvider());
             var window = new SettingsWindow(viewModel);
-            var originalLanguage = UiText.CurrentCulture.Name == "zh-TW"
-                ? UiLanguagePreference.TraditionalChinese
-                : UiLanguagePreference.EnglishUnitedStates;
 
             Assert.Equal(680, window.Width);
             Assert.Equal(720, window.Height);
@@ -119,6 +120,7 @@ public sealed class SettingsWindowContractTests
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 AssertSelectedAppearanceOptions(window, viewModel);
                 AssertStableReleaseStatus(window);
+                AssertVisibleRecoveryValidation(window, "Enter a finite recovery timeout");
             }
             finally
             {
@@ -216,6 +218,19 @@ public sealed class SettingsWindowContractTests
             WpfTestHost.FindVisualChildren<Border>(timeout),
             candidate => candidate.Name == "Chrome");
         Assert.Equal(window.FindResource("DangerBrush"), chrome.BorderBrush);
+
+        AssertVisibleRecoveryValidation(window, "請輸入 0 到 300 秒");
+    }
+
+    private static void AssertVisibleRecoveryValidation(
+        SettingsWindow window,
+        string expectedMessage)
+    {
+        var visibleValidationMessage = Assert.Single(
+            WpfTestHost.FindVisualChildren<TextBlock>(window),
+            candidate => candidate.IsVisible &&
+                candidate.Text.Contains("ML-SET-004", StringComparison.Ordinal));
+        Assert.Contains(expectedMessage, visibleValidationMessage.Text, StringComparison.Ordinal);
     }
 
     private static void AssertRepeatedPauseOverrideUsesSharedControls(

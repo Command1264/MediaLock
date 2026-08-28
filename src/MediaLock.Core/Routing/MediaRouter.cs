@@ -888,7 +888,7 @@ public sealed class MediaRouter : IMediaRouter
                     RouteReason.ControlFailed,
                     command,
                     target.Id,
-                    Error: exception.Message));
+                    ExceptionType: exception.GetType().FullName ?? exception.GetType().Name));
         }
 
         var successfulReason = state.Mode switch

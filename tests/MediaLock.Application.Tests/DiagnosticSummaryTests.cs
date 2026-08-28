@@ -64,6 +64,7 @@ public sealed class DiagnosticSummaryTests
             "Routing mode: PriorityRules",
             "Routing status: Recovering",
             "Media catalog: Reacquiring",
+            "Problem code: None",
             "Media-key interception: Active",
             "Session count: 1",
             "Recovery timeout: 30 seconds",
@@ -73,6 +74,51 @@ public sealed class DiagnosticSummaryTests
         Assert.DoesNotContain("Private artist", summary, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-session-key", summary, StringComparison.Ordinal);
         Assert.DoesNotContain("PrivateAccount", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateIncludesTheActiveProblemCodeWithoutTechnicalContext()
+    {
+        var environment = new AppEnvironmentInfo(
+            "0.3.0",
+            "Windows 11 Pro",
+            "25H2",
+            "26200.1000",
+            "x64",
+            IsSigned: false);
+        var state = MediaLockApplicationState.Initial with
+        {
+            Problem = MediaLockProblem.Error(
+                MediaLockProblemId.RuntimeStateSaveFailed,
+                new IOException(@"C:\Users\PrivateAccount\state.json")),
+        };
+
+        var summary = DiagnosticSummary.Create(environment, state, isMediaInputRunning: true);
+
+        Assert.Contains("Problem code: ML-CFG-009", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("PrivateAccount", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain(nameof(IOException), summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateCanIncludeTheLatestSurfaceProblemWithoutPromotingItToApplicationState()
+    {
+        var environment = new AppEnvironmentInfo(
+            "0.3.0",
+            "Windows 11 Pro",
+            "25H2",
+            "26200.1000",
+            "x64",
+            IsSigned: false);
+
+        var summary = DiagnosticSummary.Create(
+            environment,
+            MediaLockApplicationState.Initial,
+            isMediaInputRunning: true,
+            lastReportedProblemCode: "ML-SET-003");
+
+        Assert.Contains("Problem code: ML-SET-003", summary, StringComparison.Ordinal);
+        Assert.Null(MediaLockApplicationState.Initial.Problem);
     }
 
     [Fact]

@@ -93,6 +93,17 @@ choices, language-native choice names, successful-save application and failed-sa
 must confirm that main-window text, Settings, playback/status labels, accessibility names and notification-area
 commands switch immediately after Save without restarting routing or duplicating a media command.
 
+Phase 17 tests the structured problem contract independently from localized presentation. Application coverage
+requires one catalog entry per semantic identifier, globally unique stable desktop codes, distinct occurrence IDs and
+exception-type-only technical context. App coverage requires exact English／Traditional Chinese resource parity,
+unknown and missing-locale fallback, immediate re-rendering of an already visible problem, stable dismissal across
+ordinary state refresh and recurrence after a new occurrence. Main, Settings, tray and startup paths must show the
+same latest reported code that `problem.reported` diagnostics and the privacy-safe diagnostic summary expose. JSONL
+coverage verifies the explicit `ProblemCode` field without media metadata, complete target identity, private paths or
+exception messages.
+Browser Extension coverage keeps `ML-BR-000` through `ML-BR-011` unique and localized; desktop Browser codes begin at
+`ML-BR-012`. The full gate must prove routing, Recovery and persistence behavior remains unchanged.
+
 Phase 7B tests theme-preference validation, schema-v4 migration, Windows-theme and DWM-frame mapping, Settings choices,
 successful-save application, failed-save suppression, Cancel discard behavior and the fixed frameless Settings
 contract. Build-time XAML compilation covers both palette and shared control dictionaries. A manual WPF smoke test

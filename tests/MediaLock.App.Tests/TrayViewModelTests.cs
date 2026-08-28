@@ -44,7 +44,6 @@ public sealed class TrayViewModelTests
         application.Publish(application.State with
         {
             CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
-            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
         });
         Assert.Equal("Reacquiring", viewModel.StatusText);
 
@@ -76,7 +75,8 @@ public sealed class TrayViewModelTests
 
         await viewModel.NextCommand.ExecuteAsync(null);
 
-        Assert.Equal("GSMTC unavailable", viewModel.ErrorMessage);
+        Assert.Contains("ML-APP-003", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("GSMTC unavailable", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ using MediaLock.Windows.Startup;
 using MediaLock.Windows.Gsmtc;
 using MediaLock.Windows.Diagnostics;
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.App.Theming;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -124,7 +125,9 @@ public partial class App : System.Windows.Application
             catch (Exception exception)
             {
                 mediaInputStartupFailure = exception;
-                await RecordMediaInputFailureAsync("input.hook.start_failed", exception);
+                await RecordProblemAsync(
+                    "input.hook.start_failed",
+                    MediaLockProblem.Warning(MediaLockProblemId.MediaInputStartupFailed, exception));
                 mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
                 await mediaInputCoordinator.DisposeAsync();
                 mediaInputCoordinator = null;
@@ -172,7 +175,9 @@ public partial class App : System.Windows.Application
             {
                 System.Windows.MessageBox.Show(
                     window,
-                    $"{UiText.Get("App_MediaInputStartupFailed")}\n\n{mediaInputStartupFailure.Message}",
+                    ProblemPresentation.Describe(MediaLockProblem.Warning(
+                        MediaLockProblemId.MediaInputStartupFailed,
+                        mediaInputStartupFailure)),
                     UiText.Get("App_MediaInputErrorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -180,18 +185,19 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            var details = exception.Message;
+            var problem = MediaLockProblem.Error(MediaLockProblemId.StartupFailed, exception);
+            await RecordProblemAsync("app.startup.failed", problem);
             try
             {
                 await ShutdownAsync();
             }
             catch (Exception cleanupException)
             {
-                details += $"\n\n{UiText.Format("App_CleanupAlsoFailed", cleanupException.Message)}";
+                System.Diagnostics.Trace.TraceError(cleanupException.ToString());
             }
 
             System.Windows.MessageBox.Show(
-                $"{UiText.Get("App_StartupFailed")}\n\n{details}",
+                ProblemPresentation.Describe(problem),
                 UiText.Get("App_StartupErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -233,8 +239,10 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            var problem = MediaLockProblem.Error(MediaLockProblemId.ShutdownFailed, exception);
+            await RecordProblemAsync("app.shutdown.failed", problem);
             System.Windows.MessageBox.Show(
-                $"{UiText.Get("App_ShutdownFailed")}\n\n{exception.Message}",
+                ProblemPresentation.Describe(problem),
                 UiText.Get("App_ShutdownErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -358,7 +366,9 @@ public partial class App : System.Windows.Application
 
         try
         {
-            await RecordMediaInputFailureAsync("input.hook.faulted", args.Exception);
+            await RecordProblemAsync(
+                "input.hook.faulted",
+                MediaLockProblem.Warning(MediaLockProblemId.MediaInputStopped, args.Exception));
             await Dispatcher.InvokeAsync(() =>
             {
                 if (mediaInputFaultReported || shutdownStarted)
@@ -369,7 +379,9 @@ public partial class App : System.Windows.Application
                 mediaInputFaultReported = true;
                 System.Windows.MessageBox.Show(
                     mainWindow,
-                    $"{UiText.Get("App_MediaInputStopped")}\n\n{args.Exception.Message}",
+                    ProblemPresentation.Describe(MediaLockProblem.Warning(
+                        MediaLockProblemId.MediaInputStopped,
+                        args.Exception)),
                     UiText.Get("App_MediaInputErrorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -381,8 +393,19 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private async ValueTask RecordMediaInputFailureAsync(string name, Exception exception)
+    private async ValueTask RecordProblemAsync(
+        string name,
+        MediaLockProblem problem)
     {
+        if (mediaApplication is not null)
+        {
+            await mediaApplication.ReportProblemEventAsync(
+                name,
+                problem,
+                CancellationToken.None);
+            return;
+        }
+
         if (diagnosticLog is null)
         {
             return;
@@ -395,9 +418,9 @@ public partial class App : System.Windows.Application
                     name,
                     new Dictionary<string, string>
                     {
-                        ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name,
-                        ["message"] = exception.Message,
-                    }),
+                        ["exceptionType"] = problem.ExceptionType ?? "Unknown",
+                    },
+                    problem.Code),
                 CancellationToken.None);
         }
         catch (Exception diagnosticException)

@@ -44,7 +44,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private string? repeatedPauseCountError;
     private bool playRepeatedPauseOverrideSound;
     private FallbackPolicy fallbackPolicy;
-    private string? errorMessage;
+    private MediaLockProblem? errorProblem;
     private string? supportStatusMessage;
     private CancellationTokenSource? supportStatusCancellation;
     private string? selectedAvailableApplication;
@@ -318,11 +318,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         private set => SetField(ref supportStatusMessage, value);
     }
 
-    public string? ErrorMessage
-    {
-        get => errorMessage;
-        private set => SetField(ref errorMessage, value);
-    }
+    public string? ErrorMessage => errorProblem is not null
+        ? ProblemPresentation.Describe(errorProblem)
+        : recoveryTimeoutError ?? repeatedPauseWindowError ?? repeatedPauseCountError;
 
     public IEnumerable GetErrors(string? propertyName)
     {
@@ -364,6 +362,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     private async Task SaveAsync()
     {
         var previousSettings = application.State.Settings;
+        var presentationFailed = false;
         try
         {
             var settings = new MediaLockSettings(
@@ -396,6 +395,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             }
             catch (Exception exception)
             {
+                presentationFailed = true;
                 var failures = new List<Exception> { exception };
                 try
                 {
@@ -431,13 +431,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
                     failures);
             }
 
-            ErrorMessage = null;
+            SetProblem(null);
             ClearSupportStatus();
             requestClose?.Invoke();
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            SetProblem(MediaLockProblem.Error(
+                presentationFailed
+                    ? MediaLockProblemId.SettingsPresentationApplyFailed
+                    : MediaLockProblemId.SettingsSaveFailed,
+                exception));
         }
     }
 
@@ -451,7 +455,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
     internal void DiscardChanges()
     {
         Apply(application.State.Settings);
-        ErrorMessage = null;
+        SetProblem(null);
         ClearSupportStatus();
     }
 
@@ -480,22 +484,26 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         {
             if (recoveryTimeoutError is not null)
             {
-                recoveryTimeoutError = UiText.Get("Settings_RecoveryTimeoutValidation");
+                recoveryTimeoutError = DescribeValidation(MediaLockProblemId.RecoveryTimeoutInvalid);
                 ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RecoveryTimeoutText)));
             }
 
             if (repeatedPauseWindowError is not null)
             {
-                repeatedPauseWindowError = UiText.Get("Settings_RepeatedPauseWindowValidation");
+                repeatedPauseWindowError = DescribeValidation(
+                    MediaLockProblemId.RepeatedPauseWindowInvalid);
                 ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepeatedPauseWindowText)));
             }
 
             if (repeatedPauseCountError is not null)
             {
-                repeatedPauseCountError = UiText.Get("Settings_RepeatedPauseCountValidation");
+                repeatedPauseCountError = DescribeValidation(
+                    MediaLockProblemId.RepeatedPauseCountInvalid);
                 ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(nameof(RepeatedPauseCountText)));
             }
         }
+
+        OnPropertyChanged(nameof(ErrorMessage));
     }
 
     private async Task ExecuteSupportActionAsync(DesktopSupportAction action)
@@ -511,12 +519,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
                 ? DiagnosticSummary.Create(
                     environmentInfo,
                     application.State,
-                    isMediaInputRunning())
+                    isMediaInputRunning(),
+                    application.LastReportedProblemCode)
                 : null;
             await desktopSupportActions.ExecuteAsync(
                 new DesktopSupportRequest(action, summary),
                 CancellationToken.None);
-            ErrorMessage = null;
+            SetProblem(null);
             if (action == DesktopSupportAction.CopyDiagnostics)
             {
                 ShowSupportStatus(UiText.Get("Settings_DiagnosticsCopied"));
@@ -529,7 +538,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         catch (Exception exception)
         {
             ClearSupportStatus();
-            ErrorMessage = UiText.Format("Settings_SupportActionFailed", exception.Message);
+            SetProblem(MediaLockProblem.Error(
+                MediaLockProblemId.SupportActionFailed,
+                exception));
         }
     }
 
@@ -548,6 +559,28 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         supportStatusCancellation = null;
         cancellation?.Cancel();
         SupportStatusMessage = null;
+    }
+
+    private void SetProblem(MediaLockProblem? problem)
+    {
+        if (Equals(errorProblem, problem))
+        {
+            return;
+        }
+
+        errorProblem = problem;
+        if (problem is not null)
+        {
+            _ = application.ReportProblemAsync(problem, CancellationToken.None);
+        }
+        OnPropertyChanged(nameof(ErrorMessage));
+    }
+
+    private string DescribeValidation(MediaLockProblemId id)
+    {
+        var problem = MediaLockProblem.Warning(id);
+        _ = application.ReportProblemAsync(problem, CancellationToken.None);
+        return ProblemPresentation.Describe(problem);
     }
 
     private async Task ClearSupportStatusAfterDelayAsync(CancellationTokenSource cancellation)
@@ -689,7 +722,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
             seconds <= RecoverySettings.MaximumTimeoutSeconds;
         var nextError = isValid
             ? null
-            : UiText.Get("Settings_RecoveryTimeoutValidation");
+            : DescribeValidation(MediaLockProblemId.RecoveryTimeoutInvalid);
 
         if (isValid)
         {
@@ -701,6 +734,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         {
             recoveryTimeoutError = nextError;
             OnPropertyChanged(nameof(HasErrors));
+            OnPropertyChanged(nameof(ErrorMessage));
         }
 
         ErrorsChanged?.Invoke(
@@ -726,7 +760,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         SetValidationError(
             nameof(RepeatedPauseWindowText),
             ref repeatedPauseWindowError,
-            isValid ? null : UiText.Get("Settings_RepeatedPauseWindowValidation"));
+            isValid ? null : DescribeValidation(MediaLockProblemId.RepeatedPauseWindowInvalid));
     }
 
     private void ValidateRepeatedPauseCount()
@@ -746,7 +780,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         SetValidationError(
             nameof(RepeatedPauseCountText),
             ref repeatedPauseCountError,
-            isValid ? null : UiText.Get("Settings_RepeatedPauseCountValidation"));
+            isValid ? null : DescribeValidation(MediaLockProblemId.RepeatedPauseCountInvalid));
     }
 
     private void SetValidationError(string propertyName, ref string? field, string? next)
@@ -755,6 +789,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, INotifyDataError
         {
             field = next;
             OnPropertyChanged(nameof(HasErrors));
+            OnPropertyChanged(nameof(ErrorMessage));
         }
 
         ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(propertyName));

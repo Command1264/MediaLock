@@ -259,7 +259,7 @@ public sealed class MediaTargetCatalogTests
             CancellationToken.None);
 
         Assert.Equal(saveCountAfterStartup, runtimeState.Saved.Count);
-        Assert.Null(application.State.ErrorMessage);
+        Assert.Null(application.State.Problem);
         Assert.Equal(browser.Id, application.State.Router.ActiveTarget);
     }
 

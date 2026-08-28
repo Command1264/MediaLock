@@ -758,5 +758,5 @@ Exit criteria:
 - Missing translations and unknown codes fail to a safe, identifiable fallback while routing and recovery behavior
   remain unchanged.
 
-Status: planned in [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
+Status: complete for [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
 telemetry or automatic remote reporting.
