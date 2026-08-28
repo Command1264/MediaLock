@@ -434,13 +434,17 @@ Browser profile + explicit permission + Page Binding
 
 A Page Binding is Extension-issued and authoritative; URL, title, artist and browser executable are never sufficient
 identity. Live resolution adds the current document generation, frame and media-element endpoint, all of which become
-stale on navigation or reload. A successor is accepted only through the same Page Binding and an authorized site
-scope. If the Extension cannot prove continuity after browser restart, the target remains unavailable rather than
-being recovered by URL similarity.
+stale on navigation or reload. The first production candidate removes every old binding for that tab on browser
+`loading`. A temporary grant never creates a successor. An exact-site grant may create one new Page Binding after
+the replacement top-level HTTPS document reaches `complete` and proves that its origin still has permission; the new
+opaque identity is only a catalog candidate and never satisfies, selects or repairs a lock on the old identity. If
+the Extension cannot prove continuity after browser restart, the old target remains unavailable rather than being
+recovered by URL similarity.
 
 Routing modes keep their user meaning across providers:
 
-- Session Lock captures one exact Page Binding and follows only its authorized Endpoint succession.
+- Session Lock captures one exact Page Binding; reload／navigation removes it and never adopts an automatically
+  created trusted-site successor without an explicit new lock action.
 - App Lock captures a Browser Application Scope (browser profile plus origin／installed Web App identity), then applies
   a deterministic candidate policy; multiple unresolved pages are an ambiguity, not permission to choose list order.
 - Priority Rules persist a typed selector and display whether it is page-scoped or application-scoped. Rules for two
@@ -456,6 +460,57 @@ Target presentation reconciliation is exact and fail-open toward the established
 suppresses only the one GSMTC target named by an authoritative correlation while both identities are present. No
 correlation is inferred from Brave／Chrome executable identity, title, URL, origin similarity, tab order or track
 metadata. Therefore installing an Extension does not hide unrelated or uncorrelated Brave GSMTC targets.
+
+The first production candidate composes the existing GSMTC Adapter as the primary provider with an optional Browser
+Adapter. The Browser Module owns protocol v2, authorization, profile／Page Binding／Endpoint state, event-driven
+playback／timeline／rate snapshots and one-shot command correlation. Generic Toggle Play／Pause resolves the exact
+Endpoint's live paused state into one explicit Play or Pause. The provider-neutral input coordinator checks the
+captured target through the shared target catalog, so a supported Browser Toggle is consumed without a GSMTC-only
+capability lookup. A minimal Native Host validates the fixed Extension launch origin and relays bounded frames over the
+fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
+[ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+This composition enables only exact Browser Session Lock at runtime. It emits no inferred GSMTC correlation, so Brave
+GSMTC targets remain visible unless a future provider supplies an authoritative exact link. Browser target loss keeps
+the provider-qualified lock in Recovery／Unavailable; it never asks the GSMTC primary provider for a similar target.
+Because the Browser lock is runtime-only, it is never serialized into the GSMTC `RuntimeStateDocument`; catalog
+refreshes and routed commands preserve the live lock without attempting an invalid durable Session Lock. The JSON
+runtime repository independently validates every document before writing as a second integrity guard.
+
+Playback State Lock also consumes the neutral `RouterState.Targets` observation rather than reopening a GSMTC-only
+seam. Its Armed Playback Target remains a `MediaTargetId`: GSMTC targets retain fingerprint-based successor recovery,
+while a direct Browser target has no inferred successor and may resume only when the Router again resolves the same
+provider-qualified identity. A Browser Paused observation uses the existing serialized, bounded Play-correction path;
+target loss publishes Suspended and cannot redirect the correction to a replacement Page Binding or GSMTC competitor.
+
+The Browser Adapter also attaches a provider-owned, presentation-only browser-family group hint to each Browser target.
+The App presentation Module may place an exact ordinary-browser GSMTC application and those Browser pages inside one
+expandable visual group, while installed PWA identities remain separate. This grouping is not correlation evidence:
+children retain provider-qualified identities, commands still route through their original Adapter and an
+uncorrelated GSMTC child remains visible. Group expansion and selection are separate operations, and the WPF surface
+uses one bounded outer scrollbar instead of nested or independently growing target lists. The App selection Module
+maps its single Lock Session interface to `LockSession` for a GSMTC child or `LockTarget` for an exact Browser child;
+the View never owns separate provider-specific lock buttons. Browser authorization revocation remains an exact-target
+operation supplied with the row identity rather than inferred from ambient selection. Projection builds an exact
+ordinary-browser GSMTC presentation group before attaching a matching Browser-family child, preserving the existing
+group key when authorization arrives. Nested child lists delegate wheel input to the one outer scrolling surface.
+
+The Extension Popup reads current-document authorization through a narrow internal message contract. It supplies the
+active tab ID obtained from `chrome.tabs.query`, then asks the top-level document's installed generic Endpoint. The
+content boundary validates the Extension sender and projects only `authorized` plus the Binding scope from its live
+Page Binding. Browser site permission and service-worker memory are deliberately not fallback state sources:
+reload／navigation may retain permission after the document Binding is gone, while closing and reopening the Popup
+must not discard a live Binding. The Popup begins in Checking state, reports a distinct trusted-site waiting state
+when permission remains but no Endpoint answers, and reports Not authorized only when neither Binding nor site grant
+exists. It exposes no URL, title, opaque Binding identity or media metadata. Static labels and status prose use
+Chromium i18n with English fallback and a Traditional Chinese locale.
+For a site-scoped Endpoint, Popup projection also revalidates the exact origin permission; a stale document listener
+cannot remain Authorized after permission revocation. Exact-target revocation sends an `unbindGenericEndpoint`
+message to the browser-owned document before removing the registry entry; a missing document cannot block removal.
+Trusted-site automatic binding separates preparation from publication and revalidates its tab generation after every
+asynchronous boundary, so a result completed after reload／close is discarded without replacing a newer same-tab
+target. Popup failure prose maps internal transport codes to localized, actionable messages plus stable `ML-BR-*`
+support codes; this is the Browser Integration subset of the broader Phase 17 presentation contract.
 
 ## 10. Composition
 

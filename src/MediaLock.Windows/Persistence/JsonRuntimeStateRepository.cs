@@ -94,6 +94,12 @@ public sealed class JsonRuntimeStateRepository : IRuntimeStateRepository
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(state);
+        var issues = state.Validate();
+        if (issues.Length > 0)
+        {
+            throw new InvalidDataException(
+                $"Runtime state is invalid: {string.Join(" ", issues.Select(issue => issue.Message))}");
+        }
         var directory = Path.GetDirectoryName(statePath)!;
         Directory.CreateDirectory(directory);
         if (preserveExistingOnNextSave && File.Exists(statePath))

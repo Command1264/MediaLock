@@ -711,7 +711,8 @@ Exit criteria:
 
 Status: Phase 16A Gate A completed and merged through PR #56. Phase 16B has a final disposable Probe candidate: an
 explicit gesture creates a temporary or exact-site Page Binding for one unambiguous top-level media Endpoint, and
-routes Play, Pause and bounded Seek through the existing Native Messaging protocol. Exact-site reload Recovery,
+routes Play, Pause and bounded Seek through the existing Native Messaging protocol. The production candidate later
+adds exact live-state Toggle Play／Pause for the UI and physical media-key path. Exact-site reload Recovery,
 permission revocation, stale-target invalidation and fixed／generic Adapter coexistence have automated coverage. The
 real-browser final Gate passed on Chrome with temporary／exact-site authorization, command isolation, permission
 revocation, ambiguity, iframe fail-closed, lifecycle and no-Extension GSMTC compatibility evidence. A subsequent
@@ -732,8 +733,30 @@ compatibility rows, and stage Session Lock before any Browser Direct code enters
 or packaging.
 
 Status: the gate definition was accepted through PR #59 and the provider-neutral Core／Application seam is tracked by
-[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). That seam preserves the no-Extension GSMTC
-composition, adds provider-qualified identity／catalog／controller outcomes and defines exact duplicate reconciliation;
-it ships no production Browser Adapter, Extension, UI or settings migration. The next code slice adds only
-exact-Page-Binding Session Lock with Play, Pause and bounded Seek; other Routing Modes, schema migration and packaging
-remain later independent gates.
+[GitHub Issue #60](https://github.com/Command1264/MediaLock/issues/60). The seam is integrated, and
+[Issue #62](https://github.com/Command1264/MediaLock/issues/62) carries the first Browser Session Lock candidate:
+exact runtime Page Binding, Play／Pause／Toggle Play／Pause／bounded Seek, explicit authorization／revoke UI, a current-user
+Native Messaging bridge and an unpacked Extension. Other Routing Modes, persistence／schema migration, store
+distribution, installed package ownership and release qualification remain later independent gates. See the
+[candidate runbook](phase-16/browser-session-lock-candidate.md) and [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+## Phase 17 — Localized warnings and stable error codes
+
+Replace user-facing raw warning and error strings with a structured presentation contract. Every semantic warning or
+error receives one stable public code, resolves through the active English or Traditional Chinese UI language and
+uses that same code in the UI, structured logs, privacy-safe diagnostics and support guidance. Raw exception details
+remain bounded technical context rather than the primary user message.
+
+Exit criteria:
+
+- Every known user-facing warning and error has exactly one unique, documented and compatibility-stable code.
+- Main window, Settings and tray surfaces resolve messages from the active UI language without parsing English text.
+- English and Traditional Chinese resource parity, code uniqueness, fallback and immediate language changes have
+  automated coverage.
+- Structured logs and privacy-safe diagnostics carry the same code shown to the user without exposing media metadata,
+  complete target identity, secrets or unrelated full paths.
+- Missing translations and unknown codes fail to a safe, identifiable fallback while routing and recovery behavior
+  remain unchanged.
+
+Status: planned in [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
+telemetry or automatic remote reporting.

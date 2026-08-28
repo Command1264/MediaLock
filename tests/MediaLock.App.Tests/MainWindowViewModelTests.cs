@@ -1,4 +1,5 @@
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.App.ViewModels;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -12,6 +13,289 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public void AddingBrowserAuthorizationKeepsTheExistingOrdinaryBrowserGroupIdentity()
+    {
+        var session = new SessionItemViewModel(
+            new SessionKey("brave-group-stability"),
+            "Brave",
+            "Brave",
+            "Brave",
+            "Big Buck Bunny",
+            "Nuevo",
+            "Playing",
+            MediaCommandCapabilities.Play,
+            PlaybackStatus.Playing,
+            null,
+            null);
+        var targetId = MediaTargetId.FromBrowserPageBinding("page-binding-group-stability");
+        var browserTarget = new BrowserTargetItemViewModel(
+            targetId,
+            "Nuevo",
+            "Big Buck Bunny",
+            "Nuevo",
+            "Playing",
+            targetId.ToString(),
+            MediaCommandCapabilities.Play,
+            new MediaSourceGroupHint("browser-family:brave", "Brave"));
+        var before = Assert.Single(MediaSourceGroupProjection.Create([session], []));
+
+        var after = Assert.Single(MediaSourceGroupProjection.Create(
+            [session],
+            [browserTarget],
+            new Dictionary<string, bool>(StringComparer.Ordinal)
+            {
+                [before.Key] = before.IsExpanded,
+            }));
+
+        Assert.Equal(before.Key, after.Key);
+        Assert.Equal(before.IsExpanded, after.IsExpanded);
+        Assert.Same(browserTarget, Assert.Single(after.BrowserTargets));
+        Assert.Same(session, Assert.Single(after.Sessions));
+    }
+
+    [Fact]
+    public void MediaSourcesGroupBrowserPagesWithOnlyTheMatchingOrdinaryGsmtcApplication()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var browserTarget = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-grouped-source",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play,
+                observedAt,
+                SourceGroup: new MediaSourceGroupHint("browser-family:brave", "Brave")));
+        var brave = new MediaSessionSnapshot(
+            new SessionKey("brave-session"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Play,
+            observedAt,
+            Metadata: new MediaMetadata("Big Buck Bunny", null, null, null));
+        var music = new MediaSessionSnapshot(
+            new SessionKey("music-session"),
+            "Brave._crx_music",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Play,
+            observedAt,
+            Metadata: new MediaMetadata("YouTube Music", null, null, null));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Sessions = [brave, music],
+                Targets =
+                [
+                    MediaTargetSnapshot.FromGsmtc(brave),
+                    MediaTargetSnapshot.FromGsmtc(music),
+                    browserTarget,
+                ],
+            },
+        });
+
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.Collection(
+            viewModel.MediaSourceGroups,
+            group =>
+            {
+                Assert.Equal("Brave", group.DisplayName);
+                Assert.Single(group.BrowserTargets);
+                Assert.Equal(brave.Key, Assert.Single(group.Sessions).Key);
+            },
+            group =>
+            {
+                Assert.Empty(group.BrowserTargets);
+                Assert.Equal(music.Key, Assert.Single(group.Sessions).Key);
+            });
+    }
+
+    [Fact]
+    public async Task MediaSourceSelectionIsExclusiveAndGroupSelectionLocksItsGsmtcApplication()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var browserTarget = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-exclusive-selection",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play,
+                observedAt,
+                SourceGroup: new MediaSourceGroupHint("browser-family:brave", "Brave")));
+        var brave = new MediaSessionSnapshot(
+            new SessionKey("brave-exclusive-session"),
+            "Brave",
+            PlaybackStatus.Playing,
+            MediaCommandCapabilities.Play,
+            observedAt);
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Sessions = [brave],
+                Targets = [MediaTargetSnapshot.FromGsmtc(brave), browserTarget],
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+        var group = Assert.Single(viewModel.MediaSourceGroups);
+        var browserItem = Assert.Single(group.BrowserTargets);
+        var sessionItem = Assert.Single(group.Sessions);
+
+        viewModel.SelectedBrowserTarget = browserItem;
+        Assert.Null(viewModel.SelectedSession);
+        Assert.Null(viewModel.SelectedMediaSourceGroup);
+
+        viewModel.SelectedSession = sessionItem;
+        Assert.Null(viewModel.SelectedBrowserTarget);
+        Assert.Null(viewModel.SelectedMediaSourceGroup);
+
+        await viewModel.SelectMediaSourceGroupCommand.ExecuteAsync(group);
+        Assert.Same(group, viewModel.SelectedMediaSourceGroup);
+        Assert.Null(viewModel.SelectedBrowserTarget);
+        Assert.Null(viewModel.SelectedSession);
+        Assert.True(viewModel.AppLockCommand.CanExecute(null));
+
+        await viewModel.AppLockCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.LockApplication>(Assert.Single(application.Intents));
+        Assert.Equal("Brave", intent.SourceAppUserModelId);
+    }
+
+    [Fact]
+    public async Task BrowserPageTargetUsesTheSharedLockCommandAndCanRevokeItsOwnAuthorization()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-7",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play |
+                    MediaCommandCapabilities.Pause |
+                    MediaCommandCapabilities.SeekAbsolute,
+                DateTimeOffset.Parse("2026-08-27T00:00:00Z"),
+                new MediaMetadata("Big Buck Bunny", "Nuevo", null, null),
+                new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromMinutes(2),
+                    DateTimeOffset.Parse("2026-08-27T00:00:00Z"))));
+        var state = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Targets = [target],
+                Revision = 1,
+            },
+        };
+        var application = new FakeApplication(state);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        var item = Assert.Single(viewModel.BrowserTargets);
+        Assert.Equal("Nuevo Big Buck Bunny", item.SourceDisplayName);
+        Assert.Contains("browser:", item.TargetDetails, StringComparison.Ordinal);
+        viewModel.SelectedBrowserTarget = item;
+
+        Assert.True(viewModel.LockCommand.CanExecute(null));
+        Assert.True(viewModel.RevokeBrowserTargetAuthorizationCommand.CanExecute(item));
+        await viewModel.LockCommand.ExecuteAsync(null);
+
+        viewModel.SelectedBrowserTarget = null;
+        Assert.True(viewModel.RevokeBrowserTargetAuthorizationCommand.CanExecute(item));
+        await viewModel.RevokeBrowserTargetAuthorizationCommand.ExecuteAsync(item);
+
+        Assert.Collection(
+            application.Intents,
+            intent => Assert.Equal(target.Id, Assert.IsType<ApplicationIntent.LockTarget>(intent).Target),
+            intent => Assert.Equal(
+                target.Id,
+                Assert.IsType<ApplicationIntent.RevokeTargetAuthorization>(intent).Target));
+    }
+
+    [Fact]
+    public async Task BrowserToggleCommandUsesTheExactLockedTargetCapability()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-toggle",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.TogglePlayPause,
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+
+        await viewModel.TogglePlayPauseCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.Route>(Assert.Single(application.Intents));
+        Assert.Equal(MediaCommand.TogglePlayPause, intent.Command);
+    }
+
+    [Fact]
+    public void PlayAndPauseCommandsFollowTheResolvedTargetsPlaybackState()
+    {
+        static MediaTargetSnapshot BrowserTarget(PlaybackStatus playbackStatus) =>
+            MediaTargetSnapshot.FromBrowserPageBinding(
+                "page-binding-transport-state",
+                new MediaTargetPresentation(
+                    "Nuevo Big Buck Bunny",
+                    playbackStatus,
+                    MediaCommandCapabilities.Play |
+                        MediaCommandCapabilities.Pause |
+                        MediaCommandCapabilities.TogglePlayPause,
+                    DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+
+        var target = BrowserTarget(PlaybackStatus.Playing);
+        var initial = MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        };
+        var application = new FakeApplication(initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.False(viewModel.PlayCommand.CanExecute(null));
+        Assert.True(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+
+        var paused = BrowserTarget(PlaybackStatus.Paused);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Targets = [paused], Revision = 1 },
+        });
+
+        Assert.True(viewModel.PlayCommand.CanExecute(null));
+        Assert.False(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+
+        var unknown = BrowserTarget(PlaybackStatus.Unknown);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Targets = [unknown], Revision = 2 },
+        });
+
+        Assert.True(viewModel.PlayCommand.CanExecute(null));
+        Assert.True(viewModel.PauseCommand.CanExecute(null));
+        Assert.True(viewModel.TogglePlayPauseCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task KeepPlayingCanBeEnabledForThePlayingRoutedTarget()
     {
         var session = new MediaSessionSnapshot(
@@ -24,6 +308,38 @@ public sealed class MainWindowViewModelTests
         using var viewModel = new MainWindowViewModel(
             application,
             synchronizationContext: null);
+
+        Assert.True(viewModel.KeepPlayingCommand.CanExecute(null));
+        await viewModel.KeepPlayingCommand.ExecuteAsync(null);
+
+        var intent = Assert.IsType<ApplicationIntent.SetPlaybackStateLock>(
+            Assert.Single(application.Intents));
+        Assert.Equal(PlaybackStateLockMode.KeepPlaying, intent.Mode);
+    }
+
+    [Fact]
+    public async Task KeepPlayingCanBeEnabledForAPlayingBrowserTarget()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "keep-playing-page",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play |
+                    MediaCommandCapabilities.Pause |
+                    MediaCommandCapabilities.TogglePlayPause,
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
 
         Assert.True(viewModel.KeepPlayingCommand.CanExecute(null));
         await viewModel.KeepPlayingCommand.ExecuteAsync(null);
@@ -201,6 +517,46 @@ public sealed class MainWindowViewModelTests
         viewModel.RefreshTimeline();
 
         Assert.Equal("0:30", viewModel.NowPlayingElapsed);
+    }
+
+    [Fact]
+    public void BrowserNowPlayingTimelineUsesTheObservedPlaybackRate()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var clock = new TestTimeProvider(observedAt.AddSeconds(4));
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-rate",
+            new MediaTargetPresentation(
+                "Nuevo Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.SeekAbsolute,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(4),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                PlaybackRate: 1.75));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            timeProvider: clock);
+
+        viewModel.RefreshTimeline();
+
+        Assert.Equal("0:37", viewModel.NowPlayingElapsed);
+        Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
     }
 
     [Fact]
@@ -670,6 +1026,26 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(mode == RoutingMode.PriorityRules, viewModel.IsPriorityRulesMode);
         Assert.Equal(mode == RoutingMode.AppLock, viewModel.IsAppLockMode);
         Assert.Equal(mode == RoutingMode.SessionLock, viewModel.IsSessionLockMode);
+    }
+
+    [Fact]
+    public async Task WindowsAutoCanPersistAFallbackWhenTheStartupModeDiffers()
+    {
+        var application = new FakeApplication(new MediaLockApplicationState(
+            RouterState.Initial,
+            "Default App Lock target is unavailable.",
+            MediaLockSettings.Default with
+            {
+                DefaultRoutingMode = RoutingMode.AppLock,
+            }));
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.True(viewModel.IsWindowsAutoMode);
+        Assert.True(viewModel.WindowsAutoCommand.CanExecute(null));
+
+        await viewModel.WindowsAutoCommand.ExecuteAsync(null);
+
+        Assert.IsType<ApplicationIntent.UseWindowsAuto>(Assert.Single(application.Intents));
     }
 
     [Theory]
@@ -1228,6 +1604,37 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.HasError);
         Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task DismissedApplicationErrorDoesNotReturnUntilItClearsAndRecurs()
+    {
+        const string warning = "Default App Lock target is unavailable.";
+        var initial = new MediaLockApplicationState(RouterState.Initial, warning);
+        var application = new FakeApplication(initial);
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        await viewModel.DismissErrorCommand.ExecuteAsync(null);
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 1 },
+        });
+
+        Assert.False(viewModel.HasError);
+        Assert.Null(viewModel.ErrorMessage);
+
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 2 },
+            ErrorMessage = null,
+        });
+        application.Publish(initial with
+        {
+            Router = initial.Router with { Revision = 3 },
+        });
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal(warning, viewModel.ErrorMessage);
     }
 
     [Fact]

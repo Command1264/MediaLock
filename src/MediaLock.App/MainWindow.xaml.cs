@@ -52,6 +52,31 @@ public partial class MainWindow : Window
 
     private void ApplyFrameTheme() => WindowFrameTheme.TryApply(this, UiTheme.Current);
 
+    private void OnBrowserTargetActionsClick(object sender, RoutedEventArgs args)
+    {
+        if (sender is not System.Windows.Controls.Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+        args.Handled = true;
+    }
+
+    private void OnNestedMediaSourcePreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs args)
+    {
+        var requestedOffset = MediaSourceScrollViewer.VerticalOffset - args.Delta;
+        MediaSourceScrollViewer.ScrollToVerticalOffset(Math.Clamp(
+            requestedOffset,
+            0,
+            MediaSourceScrollViewer.ScrollableHeight));
+        args.Handled = true;
+    }
+
     private void OnPlaybackSeekPointerDown(object sender, MouseButtonEventArgs args)
     {
         if (!BeginSeekGesture(SeekGestureInput.Pointer))

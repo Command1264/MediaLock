@@ -29,6 +29,39 @@ public sealed class MediaInputCoordinatorTests
     }
 
     [Fact]
+    public async Task BrowserToggleInputIsConsumedAndDispatchedToTheExactLockedTarget()
+    {
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding",
+            new MediaTargetPresentation(
+                "Browser video",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.TogglePlayPause,
+                DateTimeOffset.Parse("2026-08-28T00:00:00Z")));
+        var application = new RecordingApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+            },
+        });
+        await using var source = new FakeInputSource();
+        await using var coordinator = new MediaInputCoordinator(application, source);
+        await coordinator.StartAsync(CancellationToken.None);
+
+        var consumed = source.Emit(MediaCommand.TogglePlayPause);
+        var intent = await application.NextIntent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(consumed);
+        var route = Assert.IsType<ApplicationIntent.Route>(intent);
+        Assert.Equal(MediaCommand.TogglePlayPause, route.Command);
+        Assert.Equal(target.Id, route.ExpectedTarget);
+    }
+
+    [Fact]
     public async Task DisabledInterceptionPassesTheInputThrough()
     {
         var target = Session("music", MediaCommandCapabilities.All);
@@ -191,6 +224,7 @@ public sealed class MediaInputCoordinatorTests
             Router = RouterState.Initial with
             {
                 Mode = RoutingMode.PriorityRules,
+                Targets = [MediaTargetSnapshot.FromGsmtc(target)],
                 Sessions = [target],
                 WindowsCurrentSession = target.Key,
                 PriorityTarget = target.Key,

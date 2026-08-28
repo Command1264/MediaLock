@@ -109,6 +109,12 @@ public sealed record RouterState(
     long Revision,
     SessionKey? PriorityTarget)
 {
+    public ImmutableArray<MediaTargetSnapshot> Targets { get; init; } = [];
+
+    public MediaTargetId? WindowsCurrentTarget { get; init; }
+
+    public MediaTargetId? LockedMediaTarget { get; init; }
+
     public SessionKey? ActiveSession => Status == RouterStatus.Fallback &&
         ActiveFallback == FallbackPolicy.WindowsCurrentSession
             ? WindowsCurrentSession
@@ -118,9 +124,13 @@ public sealed record RouterState(
                 ? LockedTarget?.ResolvedSession
                 : WindowsCurrentSession;
 
-    public MediaTargetId? ActiveTarget => ActiveSession is { } session
-        ? MediaTargetId.FromGsmtc(session)
-        : null;
+    public MediaTargetId? ActiveTarget =>
+        Mode == RoutingMode.SessionLock && Status == RouterStatus.Locked &&
+        LockedMediaTarget is { } directTarget
+            ? directTarget
+            : ActiveSession is { } session
+                ? MediaTargetId.FromGsmtc(session)
+                : null;
 
     public static RouterState Initial { get; } = new(
         RoutingMode.WindowsAuto,
@@ -179,11 +189,17 @@ public abstract record RouterIntent
         ImmutableArray<MediaSessionSnapshot> Sessions,
         SessionKey? WindowsCurrentSession) : RouterIntent;
 
+    public sealed record MediaTargetsUpdated(
+        ImmutableArray<MediaTargetSnapshot> Targets,
+        MediaTargetId? WindowsCurrentTarget) : RouterIntent;
+
     public sealed record Route(
         MediaCommand Command,
         MediaTargetId? ExpectedTarget = null) : RouterIntent;
 
     public sealed record LockSession(SessionKey Session) : RouterIntent;
+
+    public sealed record LockTarget(MediaTargetId Target) : RouterIntent;
 
     public sealed record RestoreSessionLock(SessionFingerprint Fingerprint) : RouterIntent;
 

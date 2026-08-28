@@ -146,7 +146,9 @@ public sealed class MediaRouter : IMediaRouter
         return intent switch
         {
             RouterIntent.CatalogUpdated catalog => UpdateCatalog(catalog),
+            RouterIntent.MediaTargetsUpdated catalog => UpdateCatalog(catalog),
             RouterIntent.LockSession lockSession => LockSession(lockSession.Session),
+            RouterIntent.LockTarget lockTarget => LockTarget(lockTarget.Target),
             RouterIntent.RestoreSessionLock restore => RestoreSessionLock(restore.Fingerprint),
             RouterIntent.LockApplication lockApplication => LockApplication(lockApplication.SourceAppUserModelId),
             RouterIntent.RecoveryTimedOut timeout => ApplyRecoveryTimeout(timeout.RecoveryEpoch),
@@ -205,6 +207,7 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.PriorityRules,
             Status = RouterStatus.Ready,
             LockedTarget = null,
+            LockedMediaTarget = null,
             PriorityTarget = SelectPriorityCandidate(state.Sessions, options.PriorityRules)?.Key,
             ActiveFallback = null,
             RecoveryEpoch = null,
@@ -222,6 +225,7 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.WindowsAuto,
             Status = RouterStatus.Ready,
             LockedTarget = null,
+            LockedMediaTarget = null,
             PriorityTarget = null,
             ActiveFallback = null,
             RecoveryEpoch = null,
@@ -239,25 +243,27 @@ public sealed class MediaRouter : IMediaRouter
         }
 
         var previous = state;
-        var (status, target, activeFallback) = options.FallbackPolicy switch
-        {
-            FallbackPolicy.SameApplication => ResolveSameApplicationFallback(),
-            FallbackPolicy.WindowsCurrentSession => (
-                RouterStatus.Fallback,
-                state.LockedTarget,
-                FallbackPolicy.WindowsCurrentSession),
-            FallbackPolicy.SameApplicationThenWindowsCurrentSession =>
-                ResolveDefaultFallback(),
-            FallbackPolicy.Wait => (
-                RouterStatus.Unavailable,
-                state.LockedTarget,
-                FallbackPolicy.Wait),
-            FallbackPolicy.DisableRouting => (
-                RouterStatus.Unavailable,
-                state.LockedTarget,
-                FallbackPolicy.DisableRouting),
-            _ => throw new ArgumentOutOfRangeException(nameof(options.FallbackPolicy)),
-        };
+        var (status, target, activeFallback) = state.LockedMediaTarget is not null
+            ? (RouterStatus.Unavailable, state.LockedTarget, (FallbackPolicy?)FallbackPolicy.Wait)
+            : options.FallbackPolicy switch
+            {
+                FallbackPolicy.SameApplication => ResolveSameApplicationFallback(),
+                FallbackPolicy.WindowsCurrentSession => (
+                    RouterStatus.Fallback,
+                    state.LockedTarget,
+                    FallbackPolicy.WindowsCurrentSession),
+                FallbackPolicy.SameApplicationThenWindowsCurrentSession =>
+                    ResolveDefaultFallback(),
+                FallbackPolicy.Wait => (
+                    RouterStatus.Unavailable,
+                    state.LockedTarget,
+                    FallbackPolicy.Wait),
+                FallbackPolicy.DisableRouting => (
+                    RouterStatus.Unavailable,
+                    state.LockedTarget,
+                    FallbackPolicy.DisableRouting),
+                _ => throw new ArgumentOutOfRangeException(nameof(options.FallbackPolicy)),
+            };
 
         state = state with
         {
@@ -320,6 +326,7 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.AppLock,
             Status = candidate is null ? RouterStatus.Recovering : RouterStatus.Locked,
             LockedTarget = new LockedTarget(fingerprint, candidate?.Key),
+            LockedMediaTarget = null,
             ActiveFallback = null,
             RecoveryEpoch = candidate is null ? state.Revision + 1 : null,
             Revision = state.Revision + 1,
@@ -342,6 +349,41 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.SessionLock,
             Status = RouterStatus.Locked,
             LockedTarget = new LockedTarget(SessionFingerprint.From(session), session.Key),
+            LockedMediaTarget = null,
+            ActiveFallback = null,
+            RecoveryEpoch = null,
+            Revision = state.Revision + 1,
+        };
+
+        return StateUpdated(previous);
+    }
+
+    private RouterResult LockTarget(MediaTargetId targetId)
+    {
+        if (!targetId.IsValid)
+        {
+            throw new ArgumentException("The Media Target to lock must be valid.", nameof(targetId));
+        }
+
+        if (targetId.Provider == MediaTargetProviderId.Gsmtc)
+        {
+            return LockSession(new SessionKey(targetId.Value));
+        }
+
+        if (!state.Targets.Any(target => target.Id == targetId))
+        {
+            throw new ArgumentException(
+                "The Media Target to lock is not present in the current catalog.",
+                nameof(targetId));
+        }
+
+        var previous = state;
+        state = state with
+        {
+            Mode = RoutingMode.SessionLock,
+            Status = RouterStatus.Locked,
+            LockedTarget = null,
+            LockedMediaTarget = targetId,
             ActiveFallback = null,
             RecoveryEpoch = null,
             Revision = state.Revision + 1,
@@ -360,11 +402,14 @@ public sealed class MediaRouter : IMediaRouter
             Mode = RoutingMode.SessionLock,
             Status = RouterStatus.Recovering,
             LockedTarget = new LockedTarget(fingerprint, null),
+            LockedMediaTarget = null,
             ActiveFallback = null,
             RecoveryEpoch = null,
             Revision = state.Revision + 1,
         };
-        var (status, lockedTarget, activeFallback) = ResolveLockedTarget(state.Sessions);
+        var (status, lockedTarget, activeFallback) = ResolveLockedTarget(
+            state.Targets,
+            state.Sessions);
         state = state with
         {
             Status = status,
@@ -376,19 +421,28 @@ public sealed class MediaRouter : IMediaRouter
         return StateUpdated(previous);
     }
 
-    private RouterResult UpdateCatalog(RouterIntent.CatalogUpdated catalog)
+    private RouterResult UpdateCatalog(RouterIntent.MediaTargetsUpdated catalog)
     {
         ValidateCatalog(catalog);
 
-        if (state.WindowsCurrentSession == catalog.WindowsCurrentSession &&
-            state.Sessions.SequenceEqual(catalog.Sessions))
+        if (state.WindowsCurrentTarget == catalog.WindowsCurrentTarget &&
+            state.Targets.SequenceEqual(catalog.Targets))
         {
             return new RouterResult(state, RouteDecision.StateUpdated);
         }
 
         var previous = state;
-        var sessions = catalog.Sessions;
-        var (status, lockedTarget, activeFallback) = ResolveLockedTarget(sessions);
+        var targets = catalog.Targets;
+        var sessions = targets
+            .Where(target => target.GsmtcSession is not null)
+            .Select(target => target.GsmtcSession!)
+            .ToImmutableArray();
+        var currentSession = catalog.WindowsCurrentTarget is
+        { Provider: var provider, Value: var value } &&
+            provider == MediaTargetProviderId.Gsmtc
+                ? new SessionKey(value)
+                : (SessionKey?)null;
+        var (status, lockedTarget, activeFallback) = ResolveLockedTarget(targets, sessions);
         var nextRevision = state.Revision + 1;
         long? recoveryEpoch = status == RouterStatus.Recovering
             ? state.Status == RouterStatus.Recovering
@@ -397,8 +451,10 @@ public sealed class MediaRouter : IMediaRouter
             : null;
         state = state with
         {
+            Targets = targets,
+            WindowsCurrentTarget = catalog.WindowsCurrentTarget,
             Sessions = sessions,
-            WindowsCurrentSession = catalog.WindowsCurrentSession,
+            WindowsCurrentSession = currentSession,
             Status = status,
             LockedTarget = lockedTarget,
             ActiveFallback = activeFallback,
@@ -410,6 +466,16 @@ public sealed class MediaRouter : IMediaRouter
         };
 
         return StateUpdated(previous);
+    }
+
+    private RouterResult UpdateCatalog(RouterIntent.CatalogUpdated catalog)
+    {
+        ValidateCatalog(catalog);
+        return UpdateCatalog(new RouterIntent.MediaTargetsUpdated(
+            catalog.Sessions.Select(MediaTargetSnapshot.FromGsmtc).ToImmutableArray(),
+            catalog.WindowsCurrentSession is { } current
+                ? MediaTargetId.FromGsmtc(current)
+                : null));
     }
 
     private static void ValidateCatalog(RouterIntent.CatalogUpdated catalog)
@@ -490,9 +556,123 @@ public sealed class MediaRouter : IMediaRouter
         }
     }
 
+    private static void ValidateCatalog(RouterIntent.MediaTargetsUpdated catalog)
+    {
+        if (catalog.Targets.IsDefault)
+        {
+            throw new ArgumentException(
+                "Catalog Media Targets must be an initialized immutable array.",
+                nameof(catalog));
+        }
+
+        var targetIds = new HashSet<MediaTargetId>();
+        foreach (var target in catalog.Targets)
+        {
+            if (target is null)
+            {
+                throw new ArgumentException(
+                    "Catalog Media Targets must not contain a null target.",
+                    nameof(catalog));
+            }
+
+            if (!target.Id.IsValid || !targetIds.Add(target.Id))
+            {
+                throw new ArgumentException(
+                    "Every catalog Media Target must have a unique valid identity.",
+                    nameof(catalog));
+            }
+
+            var presentation = target.Presentation;
+            if (string.IsNullOrWhiteSpace(presentation.SourceDisplayName) ||
+                !Enum.IsDefined(presentation.PlaybackStatus) ||
+                (presentation.Capabilities & ~MediaCommandCapabilities.All) != 0)
+            {
+                throw new ArgumentException(
+                    "Every catalog Media Target must have a valid presentation.",
+                    nameof(catalog));
+            }
+
+            if (target.GsmtcSession is not { } session)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(session.Key.Value))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session key must be non-blank.",
+                    nameof(catalog));
+            }
+
+            if (string.IsNullOrWhiteSpace(session.SourceAppUserModelId))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session source application ID must be non-blank.",
+                    nameof(catalog));
+            }
+
+            if (session.SessionInstanceHint is not null &&
+                string.IsNullOrWhiteSpace(session.SessionInstanceHint))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session instance hint must be null or non-blank.",
+                    nameof(catalog));
+            }
+
+            if (!Enum.IsDefined(session.PlaybackStatus))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session playback status must be defined.",
+                    nameof(catalog));
+            }
+
+            if (!Enum.IsDefined(session.PlaybackType))
+            {
+                throw new ArgumentException(
+                    "Every catalog Session playback type must be defined.",
+                    nameof(catalog));
+            }
+
+            if ((session.Capabilities & ~MediaCommandCapabilities.All) != 0)
+            {
+                throw new ArgumentException(
+                    "Every catalog Session capability value must contain only known flags.",
+                    nameof(catalog));
+            }
+
+            if (target.Id != MediaTargetId.FromGsmtc(session.Key))
+            {
+                throw new ArgumentException(
+                    "A GSMTC Media Target identity must match its Session key.",
+                    nameof(catalog));
+            }
+        }
+
+        if (catalog.WindowsCurrentTarget is { } current &&
+            (current.Provider != MediaTargetProviderId.Gsmtc || !targetIds.Contains(current)))
+        {
+            throw new ArgumentException(
+                "Windows Current Target must identify a GSMTC target in the catalog.",
+                nameof(catalog));
+        }
+    }
+
     private (RouterStatus Status, LockedTarget? Target, FallbackPolicy? ActiveFallback) ResolveLockedTarget(
+        ImmutableArray<MediaTargetSnapshot> targets,
         ImmutableArray<MediaSessionSnapshot> sessions)
     {
+        if (state.Mode == RoutingMode.SessionLock && state.LockedMediaTarget is { } exactTarget)
+        {
+            if (targets.Any(target => target.Id == exactTarget))
+            {
+                return (RouterStatus.Locked, null, null);
+            }
+
+            return state.Status == RouterStatus.Unavailable
+                ? (RouterStatus.Unavailable, null, FallbackPolicy.Wait)
+                : (RouterStatus.Recovering, null, null);
+        }
+
         if (state.LockedTarget is null)
         {
             return (state.Status, state.LockedTarget, state.ActiveFallback);
@@ -654,49 +834,46 @@ public sealed class MediaRouter : IMediaRouter
             }
         }
 
-        var targetKey = state.ActiveSession;
-        var targetId = targetKey is { } activeSession
-            ? MediaTargetId.FromGsmtc(activeSession)
-            : (MediaTargetId?)null;
+        var targetId = state.ActiveTarget;
         if (expectedTarget is not null && targetId != expectedTarget)
         {
-            return Skipped(command, RouteReason.InputTargetChanged, targetKey);
+            return Skipped(command, RouteReason.InputTargetChanged, targetId);
         }
 
-        if (targetKey is null)
+        if (targetId is null)
         {
             return Skipped(command, RouteReason.NoWindowsCurrentSession);
         }
 
-        var target = state.Sessions.FirstOrDefault(session => session.Key == targetKey.Value);
+        var target = state.Targets.FirstOrDefault(candidate => candidate.Id == targetId.Value);
         if (target is null)
         {
             return Skipped(command, RouteReason.NoWindowsCurrentSession);
         }
 
-        if (!target.Capabilities.Supports(command))
+        if (!target.Presentation.Capabilities.Supports(command))
         {
-            return Skipped(command, RouteReason.UnsupportedCommand, target.Key);
+            return Skipped(command, RouteReason.UnsupportedCommand, target.Id);
         }
 
         if (command.Kind == MediaCommandKind.SeekAbsolute)
         {
-            if (target.Timeline is not { } timeline || timeline.End <= timeline.Start)
+            if (target.Presentation.Timeline is not { } timeline || timeline.End <= timeline.Start)
             {
-                return Skipped(command, RouteReason.SeekTimelineUnavailable, target.Key);
+                return Skipped(command, RouteReason.SeekTimelineUnavailable, target.Id);
             }
 
             var position = command.AbsolutePosition!.Value;
             if (position < timeline.Start || position > timeline.End)
             {
-                return Skipped(command, RouteReason.SeekOutOfRange, target.Key);
+                return Skipped(command, RouteReason.SeekOutOfRange, target.Id);
             }
         }
 
         MediaCommandOutcome controlOutcome;
         try
         {
-            controlOutcome = await controller.TryExecuteAsync(targetId!.Value, command, cancellationToken);
+            controlOutcome = await controller.TryExecuteAsync(target.Id, command, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -710,7 +887,7 @@ public sealed class MediaRouter : IMediaRouter
                     RouteDecisionKind.Failed,
                     RouteReason.ControlFailed,
                     command,
-                    target.Key,
+                    target.Id,
                     Error: exception.Message));
         }
 
@@ -741,7 +918,7 @@ public sealed class MediaRouter : IMediaRouter
                 kind,
                 reason,
                 command,
-                target.Key,
+                target.Id,
                 controlOutcome));
     }
 

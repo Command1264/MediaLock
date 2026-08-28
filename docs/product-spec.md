@@ -157,7 +157,9 @@ Every successful explicit Routing Mode choice on the main window becomes the sta
 a Session or sending a Media Command does not change it. Settings shows this startup choice as read-only state while
 remaining the editing surface for Recovery, desktop behavior and Priority Rules. A failed startup-mode or Locked
 Target persistence attempt keeps the prior startup choice and remains observable instead of creating an invalid
-durable lock.
+durable lock. When startup recovery safely falls back to a mode that differs from that prior startup choice, the
+already-selected fallback action remains enabled so the user can explicitly make it durable without selecting an
+unrelated mode first.
 
 At startup, saved Windows Auto ignores any previously saved lock. Saved App Lock restores a valid persisted source
 application and resolves its current candidate with the same deterministic policy used for an interactive App Lock;
@@ -180,6 +182,21 @@ has the same source-application identity. While no successor exists the list rem
 within the configured Recovery timeout restores selection. An explicit selection replaces the bookmark. Timeout or
 ambiguous same-application replacements leave the list unselected rather than choosing the first row. This presentation
 continuity does not change the Locked Target or routing target.
+The main media-source surface groups exact Browser page targets and ordinary browser-owned GSMTC Sessions under one
+expandable presentation source when the Browser provider supplies a family hint and the GSMTC application identity is
+an exact ordinary-browser match. Installed PWAs and other distinct source-application identities remain separate.
+This visual grouping does not create Authoritative Media Target Correlation, merge identities or hide either control
+path. Selecting the group header represents the available GSMTC application scope; selecting an exact page or Windows
+Session child retains that target's own supported actions. The existing **Lock Session** action locks either selected
+child through one provider-neutral selection flow; Browser pages do not expose a second lock action inside the list.
+Each Browser row exposes authorization revocation through its own overflow action, which carries that exact target and
+does not select or lock it. Browser and Windows rows reserve the same trailing action and playback-status columns and
+render playback status through one shared style. Adding an authorized Browser child to an existing ordinary-browser
+GSMTC group preserves that group's presentation identity and expansion state. Expansion is independent from selection.
+All groups and children share one vertically bounded scrolling surface; wheel input over either nested child list is
+forwarded to that surface, so expanding a source never moves the transport controls or pushes another source outside
+the window without making it reachable through the same scrollbar. Selection and keyboard focus change colors only,
+not row border thickness or geometry.
 Closing the window hides it when close-to-tray is enabled; only an explicit Exit command terminates the process.
 Tray state distinguishes Windows Auto, Locked, Recovering, Suspended, Reacquiring and Unavailable, and provides
 essential controls without opening the window.
@@ -206,7 +223,13 @@ timeline snapshot remains authoritative; rejection, failure, target loss or conf
 position with an actionable error. Seek adds no physical-key binding, setting or persisted state.
 Pressing an empty point on the timeline may continue directly into a captured drag; only release commits the final
 previewed position.
-The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer.
+The main-window error card provides an explicit dismiss action; errors do not disappear on an arbitrary timer. An
+explicitly dismissed Application error stays dismissed across ordinary state refreshes while the same underlying
+error remains active. It may appear again after the condition clears and recurs, and a different error remains
+immediately visible.
+Transport controls combine the resolved target's advertised capability with its current presentation state: Play is
+disabled while Playing and Pause is disabled while Paused. Toggle remains available when advertised, while Unknown
+or Changing presentation does not suppress an otherwise supported explicit Play or Pause.
 
 The desktop settings persist whether Media Lock intercepts global media keys. It defaults to enabled so the installed
 application fulfils its routing promise; disabling it takes effect immediately and passes physical media keys through
@@ -347,6 +370,35 @@ page-aware Recovery, human-readable source names and direct playback state, meta
 The existing GSMTC path remains available whenever the integration is absent, unsupported, disconnected or denied
 permission.
 
+The first production candidate treats browser reload or navigation as terminal for every existing Page Binding on
+that tab and removes the old target immediately. A one-time grant requires a new explicit authorization. Under an
+exact-site grant, a replacement top-level HTTPS document automatically receives one new binding after load completes
+and the Extension revalidates the exact origin permission. The new opaque target is never auto-selected and never
+satisfies a lock on its predecessor. Reauthorizing one unchanged tab likewise replaces its old binding instead of
+accumulating opaque ghost targets. Direct presentation observes page-originated Play／Pause,
+timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback.
+The Extension Popup queries the exact active tab's current Page Binding when opened. It distinguishes Checking,
+Authorized, trusted-site waiting, Not authorized and unavailable-page results. An exact-site permission without a
+live Binding displays trusted-site waiting; a page with neither Binding nor site grant displays Not authorized. The
+status contract returns only authorization state and scope, not URL, title, Binding ID or media metadata. Closing and
+reopening the Popup preserves Authorized for the same live document. Popup labels and status prose follow the browser
+UI language, with English fallback and a Traditional Chinese locale; its two authorization actions remain vertically
+separated rather than collapsing into adjacent controls. Internal Extension error identifiers are never shown as the
+primary prose. Known failures resolve to localized, actionable English／Traditional Chinese text and one stable
+`ML-BR-*` support code; unknown failures use an identifiable localized fallback. This Browser Integration subset does
+not mark the application-wide Phase 17 warning and error contract complete.
+The generic direct target also exposes Toggle Play／Pause: execution reads the exact bound media element's live paused
+state and performs one explicit Play or Pause. This enables the existing UI toggle and provider-neutral physical
+media-key path without adding generic Previous, Next or Stop semantics that `HTMLMediaElement` does not define.
+Playback State Lock observes the same provider-neutral target snapshot. A playing, directly locked Browser target may
+arm Keep Playing; an external Paused observation sends one explicit Play only to that exact provider-qualified target.
+Loss of the Page Binding suspends correction while preserving the Armed Playback Target identity, and a replacement
+binding or competing GSMTC Session never receives the correction. The existing repeated-pause override and bounded
+confirmation-attempt policy apply without creating a Browser-specific policy loop.
+The candidate's Browser Session Lock remains runtime-only: later catalog observations and media commands must not
+serialize it through the GSMTC runtime-state schema. Persistence rejects any invalid mode／Locked Target combination
+before writing a file.
+
 The Extension is an optional enhancement, not a prerequisite or replacement installation path. A user who never
 installs it must retain the complete `0.3.0` GSMTC experience: Session discovery, all four routing modes, Recovery,
 global media-key interception, playback-state lock, controls, Seek, Settings, tray and startup continue through the
@@ -371,12 +423,18 @@ preserve existing App Lock, Session Lock, Priority Rules, Recovery, expected-tar
 semantics. Site DOM or private JavaScript dependencies remain isolated behind site-specific adapters and must fail
 closed rather than route to another tab when the page changes.
 
-Browser routing identity is page-aware in every Routing Mode. Session Lock captures one Page Binding and only accepts
-its Endpoint successors. App Lock uses a Browser Application Scope rather than the whole browser executable and must
+Browser routing identity is page-aware in every Routing Mode. Session Lock captures one Page Binding and never
+adopts a trusted-site successor after reload／navigation without a new explicit lock action. App Lock uses a Browser Application
+Scope rather than the whole browser executable and must
 resolve a unique page using an explicit candidate policy. Priority Rules persist their exact selector scope and never
 collapse distinct pages, profiles or Web Apps into one `Chrome`／`Brave` entry. Windows Auto does not persist a binding,
 but its selected target and UI projection still identify the exact page. Ambiguity produces no route instead of
 choosing the first tab.
+
+The first production candidate deliberately enables only runtime Session Lock for Browser targets. Its authorization
+and target identity are not persisted, and App Lock, Priority Rules and Windows Auto continue to resolve GSMTC only.
+This staged limitation prevents an unpacked Extension or unproven restart identity from silently changing existing
+settings semantics. The remaining modes require their own two-page ambiguity and schema-migration gates.
 
 #### Human-readable source identities
 

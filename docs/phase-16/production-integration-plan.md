@@ -7,15 +7,17 @@ complete `0.3.0` GSMTC path independent. Phase 16C freezes the production seam, 
 implementation slices. It does not connect the disposable Probe to the production Router, change settings or ship an
 Extension.
 
-Status: gate definition accepted through PR #59. The provider-neutral Core／Application seam is the Issue #60
-candidate; production Browser Adapter code, persistence, packaging and support claims remain separately gated by this
-plan and [ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md).
+Status: gate definition accepted through PR #59 and the provider-neutral Core／Application seam is integrated.
+Issue #62 implements slice 3 as a runtime-only Browser Session Lock candidate. Persistence, remaining Routing Modes,
+store distribution, installed-package ownership and support claims remain separately gated by this plan,
+[ADR 0006](../adr/0006-use-provider-neutral-media-targets-in-production-routing.md) and
+[ADR 0007](../adr/0007-use-a-current-user-native-messaging-bridge.md).
 
 ## Entry evidence and unresolved claims
 
 Phase 16A proved fixed-site Play, Pause and Seek with exact-page isolation on Chrome, ordinary Brave and the installed
 Brave YouTube Music PWA. Phase 16B proved a temporary or exact-site Page Binding, one top-level
-`HTMLMediaElement`, bounded Play／Pause／Seek, same-origin reload Recovery, revocation, ambiguity and stale-target
+`HTMLMediaElement`, bounded Play／Pause／Seek, revocation, ambiguity and stale-target
 failure on Chrome. The subsequent Brave compatibility-closure Gate qualified named direct MP4, cloud-hosted MP4,
 ordinary streaming and unsupported-page samples. Both Probes proved that disabling or omitting the Extension leaves
 the existing GSMTC path usable.
@@ -71,8 +73,9 @@ Provider absence and loss of a bound target are different state transitions:
 2. **Bound target lost** — permission revocation, disconnect, navigation or stale Endpoint preserves the Browser Media
    Target identity and enters target-preserving Recovery／Unavailable. Session Lock never reroutes that command to a
    competing GSMTC Session or page.
-3. **Endpoint successor** — reload or same-origin navigation may resolve a successor only when the Extension proves the
-   same Page Binding and authorized scope. A command captured for the old Endpoint is rejected, not replayed.
+3. **Reload／navigation** — browser `loading` removes every binding for that tab, including exact-site bindings. Site
+   permission may remain, but no successor is created until an explicit authorization issues a new Page Binding. A
+   command captured for the old Endpoint is rejected, not replayed.
 4. **Browser restart** — the target stays unavailable unless the Extension proves Page Binding continuity. URL, title,
    origin similarity and tab order are never Recovery evidence by themselves.
 5. **Return to GSMTC** — the user explicitly unlocks／changes Routing Mode or selects a GSMTC target. Adapter failure is
@@ -114,10 +117,16 @@ Status: implemented as the Issue #60 candidate; merge remains separately gated.
 
 ### 3. Browser Session Lock vertical slice
 
+Status: candidate implemented by Issue #62; automated and named manual qualification remain the acceptance gate.
+
 - Add the production Browser Adapter Module behind the accepted seam.
 - Discover only explicitly authorized targets and route Play, Pause and bounded Seek to one exact Endpoint.
 - Preserve target identity through Recovery while failing closed on ambiguity, permission loss and stale Endpoint.
 - Add the minimum authorization and target-detail UI needed to create, inspect and revoke a direct Session Lock.
+
+The candidate uses an unpacked fixed-ID Chromium Extension and a current-user-only Native Messaging／named-pipe bridge.
+It is intentionally runtime-only and does not enter the installed `0.3.0` payload. See the
+[candidate runbook](browser-session-lock-candidate.md).
 
 ### 4. Remaining Routing Modes and persistence
 

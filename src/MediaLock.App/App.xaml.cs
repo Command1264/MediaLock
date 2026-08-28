@@ -15,8 +15,10 @@ using MediaLock.Application;
 using MediaLock.Core.Configuration;
 using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Input;
+using MediaLock.Core.Media;
 using MediaLock.Windows.Input;
 using MediaLock.Windows;
+using MediaLock.Browser;
 using Microsoft.Win32;
 
 namespace MediaLock.App;
@@ -41,6 +43,7 @@ public partial class App : System.Windows.Application
     private bool mediaInputFaultReported;
     private readonly object sourceMetadataDiagnosticGate = new();
     private readonly HashSet<Task> sourceMetadataDiagnosticTasks = [];
+    private BrowserMediaBridgeServer? browserMediaBridgeServer;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -79,7 +82,21 @@ public partial class App : System.Windows.Application
             }
 
             systemLifecycle = new SystemLifecycle();
-            var adapter = new GsmtcMediaAdapter(systemLifecycle);
+            var gsmtcAdapter = new GsmtcMediaAdapter(systemLifecycle);
+            var browserAdapter = new BrowserMediaAdapter(
+                new BrowserMediaAdapterOptions(
+                    BrowserMediaAdapterOptions.ProductionExtensionId));
+            browserMediaBridgeServer = new BrowserMediaBridgeServer(browserAdapter);
+            browserMediaBridgeServer.Start();
+            var adapter = new CompositeMediaTargetAdapter(
+                new MediaTargetAdapterRegistration(
+                    MediaTargetProviderId.Gsmtc,
+                    gsmtcAdapter,
+                    gsmtcAdapter),
+                new MediaTargetAdapterRegistration(
+                    MediaTargetProviderId.Browser,
+                    browserAdapter,
+                    browserAdapter));
             var router = new MediaRouter(adapter);
             diagnosticLog = new JsonLinesDiagnosticLog();
             mediaApplication = new MediaLock.Application.MediaLockApplication(
@@ -89,7 +106,8 @@ public partial class App : System.Windows.Application
                 new RegistryLoginStartupManager(),
                 new JsonRuntimeStateRepository(),
                 diagnosticLog,
-                systemLifecycle);
+                systemLifecycle,
+                mediaTargetAuthorizationController: adapter);
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
@@ -533,6 +551,20 @@ public partial class App : System.Windows.Application
 
         mainWindowViewModel = null;
         mainWindow = null;
+
+        if (browserMediaBridgeServer is not null)
+        {
+            try
+            {
+                await browserMediaBridgeServer.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            browserMediaBridgeServer = null;
+        }
 
         if (mediaApplication is not null)
         {

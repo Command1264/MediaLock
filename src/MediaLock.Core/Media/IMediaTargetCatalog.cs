@@ -10,6 +10,31 @@ public enum MediaSessionCatalogStatus
     Unavailable,
 }
 
+public sealed record MediaSourceGroupHint
+{
+    public MediaSourceGroupHint(string key, string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            throw new ArgumentException("A media source group key is required.", nameof(key));
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            throw new ArgumentException(
+                "A media source group display name is required.",
+                nameof(displayName));
+        }
+
+        Key = key;
+        DisplayName = displayName;
+    }
+
+    public string Key { get; }
+
+    public string DisplayName { get; }
+}
+
 public sealed record MediaTargetPresentation(
     string SourceDisplayName,
     PlaybackStatus PlaybackStatus,
@@ -18,7 +43,9 @@ public sealed record MediaTargetPresentation(
     MediaMetadata? Metadata = null,
     MediaTimeline? Timeline = null,
     MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
-    MediaArtwork? Artwork = null);
+    MediaArtwork? Artwork = null,
+    double PlaybackRate = 1d,
+    MediaSourceGroupHint? SourceGroup = null);
 
 public sealed record MediaTargetSnapshot
 {
