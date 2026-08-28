@@ -41,6 +41,29 @@ surface and Settings Priority Rules show one shared friendly presentation. The e
 a tooltip and accessibility help text; duplicate friendly labels receive a visible raw-ID qualifier. Friendly-name
 fallback or refresh must not resize surrounding controls or change the selected／routed identity.
 
+Main-window media sources use expandable cards inside one vertically bounded outer `ScrollViewer`. The compact
+chevron action changes expansion only; the adjacent selection surface changes source scope only. Exact Browser pages
+and Windows media Sessions remain visibly labeled child rows with their own identities and capabilities. Nested child
+lists do not create independent scrollbars, and expanding a card never moves the fixed transport-control card.
+Browser and Windows child rows use the same source, metadata, fixed-width secondary-action and shared-size playback
+status columns. Both render the playback label with `MediaPlaybackStatusPillStyle`; a Browser row uses the secondary
+action column for a compact overflow menu, while a Windows row leaves that reserved column empty. Page authorization
+revocation lives in that row menu and the ordinary Lock Session mode action handles the selected Browser or Windows
+child. The overflow trigger keeps its background and border transparent in every state; a theme-specific glyph shadow
+makes the action discoverable without a delayed tooltip, hover and press change only glyph opacity, and keyboard focus
+uses the accent glyph, so the selected row surface remains uninterrupted. Its
+client-area menu owns its complete template instead of inheriting WPF's icon gutter or system-colored
+surface; it uses shared theme brushes, 36 px interaction height, focusable menu semantics and localized automation
+names. Child-row selection and keyboard focus preserve a 1 px border and alter only semantic colors. Mouse-wheel input
+over either nested child list is forwarded to the bounded outer `ScrollViewer`. Playback-status pills share one
+adaptive-width column across the complete media-source surface: the longest visible string in the active language sets
+the width, every pill stretches to that width, and every status label is centered horizontally and vertically.
+
+The Browser Extension Popup follows Chromium's resolved UI locale rather than owning a separate language selector.
+English is the fallback and Traditional Chinese is supplied explicitly. Its two authorization actions form one
+vertical action group with a stable 10 px gap so translated labels never collide or rely on incidental wrapping.
+Status prose wraps inside the Popup width and uses the same locale as the static labels.
+
 Transient success or informational feedback clears after five seconds and immediately when its owning surface closes.
 A newer message replaces the previous message and its pending timeout. Visible localized feedback refreshes when the UI
 language changes. Actionable errors are not transient: keep them visible until the user dismisses them or the

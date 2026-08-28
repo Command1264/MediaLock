@@ -10,7 +10,8 @@ public sealed record BrowserTargetItemViewModel(
     string Artist,
     string PlaybackStatus,
     string TargetDetails,
-    MediaCommandCapabilities Capabilities)
+    MediaCommandCapabilities Capabilities,
+    MediaSourceGroupHint? SourceGroup)
 {
     internal static BrowserTargetItemViewModel From(MediaTargetSnapshot target) => new(
         target.Id,
@@ -19,5 +20,6 @@ public sealed record BrowserTargetItemViewModel(
         target.Presentation.Metadata?.Artist ?? UiText.Get("Media_UnknownArtist"),
         UiDescriptions.DescribePlaybackStatus(target.Presentation.PlaybackStatus),
         target.Id.ToString(),
-        target.Presentation.Capabilities);
+        target.Presentation.Capabilities,
+        target.Presentation.SourceGroup);
 }

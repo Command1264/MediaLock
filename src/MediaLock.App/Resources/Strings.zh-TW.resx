@@ -29,12 +29,16 @@
   <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>
   <data name="Main_DismissError" xml:space="preserve"><value>關閉錯誤提示</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>媒體工作階段</value></data>
+  <data name="Main_MediaSources" xml:space="preserve"><value>媒體來源</value></data>
+  <data name="Main_AvailableMediaSources" xml:space="preserve"><value>可用的媒體來源群組</value></data>
+  <data name="Main_ToggleMediaSourceGroup" xml:space="preserve"><value>展開或收合此媒體來源</value></data>
   <data name="Main_BrowserPageTargets" xml:space="preserve"><value>已授權的瀏覽器頁面</value></data>
+  <data name="Main_BrowserPageTargetsHelp" xml:space="preserve"><value>選取精確頁面後，使用「鎖定工作階段」及頁面支援的控制。</value></data>
+  <data name="Main_WindowsMediaSessions" xml:space="preserve"><value>Windows 媒體工作階段</value></data>
   <data name="Main_AvailableBrowserTargets" xml:space="preserve"><value>已授權的瀏覽器媒體頁面目標</value></data>
-  <data name="Main_LockBrowserTarget" xml:space="preserve"><value>鎖定頁面</value></data>
-  <data name="Main_LockBrowserTargetAutomation" xml:space="preserve"><value>鎖定選取的已授權瀏覽器頁面</value></data>
   <data name="Main_RevokeBrowserAuthorization" xml:space="preserve"><value>撤銷存取</value></data>
   <data name="Main_RevokeBrowserAuthorizationAutomation" xml:space="preserve"><value>撤銷選取瀏覽器頁面的授權</value></data>
+  <data name="Main_BrowserTargetActions" xml:space="preserve"><value>瀏覽器頁面動作</value></data>
   <data name="Main_Subtitle" xml:space="preserve"><value>讓媒體鍵固定控制你選擇的播放器。</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>鎖定工作階段</value></data>
   <data name="Main_LockSessionAutomation" xml:space="preserve"><value>鎖定選取的媒體工作階段</value></data>

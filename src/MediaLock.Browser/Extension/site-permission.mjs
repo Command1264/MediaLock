@@ -18,6 +18,7 @@ export async function prepareExactActiveSitePermission(tabs) {
 
   return {
     accepted: true,
+    tabId: activeTabs[0].id,
     request: { origins: [`${pageUrl.origin}/*`] },
   };
 }

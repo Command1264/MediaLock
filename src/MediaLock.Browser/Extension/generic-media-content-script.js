@@ -34,7 +34,10 @@
   });
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type !== 'bindGenericEndpoint' && message?.type !== 'genericCommand') {
+    if (message?.type !== 'bindGenericEndpoint'
+        && message?.type !== 'getGenericEndpointStatus'
+        && message?.type !== 'unbindGenericEndpoint'
+        && message?.type !== 'genericCommand') {
       return false;
     }
     try {

@@ -40,6 +40,20 @@
           return endpoint;
         }
 
+        if (message?.type === 'getGenericEndpointStatus') {
+          return activeTarget
+            ? { authorized: true, scope: activeTarget.scope }
+            : { authorized: false };
+        }
+
+        if (message?.type === 'unbindGenericEndpoint') {
+          if (!activeTarget || !sameTarget(message.target, activeTarget)) {
+            return { accepted: false, errorCode: 'unauthorized-command' };
+          }
+          activeTarget = undefined;
+          return { accepted: true };
+        }
+
         if (message?.type !== 'genericCommand'
             || !activeTarget
             || !sameTarget(message.target, activeTarget)) {

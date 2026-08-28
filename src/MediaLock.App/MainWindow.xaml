@@ -189,7 +189,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}"
-                       Text="{loc:Translate Main_MediaSessions}" />
+                       Text="{loc:Translate Main_MediaSources}" />
             <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
                 <ToggleButton Margin="8,0,0,0"
                               Style="{StaticResource RoutingModeToggleStyle}"
@@ -218,130 +218,179 @@
             </WrapPanel>
         </Grid>
 
-        <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <Border Margin="0,0,0,10" Padding="12">
-                <Border.Style>
-                    <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasBrowserTargets}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
-                                   Text="{loc:Translate Main_BrowserPageTargets}" />
-                        <WrapPanel Grid.Column="1">
-                            <Button Margin="8,0,0,0"
-                                    AutomationProperties.Name="{loc:Translate Main_LockBrowserTargetAutomation}"
-                                    Command="{Binding LockBrowserTargetCommand}"
-                                    Content="{loc:Translate Main_LockBrowserTarget}" />
-                            <Button Margin="8,0,0,0"
-                                    AutomationProperties.Name="{loc:Translate Main_RevokeBrowserAuthorizationAutomation}"
-                                    Command="{Binding RevokeBrowserTargetAuthorizationCommand}"
-                                    Content="{loc:Translate Main_RevokeBrowserAuthorization}" />
-                        </WrapPanel>
-                    </Grid>
-                    <ListBox Grid.Row="1" Margin="0,8,0,0" MaxHeight="126"
-                             AutomationProperties.Name="{loc:Translate Main_AvailableBrowserTargets}"
-                             ItemsSource="{Binding BrowserTargets}"
-                             SelectedItem="{Binding SelectedBrowserTarget}"
-                             KeyboardNavigation.DirectionalNavigation="Contained">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
+        <ScrollViewer x:Name="MediaSourceScrollViewer" Grid.Row="3"
+                      AutomationProperties.Name="{loc:Translate Main_AvailableMediaSources}"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="True" Focusable="False">
+            <ItemsControl Grid.IsSharedSizeScope="True"
+                          ItemsSource="{Binding MediaSourceGroups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,0,10" Padding="12" Style="{StaticResource CardStyle}">
+                            <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
-                                        <ColumnDefinition Width="3*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock FontWeight="SemiBold" Text="{Binding SourceDisplayName}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Style="{StaticResource SecondaryTextStyle}"
-                                                   Text="{Binding TargetDetails}"
-                                                   ToolTip="{Binding TargetDetails}"
-                                                   AutomationProperties.HelpText="{Binding TargetDetails}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="18,0">
-                                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Style="{StaticResource SecondaryTextStyle}"
-                                                   Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" VerticalAlignment="Center"
-                                               Text="{Binding PlaybackStatus}" />
+                                    <Button Width="36" Height="36" Margin="0,0,8,0"
+                                            Command="{Binding DataContext.ToggleMediaSourceGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}"
+                                            AutomationProperties.Name="{loc:Translate Main_ToggleMediaSourceGroup}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource CompactButtonStyle}">
+                                                <Setter Property="Content" Value="&#x25B6;" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                        <Setter Property="Content" Value="&#x25BC;" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    <ToggleButton Grid.Column="1" HorizontalContentAlignment="Left"
+                                                  Style="{StaticResource RoutingModeToggleStyle}"
+                                                  IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                                  Command="{Binding DataContext.SelectMediaSourceGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  CommandParameter="{Binding}"
+                                                  AutomationProperties.Name="{Binding DisplayName}">
+                                        <TextBlock FontSize="16" FontWeight="SemiBold"
+                                                   Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                    </ToggleButton>
                                 </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Grid>
-            </Border>
-            <ListBox Grid.Row="1" AutomationProperties.Name="{loc:Translate Main_AvailableSessions}"
-                     ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}"
-                     KeyboardNavigation.DirectionalNavigation="Contained">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="3*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
-                                       Text="{Binding SourceApplicationDisplayName}"
-                                       ToolTip="{Binding SourceApplicationDetails}"
-                                       AutomationProperties.HelpText="{Binding SourceApplicationDetails}"
-                                       TextTrimming="CharacterEllipsis" />
-                            <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center">
-                                <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding Title}"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Margin="0,3,0,0" Style="{StaticResource SecondaryTextStyle}"
-                                           Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
+
+                                <StackPanel Margin="44,10,0,0"
+                                            Visibility="{Binding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel Visibility="{Binding HasBrowserTargets, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{loc:Translate Main_BrowserPageTargets}" />
+                                            <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                                       Text="{loc:Translate Main_BrowserPageTargetsHelp}" />
+                                        </StackPanel>
+                                        <ListBox Margin="0,0,0,10"
+                                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 PreviewMouseWheel="OnNestedMediaSourcePreviewMouseWheel"
+                                                 AutomationProperties.Name="{loc:Translate Main_AvailableBrowserTargets}"
+                                                 ItemsSource="{Binding BrowserTargets}"
+                                                 SelectedItem="{Binding DataContext.SelectedBrowserTarget, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 KeyboardNavigation.DirectionalNavigation="Contained">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*" />
+                                                            <ColumnDefinition Width="3*" />
+                                                            <ColumnDefinition Width="36" />
+                                                            <ColumnDefinition Width="Auto" SharedSizeGroup="MediaPlaybackStatus" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock FontWeight="SemiBold" Text="{Binding SourceDisplayName}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                                                       Text="{Binding TargetDetails}"
+                                                                       ToolTip="{Binding TargetDetails}"
+                                                                       AutomationProperties.HelpText="{Binding TargetDetails}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Margin="18,0">
+                                                            <TextBlock FontWeight="SemiBold" Text="{Binding Title}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                                                                       Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Width="36" Height="36"
+                                                                Style="{StaticResource OverflowButtonStyle}"
+                                                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                Click="OnBrowserTargetActionsClick"
+                                                                Content="&#x2026;"
+                                                                AutomationProperties.Name="{loc:Translate Main_BrowserTargetActions}">
+                                                            <Button.ContextMenu>
+                                                                <ContextMenu Style="{StaticResource BrowserTargetContextMenuStyle}">
+                                                                    <MenuItem Style="{StaticResource BrowserTargetMenuItemStyle}"
+                                                                              Header="{loc:Translate Main_RevokeBrowserAuthorization}"
+                                                                              AutomationProperties.Name="{loc:Translate Main_RevokeBrowserAuthorizationAutomation}"
+                                                                              Command="{Binding PlacementTarget.Tag.RevokeBrowserTargetAuthorizationCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                                </ContextMenu>
+                                                            </Button.ContextMenu>
+                                                        </Button>
+                                                        <Border Grid.Column="3"
+                                                                Style="{StaticResource MediaPlaybackStatusPillStyle}">
+                                                            <TextBlock Style="{StaticResource MediaPlaybackStatusTextStyle}"
+                                                                       Text="{Binding PlaybackStatus}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+
+                                    <StackPanel Visibility="{Binding HasSessions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Margin="0,0,0,6" FontWeight="SemiBold"
+                                                   Text="{loc:Translate Main_WindowsMediaSessions}" />
+                                        <ListBox ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 PreviewMouseWheel="OnNestedMediaSourcePreviewMouseWheel"
+                                                 AutomationProperties.Name="{loc:Translate Main_AvailableSessions}"
+                                                 ItemsSource="{Binding Sessions}"
+                                                 SelectedItem="{Binding DataContext.SelectedSession, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 KeyboardNavigation.DirectionalNavigation="Contained">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*" />
+                                                            <ColumnDefinition Width="3*" />
+                                                            <ColumnDefinition Width="36" />
+                                                            <ColumnDefinition Width="Auto" SharedSizeGroup="MediaPlaybackStatus" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold"
+                                                                   Text="{Binding SourceApplicationDisplayName}"
+                                                                   ToolTip="{Binding SourceApplicationDetails}"
+                                                                   AutomationProperties.HelpText="{Binding SourceApplicationDetails}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center">
+                                                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding Title}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Margin="0,3,0,0" Style="{StaticResource SecondaryTextStyle}"
+                                                                       Text="{Binding Artist}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="3"
+                                                                Style="{StaticResource MediaPlaybackStatusPillStyle}">
+                                                            <TextBlock Style="{StaticResource MediaPlaybackStatusTextStyle}"
+                                                                       Text="{Binding PlaybackStatus}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
-                            <Border Grid.Column="2" Padding="10,4" VerticalAlignment="Center"
-                                    Background="{DynamicResource SubtleBrush}" CornerRadius="10">
-                                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}"
-                                           Text="{Binding PlaybackStatus}" />
-                            </Border>
-                        </Grid>
+                        </Border>
                     </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-            <Border Grid.Row="1" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="12">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasSessions}" Value="False">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="28"
-                           AutomationProperties.Name="{loc:Translate Main_NoSessions}"
-                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="15"
-                           Text="{Binding EmptyStateText}" TextAlignment="Center" TextWrapping="Wrap" />
-            </Border>
-        </Grid>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+        <Border Grid.Row="3" Background="{DynamicResource LayerBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasMediaSourceGroups}" Value="False">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Margin="28"
+                       AutomationProperties.Name="{loc:Translate Main_NoSessions}"
+                       Foreground="{DynamicResource TextSecondaryBrush}" FontSize="15"
+                       Text="{Binding EmptyStateText}" TextAlignment="Center" TextWrapping="Wrap" />
+        </Border>
 
         <Border Grid.Row="4" Margin="0,14,0,0" Style="{StaticResource CardStyle}">
             <UniformGrid Columns="6">

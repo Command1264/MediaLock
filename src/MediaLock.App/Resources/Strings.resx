@@ -29,12 +29,16 @@
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
   <data name="Main_DismissError" xml:space="preserve"><value>Dismiss error</value></data>
   <data name="Main_MediaSessions" xml:space="preserve"><value>Media Sessions</value></data>
+  <data name="Main_MediaSources" xml:space="preserve"><value>Media sources</value></data>
+  <data name="Main_AvailableMediaSources" xml:space="preserve"><value>Available media source groups</value></data>
+  <data name="Main_ToggleMediaSourceGroup" xml:space="preserve"><value>Expand or collapse this media source</value></data>
   <data name="Main_BrowserPageTargets" xml:space="preserve"><value>Authorized browser pages</value></data>
+  <data name="Main_BrowserPageTargetsHelp" xml:space="preserve"><value>Select an exact page, then use Lock Session and its supported controls.</value></data>
+  <data name="Main_WindowsMediaSessions" xml:space="preserve"><value>Windows media sessions</value></data>
   <data name="Main_AvailableBrowserTargets" xml:space="preserve"><value>Authorized browser media page targets</value></data>
-  <data name="Main_LockBrowserTarget" xml:space="preserve"><value>Lock page</value></data>
-  <data name="Main_LockBrowserTargetAutomation" xml:space="preserve"><value>Lock the selected authorized browser page</value></data>
   <data name="Main_RevokeBrowserAuthorization" xml:space="preserve"><value>Revoke access</value></data>
   <data name="Main_RevokeBrowserAuthorizationAutomation" xml:space="preserve"><value>Revoke authorization for the selected browser page</value></data>
+  <data name="Main_BrowserTargetActions" xml:space="preserve"><value>Browser page actions</value></data>
   <data name="Main_Subtitle" xml:space="preserve"><value>Keep media keys with the player you choose.</value></data>
   <data name="Main_LockSession" xml:space="preserve"><value>Lock session</value></data>
   <data name="Main_LockSessionAutomation" xml:space="preserve"><value>Lock selected Media Session</value></data>

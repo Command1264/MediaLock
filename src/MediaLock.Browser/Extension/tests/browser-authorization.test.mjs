@@ -222,3 +222,37 @@ test('clearing a tab invalidates an exact-site binding without revoking its site
 
   assert.equal(authorization.matches(result.binding), false);
 });
+
+test('a trusted completed tab can receive a new exact-site Page Binding without becoming active', async () => {
+  const authorization = createBrowserAuthorizationModule({
+    tabs: {},
+    scripting: {
+      async executeScript(injection) {
+        assert.deepEqual(injection.target, { tabId: 77, frameIds: [0] });
+        return [{ frameId: 0, documentId: 'document-auto-site' }];
+      },
+    },
+    permissions: {
+      async contains(request) {
+        assert.deepEqual(request, { origins: ['https://media.example.test/*'] });
+        return true;
+      },
+    },
+    createBindingId: () => 'binding-auto-site',
+  });
+
+  assert.deepEqual(await authorization.authorizeTab({
+    scope: 'site',
+    tab: { id: 77, url: 'https://media.example.test/new-document' },
+  }), {
+    accepted: true,
+    binding: {
+      bindingId: 'binding-auto-site',
+      scope: 'site',
+      tabId: 77,
+      frameId: 0,
+      documentId: 'document-auto-site',
+      pageOrigin: 'https://media.example.test',
+    },
+  });
+});

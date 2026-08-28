@@ -24,6 +24,59 @@ export function createBrowserAuthorizationModule({
     }
   });
 
+  const authorizeTab = async ({ scope, tab }) => {
+    if (scope !== 'temporary' && scope !== 'site') {
+      throw new TypeError('Page authorization scope is invalid.');
+    }
+    if (!Number.isSafeInteger(tab?.id) || typeof tab?.url !== 'string') {
+      return { accepted: false, errorCode: 'target-unavailable' };
+    }
+
+    let pageUrl;
+    try {
+      pageUrl = new URL(tab.url);
+    } catch {
+      return { accepted: false, errorCode: 'page-not-eligible' };
+    }
+    if (pageUrl.protocol !== 'https:') {
+      return { accepted: false, errorCode: 'page-not-eligible' };
+    }
+
+    if (scope === 'site') {
+      const granted = await permissions?.contains({ origins: [`${pageUrl.origin}/*`] });
+      if (granted !== true) {
+        return { accepted: false, errorCode: 'permission-denied' };
+      }
+    }
+
+    const injectionResults = await scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [0] },
+      files: [...GENERIC_CONTENT_SCRIPT_FILES],
+    });
+    if (!Array.isArray(injectionResults)
+        || injectionResults.length !== 1
+        || injectionResults[0].frameId !== 0
+        || typeof injectionResults[0].documentId !== 'string'
+        || !OPAQUE_DOCUMENT_ID_PATTERN.test(injectionResults[0].documentId)) {
+      return { accepted: false, errorCode: 'document-identity-unavailable' };
+    }
+
+    const bindingId = createBindingId();
+    if (typeof bindingId !== 'string' || !OPAQUE_BINDING_ID_PATTERN.test(bindingId)) {
+      return { accepted: false, errorCode: 'binding-identity-unavailable' };
+    }
+    const binding = Object.freeze({
+      bindingId,
+      scope,
+      tabId: tab.id,
+      frameId: 0,
+      documentId: injectionResults[0].documentId,
+      pageOrigin: pageUrl.origin,
+    });
+    bindings.set(binding.tabId, binding);
+    return { accepted: true, binding };
+  };
+
   return Object.freeze({
     async authorizeActivePage({ scope }) {
       if (scope !== 'temporary' && scope !== 'site') {
@@ -31,56 +84,13 @@ export function createBrowserAuthorizationModule({
       }
 
       const activeTabs = await tabs.query({ active: true, currentWindow: true });
-      if (activeTabs.length !== 1
-          || !Number.isSafeInteger(activeTabs[0].id)
-          || typeof activeTabs[0].url !== 'string') {
+      if (activeTabs.length !== 1) {
         return { accepted: false, errorCode: 'target-unavailable' };
       }
-
-      let pageUrl;
-      try {
-        pageUrl = new URL(activeTabs[0].url);
-      } catch {
-        return { accepted: false, errorCode: 'page-not-eligible' };
-      }
-      if (pageUrl.protocol !== 'https:') {
-        return { accepted: false, errorCode: 'page-not-eligible' };
-      }
-
-      if (scope === 'site') {
-        const granted = await permissions?.contains({ origins: [`${pageUrl.origin}/*`] });
-        if (granted !== true) {
-          return { accepted: false, errorCode: 'permission-denied' };
-        }
-      }
-
-      const injectionResults = await scripting.executeScript({
-        target: { tabId: activeTabs[0].id, frameIds: [0] },
-        files: [...GENERIC_CONTENT_SCRIPT_FILES],
-      });
-      if (!Array.isArray(injectionResults)
-          || injectionResults.length !== 1
-          || injectionResults[0].frameId !== 0
-          || typeof injectionResults[0].documentId !== 'string'
-          || !OPAQUE_DOCUMENT_ID_PATTERN.test(injectionResults[0].documentId)) {
-        return { accepted: false, errorCode: 'document-identity-unavailable' };
-      }
-
-      const bindingId = createBindingId();
-      if (typeof bindingId !== 'string' || !OPAQUE_BINDING_ID_PATTERN.test(bindingId)) {
-        return { accepted: false, errorCode: 'binding-identity-unavailable' };
-      }
-      const binding = Object.freeze({
-        bindingId,
-        scope,
-        tabId: activeTabs[0].id,
-        frameId: 0,
-        documentId: injectionResults[0].documentId,
-        pageOrigin: pageUrl.origin,
-      });
-      bindings.set(binding.tabId, binding);
-      return { accepted: true, binding };
+      return authorizeTab({ scope, tab: activeTabs[0] });
     },
+
+    authorizeTab,
 
     clearTab(tabId) {
       bindings.delete(tabId);

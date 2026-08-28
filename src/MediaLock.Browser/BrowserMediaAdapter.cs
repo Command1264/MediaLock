@@ -287,7 +287,9 @@ public sealed class BrowserMediaAdapter :
         connection.ValidateInboundEnvelope(root, "targetSnapshot");
         var endpoint = BrowserEndpoint.Parse(root.GetProperty("target"));
         var targetId = CreateTargetId(connection.ProfileId, endpoint.BindingId);
-        var presentation = ParsePresentation(root.GetProperty("presentation"));
+        var presentation = ParsePresentation(
+            root.GetProperty("presentation"),
+            connection.BrowserFamily);
         var snapshot = MediaTargetSnapshot.FromProvider(targetId, presentation);
         lock (stateGate)
         {
@@ -364,7 +366,9 @@ public sealed class BrowserMediaAdapter :
             MediaSessionCatalogStatus.Available));
     }
 
-    private static MediaTargetPresentation ParsePresentation(JsonElement value)
+    private static MediaTargetPresentation ParsePresentation(
+        JsonElement value,
+        string browserFamily)
     {
         RequireExactProperties(
             value,
@@ -429,8 +433,16 @@ public sealed class BrowserMediaAdapter :
             capabilities,
             observedAt,
             Timeline: timeline,
-            PlaybackRate: playbackRate);
+            PlaybackRate: playbackRate,
+            SourceGroup: BrowserSourceGroup(browserFamily));
     }
+
+    private static MediaSourceGroupHint BrowserSourceGroup(string browserFamily) => browserFamily switch
+    {
+        "brave" => new("browser-family:brave", "Brave"),
+        "chrome" => new("browser-family:chrome", "Google Chrome"),
+        _ => throw new InvalidDataException("The Browser family is not supported."),
+    };
 
     private static MediaCommandCapabilities ToMediaCapabilities(IEnumerable<string> capabilities)
     {
@@ -665,6 +677,8 @@ public sealed class BrowserMediaAdapter :
 
         public string ProfileId { get; private set; } = string.Empty;
 
+        public string BrowserFamily { get; private set; } = string.Empty;
+
         public void Initialize(
             string resolvedConnectionId,
             string profileId,
@@ -673,6 +687,7 @@ public sealed class BrowserMediaAdapter :
         {
             connectionId = resolvedConnectionId;
             ProfileId = profileId;
+            BrowserFamily = browserFamily;
             capabilities = negotiatedCapabilities.ToImmutableHashSet(StringComparer.Ordinal);
         }
 

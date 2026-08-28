@@ -164,3 +164,46 @@ test('two same-origin pages with identical presentation remain distinct targets'
   assert.equal(registry.get(41).bindingId, first.target.bindingId);
   assert.equal(registry.get(42).bindingId, second.target.bindingId);
 });
+
+test('discarding a stale binding never clears its newer same-tab successor', async () => {
+  let bindingIndex = 0;
+  const bindings = ['old-binding', 'new-binding'];
+  const authorization = {
+    async authorizeTab({ scope, tab }) {
+      const bindingId = bindings[bindingIndex++];
+      return {
+        accepted: true,
+        binding: {
+          bindingId,
+          scope,
+          tabId: tab.id,
+          frameId: 0,
+          documentId: `${bindingId}-document`,
+          pageOrigin: 'https://media.example.test',
+        },
+      };
+    },
+    matches() {
+      return true;
+    },
+    clearTab() {},
+  };
+  const tabs = {
+    async sendMessage(_tabId, message) {
+      return {
+        accepted: true,
+        endpointId: `${message.binding.bindingId}-endpoint`,
+        capabilities: ['pause'],
+      };
+    },
+  };
+  const registry = createBrowserMediaTargetRegistry({ authorization, tabs });
+  const tab = { id: 42, url: 'https://media.example.test/watch' };
+  const oldBinding = await registry.bindTab({ scope: 'site', tab });
+  const newBinding = await registry.bindTab({ scope: 'site', tab });
+
+  assert.equal(registry.discard(oldBinding.target), false);
+  assert.equal(registry.get(42).bindingId, 'new-binding');
+  assert.equal(registry.discard(newBinding.target), true);
+  assert.equal(registry.get(42), undefined);
+});

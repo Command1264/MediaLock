@@ -3,16 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Media Lock Browser Integration</title>
+    <title data-i18n="actionTitle">Media Lock Browser Integration</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
-      <h1>Media Lock</h1>
-      <p>Authorize one unambiguous media element on the active HTTPS page. Media Lock must already be running.</p>
-      <button id="authorize-temporary" type="button">Authorize this page once</button>
-      <button id="authorize-site" type="button">Always allow this exact site</button>
-      <p id="status" role="status" aria-live="polite">Ready.</p>
+      <h1 data-i18n="popupTitle">Media Lock</h1>
+      <p data-i18n="popupDescription">Authorize one unambiguous media element on the active HTTPS page. Media Lock must already be running.</p>
+      <div class="actions">
+        <button id="authorize-temporary" data-i18n="authorizeTemporary" type="button">Authorize this page once</button>
+        <button id="authorize-site" data-i18n="authorizeSite" type="button">Always allow this exact site</button>
+      </div>
+      <p id="status" role="status" aria-live="polite" data-i18n="statusChecking">Checking current page…</p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

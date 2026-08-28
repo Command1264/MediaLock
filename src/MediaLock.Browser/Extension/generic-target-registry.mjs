@@ -85,9 +85,30 @@ export function createBrowserMediaTargetRegistry({ authorization, tabs }) {
       return bindAuthorized(authorized);
     },
 
+    async bindTab({ scope, tab }) {
+      const authorized = await authorization.authorizeTab({ scope, tab });
+      return bindAuthorized(authorized);
+    },
+
     clearTab(tabId) {
       targets.delete(tabId);
       authorization.clearTab(tabId);
+    },
+
+    discard(target) {
+      const current = targets.get(target?.tabId)?.target;
+      if (current === undefined
+          || current.bindingId !== target?.bindingId
+          || current.endpointId !== target?.endpointId
+          || current.scope !== target?.scope
+          || current.frameId !== target?.frameId
+          || current.documentId !== target?.documentId
+          || current.pageOrigin !== target?.pageOrigin) {
+        return false;
+      }
+      targets.delete(target.tabId);
+      authorization.clearTab(target.tabId);
+      return true;
     },
 
     get(tabId) {

@@ -92,3 +92,94 @@ test('an Extension-authorized exact-site Page Binding binds one Endpoint', () =>
   assert.equal(result.accepted, true);
   assert.equal(result.endpointId, 'endpoint-exact-site');
 });
+
+test('the current document reports its Page Binding to a reopened Popup', () => {
+  const media = {
+    isConnected: true,
+    pause() {},
+    async play() {},
+  };
+  const adapter = createGenericMediaAdapter({
+    getCandidates: () => [media],
+    isMediaElement: (candidate) => candidate === media,
+    createEndpointId: () => 'endpoint-popup-status',
+  });
+  const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
+  const controller = createGenericContentController({
+    adapter,
+    extensionId,
+    pageOrigin: 'https://media.example.test',
+  });
+  const popupSender = {
+    id: extensionId,
+    url: `chrome-extension://${extensionId}/popup.html`,
+  };
+  const binding = {
+    bindingId: 'binding-popup-status',
+    scope: 'site',
+    tabId: 42,
+    frameId: 0,
+    documentId: 'document-popup-status',
+    pageOrigin: 'https://media.example.test',
+  };
+
+  assert.deepEqual(
+    controller.handle({ type: 'getGenericEndpointStatus' }, popupSender),
+    { authorized: false },
+  );
+  controller.handle({ type: 'bindGenericEndpoint', binding }, popupSender);
+  assert.deepEqual(
+    controller.handle({ type: 'getGenericEndpointStatus' }, popupSender),
+    { authorized: true, scope: 'site' },
+  );
+});
+
+test('revoking the exact Page Binding clears the current document authorization status', () => {
+  const media = {
+    isConnected: true,
+    pause() {},
+    async play() {},
+  };
+  const adapter = createGenericMediaAdapter({
+    getCandidates: () => [media],
+    isMediaElement: (candidate) => candidate === media,
+    createEndpointId: () => 'endpoint-revoked-status',
+  });
+  const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
+  const controller = createGenericContentController({
+    adapter,
+    extensionId,
+    pageOrigin: 'https://media.example.test',
+  });
+  const sender = {
+    id: extensionId,
+    url: `chrome-extension://${extensionId}/service-worker.mjs`,
+  };
+  const binding = {
+    bindingId: 'binding-revoked-status',
+    scope: 'temporary',
+    tabId: 42,
+    frameId: 0,
+    documentId: 'document-revoked-status',
+    pageOrigin: 'https://media.example.test',
+  };
+  const endpoint = controller.handle({ type: 'bindGenericEndpoint', binding }, sender);
+  const target = { ...binding, endpointId: endpoint.endpointId };
+
+  assert.deepEqual(
+    controller.handle({ type: 'unbindGenericEndpoint', target }, sender),
+    { accepted: true },
+  );
+  assert.deepEqual(
+    controller.handle({ type: 'getGenericEndpointStatus' }, sender),
+    { authorized: false },
+  );
+  assert.deepEqual(
+    controller.handle({
+      type: 'genericCommand',
+      target,
+      command: { name: 'pause' },
+    }, sender),
+    { accepted: false, errorCode: 'unauthorized-command' },
+  );
+});

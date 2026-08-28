@@ -3,6 +3,7 @@ import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.m
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 import { handleNativePortDisconnect } from './native-connection-lifecycle.mjs';
+import { createTrustedSiteAutoBinding } from './trusted-site-auto-binding.mjs';
 import {
   createInboundCommandGuard,
   validateHelloAck,
@@ -25,6 +26,13 @@ const authorizedTargetLifecycle = createAuthorizedTargetLifecycle({
   publishTarget,
   publishTargetRemoved,
   clearTab: (tabId) => genericTargetRegistry.clearTab(tabId),
+});
+const trustedSiteAutoBinding = createTrustedSiteAutoBinding({
+  hasTarget: (tabId) => authorizedTargetLifecycle.get(tabId) !== undefined,
+  hasSitePermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
+  bindTab: authorizeTrustedSiteTab,
+  commitBinding: (result) => authorizedTargetLifecycle.replace(result),
+  discardBinding: (target) => genericTargetRegistry.discard(target),
 });
 
 let nativePort;
@@ -54,18 +62,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  authorizedTargetLifecycle.handleTabUpdated(tabId, changeInfo);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  const removed = authorizedTargetLifecycle.handleTabUpdated(tabId, changeInfo);
+  if (changeInfo?.status === 'loading' && removed !== true) {
+    genericTargetRegistry.clearTab(tabId);
+  }
+  trustedSiteAutoBinding.handleTabUpdated(tabId, changeInfo, tab).catch((error) => {
+    console.debug(
+      'Media Lock trusted-site auto-binding did not complete.',
+      error instanceof Error ? error.name : 'UnknownError',
+    );
+  });
 });
 
-chrome.tabs.onRemoved.addListener((tabId) => removeTarget(tabId, 'tab-closed'));
+chrome.tabs.onRemoved.addListener((tabId) => {
+  trustedSiteAutoBinding.invalidate(tabId);
+  if (removeTarget(tabId, 'tab-closed') !== true) {
+    genericTargetRegistry.clearTab(tabId);
+  }
+});
 
 chrome.permissions.onRemoved.addListener((removed) => {
   const removedOrigins = new Set(Array.isArray(removed?.origins) ? removed.origins : []);
   for (const entry of [...authorizedTargetLifecycle.values()]) {
     if (entry.target.scope === 'site'
         && removedOrigins.has(`${entry.target.pageOrigin}/*`)) {
-      removeTarget(entry.target.tabId, 'permission-revoked');
+      revokeTarget(entry, 'permission-revoked').catch(() => {
+        removeTarget(entry.target.tabId, 'permission-revoked');
+      });
     }
   }
 });
@@ -74,15 +98,38 @@ async function authorizeTarget(scope) {
   if (scope !== 'temporary' && scope !== 'site') {
     return { accepted: false, errorCode: 'unauthorized-command' };
   }
-  const result = await genericTargetRegistry.bindActiveTarget({ scope });
+  const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (activeTabs.length !== 1 || !Number.isSafeInteger(activeTabs[0]?.id)) {
+    return { accepted: false, errorCode: 'target-unavailable' };
+  }
+  const [activeTab] = activeTabs;
+  trustedSiteAutoBinding.invalidate(activeTab.id);
+  const result = await prepareBinding(
+    () => genericTargetRegistry.bindTab({ scope, tab: activeTab }),
+  );
+  if (result.accepted !== true) {
+    return result;
+  }
+  await authorizedTargetLifecycle.replace(result);
+  return { accepted: true };
+}
+
+async function authorizeTrustedSiteTab(tab) {
+  return prepareBinding(
+    () => genericTargetRegistry.bindTab({ scope: 'site', tab }),
+  );
+}
+
+async function prepareBinding(bind) {
+  const result = await bind();
   if (result.accepted !== true) {
     return result;
   }
   if (await ensureNativeConnection() !== true) {
+    genericTargetRegistry.discard(result.target);
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
-  await authorizedTargetLifecycle.replace(result);
-  return { accepted: true };
+  return result;
 }
 
 async function ensureNativeConnection() {
@@ -210,7 +257,7 @@ async function handleNativeMessage(message) {
       if (entry.target.scope === 'site') {
         await chrome.permissions.remove({ origins: [`${entry.target.pageOrigin}/*`] });
       }
-      removeTarget(entry.target.tabId, 'permission-revoked');
+      await revokeTarget(entry, 'permission-revoked');
       revoked = true;
     }
     postMessage({
@@ -242,7 +289,20 @@ async function publishTarget(entry) {
 }
 
 function removeTarget(tabId, reason) {
-  authorizedTargetLifecycle.remove(tabId, reason);
+  return authorizedTargetLifecycle.remove(tabId, reason);
+}
+
+async function revokeTarget(entry, reason) {
+  try {
+    await chrome.tabs.sendMessage(
+      entry.target.tabId,
+      { type: 'unbindGenericEndpoint', target: entry.target },
+      { documentId: entry.target.documentId },
+    );
+  } catch {
+    // The exact document may already be gone; registry removal is still required.
+  }
+  return removeTarget(entry.target.tabId, reason);
 }
 
 async function handlePresentationChanged(message, sender) {

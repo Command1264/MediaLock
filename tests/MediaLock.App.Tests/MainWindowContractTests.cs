@@ -20,7 +20,34 @@ namespace MediaLock.App.Tests;
 public sealed class MainWindowContractTests
 {
     [Fact]
-    public void BrowserTargetsExposeExactIdentityLockAndAuthorizationRevocation()
+    public void MediaSourceGroupsShareOneBoundedVerticalScrollSurface()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var scrollViewer = Assert.Single(
+            xaml.Descendants(presentation + "ScrollViewer"),
+            element => (string?)element.Attribute(x + "Name") == "MediaSourceScrollViewer");
+        Assert.Equal("Auto", (string?)scrollViewer.Attribute("VerticalScrollBarVisibility"));
+        Assert.Equal("Disabled", (string?)scrollViewer.Attribute("HorizontalScrollBarVisibility"));
+        Assert.Equal("3", (string?)scrollViewer.Attribute("Grid.Row"));
+        Assert.Contains(
+            scrollViewer.Descendants(presentation + "ItemsControl"),
+            element => (string?)element.Attribute("ItemsSource") == "{Binding MediaSourceGroups}");
+        Assert.Contains(
+            scrollViewer.Descendants(presentation + "ToggleButton"),
+            element => (string?)element.Attribute("Command") ==
+                "{Binding DataContext.SelectMediaSourceGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}");
+        Assert.Contains(
+            scrollViewer.Descendants(presentation + "Button"),
+            element => (string?)element.Attribute("Command") ==
+                "{Binding DataContext.ToggleMediaSourceGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}");
+    }
+
+    [Fact]
+    public void BrowserTargetsUseSharedLockAndExposePerRowAuthorizationRevocation()
     {
         var xaml = XDocument.Load(Path.Combine(
             FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
@@ -29,20 +56,226 @@ public sealed class MainWindowContractTests
         var list = Assert.Single(
             xaml.Descendants(presentation + "ListBox"),
             element => (string?)element.Attribute("ItemsSource") == "{Binding BrowserTargets}");
-        Assert.Equal("{Binding SelectedBrowserTarget}", (string?)list.Attribute("SelectedItem"));
+        Assert.Equal(
+            "{Binding DataContext.SelectedBrowserTarget, RelativeSource={RelativeSource AncestorType=Window}}",
+            (string?)list.Attribute("SelectedItem"));
         var details = Assert.Single(
             list.Descendants(presentation + "TextBlock"),
             element => (string?)element.Attribute("Text") == "{Binding TargetDetails}");
         Assert.Equal("{Binding TargetDetails}",
             (string?)details.Attribute("AutomationProperties.HelpText"));
+        Assert.DoesNotContain(
+            xaml.Descendants(),
+            element => ((string?)element.Attribute("Command"))?.Contains(
+                "LockBrowserTargetCommand",
+                StringComparison.Ordinal) is true);
         Assert.Contains(
-            xaml.Descendants(presentation + "Button"),
-            element => (string?)element.Attribute("Command") ==
-                "{Binding LockBrowserTargetCommand}");
+            xaml.Descendants(),
+            element => (string?)element.Attribute("Command") == "{Binding LockCommand}");
+
+        var overflowButton = Assert.Single(
+            list.Descendants(presentation + "Button"),
+            element => (string?)element.Attribute("Content") == "…");
+        Assert.Equal("2", (string?)overflowButton.Attribute("Grid.Column"));
+        var revokeAction = Assert.Single(
+            overflowButton.Descendants(presentation + "MenuItem"),
+            element => ((string?)element.Attribute("Command"))?.Contains(
+                "RevokeBrowserTargetAuthorizationCommand",
+                StringComparison.Ordinal) is true);
+        Assert.Equal(
+            "{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}",
+            (string?)revokeAction.Attribute("CommandParameter"));
+    }
+
+    [Fact]
+    public void BrowserAndWindowsRowsShareAlignedPlaybackStatusChrome()
+    {
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+        var lists = xaml.Descendants(presentation + "ListBox")
+            .Where(element => (string?)element.Attribute("ItemsSource") is
+                "{Binding BrowserTargets}" or "{Binding Sessions}")
+            .ToArray();
+        Assert.Equal(2, lists.Length);
+
+        foreach (var list in lists)
+        {
+            Assert.Equal(
+                "OnNestedMediaSourcePreviewMouseWheel",
+                (string?)list.Attribute("PreviewMouseWheel"));
+            var status = Assert.Single(
+                list.Descendants(presentation + "Border"),
+                element => (string?)element.Attribute("Style") ==
+                    "{StaticResource MediaPlaybackStatusPillStyle}");
+            Assert.Equal("3", (string?)status.Attribute("Grid.Column"));
+
+            var row = status.Ancestors(presentation + "Grid").First();
+            var columns = Assert.Single(row.Elements(presentation + "Grid.ColumnDefinitions"))
+                .Elements(presentation + "ColumnDefinition")
+                .ToArray();
+            Assert.Equal(4, columns.Length);
+            Assert.Equal("36", (string?)columns[2].Attribute("Width"));
+        }
+    }
+
+    [Fact]
+    public void BrowserTargetOverflowOwnsItsThemeTemplatesWithoutAnIconGutter()
+    {
+        var controls = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "Themes", "Controls.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var buttonStyle = Assert.Single(
+            controls.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") == "OverflowButtonStyle");
         Assert.Contains(
-            xaml.Descendants(presentation + "Button"),
-            element => (string?)element.Attribute("Command") ==
-                "{Binding RevokeBrowserTargetAuthorizationCommand}");
+            buttonStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") == "Template");
+        Assert.DoesNotContain(
+            buttonStyle.Descendants(presentation + "Trigger")
+                .Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") is
+                "Background" or "BorderBrush");
+        Assert.Single(buttonStyle.Descendants(presentation + "DropShadowEffect"));
+
+        var mainWindow = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
+        var overflowButton = Assert.Single(
+            mainWindow.Descendants(presentation + "Button"),
+            element => (string?)element.Attribute("Style") ==
+                "{StaticResource OverflowButtonStyle}");
+        Assert.Null(overflowButton.Attribute("ToolTip"));
+
+        var contextMenuStyle = Assert.Single(
+            controls.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") == "BrowserTargetContextMenuStyle");
+        Assert.Contains(
+            contextMenuStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") == "Template");
+
+        var menuItemStyle = Assert.Single(
+            controls.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") == "BrowserTargetMenuItemStyle");
+        var templateSetter = Assert.Single(
+            menuItemStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") == "Template");
+        var header = Assert.Single(
+            templateSetter.Descendants(presentation + "ContentPresenter"));
+        Assert.Equal("Center", (string?)header.Attribute("VerticalAlignment"));
+        Assert.DoesNotContain(
+            templateSetter.Descendants(presentation + "ColumnDefinition"),
+            element => (string?)element.Attribute("Width") is "Auto" or "16" or "20");
+    }
+
+    [Fact]
+    public void PlaybackStatusPillsShareOneAdaptiveWidthAndCenterTheirText()
+    {
+        var mainWindow = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "MainWindow.xaml"));
+        var controls = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "MediaLock.App", "Themes", "Controls.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var groups = Assert.Single(
+            mainWindow.Descendants(presentation + "ItemsControl"),
+            element => (string?)element.Attribute("ItemsSource") == "{Binding MediaSourceGroups}");
+        Assert.Equal("True", (string?)groups.Attribute("Grid.IsSharedSizeScope"));
+
+        var pillStyle = Assert.Single(
+            controls.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") == "MediaPlaybackStatusPillStyle");
+        Assert.DoesNotContain(
+            pillStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") is "Width" or "MinWidth");
+        Assert.Contains(
+            pillStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") == "HorizontalAlignment" &&
+                (string?)element.Attribute("Value") == "Stretch");
+
+        var textStyle = Assert.Single(
+            controls.Descendants(presentation + "Style"),
+            element => (string?)element.Attribute(x + "Key") == "MediaPlaybackStatusTextStyle");
+        Assert.Contains(
+            textStyle.Elements(presentation + "Setter"),
+            element => (string?)element.Attribute("Property") == "TextAlignment" &&
+                (string?)element.Attribute("Value") == "Center");
+        Assert.Equal(
+            2,
+            mainWindow.Descendants(presentation + "TextBlock").Count(
+                element => (string?)element.Attribute("Style") ==
+                    "{StaticResource MediaPlaybackStatusTextStyle}"));
+    }
+
+    [Fact]
+    public void NestedMediaRowsForwardTheMouseWheelToTheSharedOuterScroller()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+            var sessions = Enumerable.Range(1, 12)
+                .Select(index => new MediaSessionSnapshot(
+                    new SessionKey($"wheel-session-{index}"),
+                    $"Wheel.App.{index}",
+                    PlaybackStatus.Playing,
+                    MediaCommandCapabilities.Play,
+                    observedAt,
+                    Metadata: new MediaMetadata($"Track {index}", null, null, null)))
+                .ToArray();
+            var application = new FakeMediaLockApplication(
+                MediaLockApplicationState.Initial with
+                {
+                    Router = RouterState.Initial with
+                    {
+                        Sessions = [.. sessions],
+                        Targets = [.. sessions.Select(MediaTargetSnapshot.FromGsmtc)],
+                    },
+                });
+            using var viewModel = new MainWindowViewModel(
+                application,
+                synchronizationContext: SynchronizationContext.Current);
+            var window = new MainWindow(viewModel)
+            {
+                Width = 720,
+                Height = 560,
+            };
+            window.Show();
+
+            try
+            {
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                var outerScroller = Assert.Single(
+                    WpfTestHost.FindVisualChildren<ScrollViewer>(window),
+                    candidate => candidate.Name == "MediaSourceScrollViewer");
+                var nestedList = Assert.Single(
+                    WpfTestHost.FindVisualChildren<ListBox>(window),
+                    candidate => candidate.Items.Count == 1 &&
+                        candidate.Items[0] is SessionItemViewModel item &&
+                        item.Key == sessions[0].Key);
+                Assert.True(outerScroller.ScrollableHeight > 0);
+
+                var wheel = new MouseWheelEventArgs(
+                    Mouse.PrimaryDevice,
+                    Environment.TickCount,
+                    -120)
+                {
+                    RoutedEvent = UIElement.PreviewMouseWheelEvent,
+                    Source = nestedList,
+                };
+                nestedList.RaiseEvent(wheel);
+                window.UpdateLayout();
+
+                Assert.True(wheel.Handled);
+                Assert.True(outerScroller.VerticalOffset > 0);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
     }
 
     [Fact]
@@ -404,7 +637,8 @@ public sealed class MainWindowContractTests
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 var listBox = Assert.Single(
                     WpfTestHost.FindVisualChildren<ListBox>(window),
-                    candidate => ReferenceEquals(candidate.ItemsSource, viewModel.Sessions));
+                    candidate => candidate.ItemsSource is IEnumerable<SessionItemViewModel> items &&
+                        items.Any(item => item.Key == brave.Key));
                 listBox.SelectedItem = Assert.Single(
                     viewModel.Sessions,
                     session => session.Key == brave.Key);
@@ -423,6 +657,10 @@ public sealed class MainWindowContractTests
                 });
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
+                listBox = Assert.Single(
+                    WpfTestHost.FindVisualChildren<ListBox>(window),
+                    candidate => candidate.ItemsSource is IEnumerable<SessionItemViewModel> items &&
+                        items.Any(item => item.Key == braveSuccessor.Key));
                 Assert.Equal(braveSuccessor.Key,
                     Assert.IsType<SessionItemViewModel>(listBox.SelectedItem).Key);
                 Assert.Equal(braveSuccessor.Key, viewModel.SelectedSession?.Key);

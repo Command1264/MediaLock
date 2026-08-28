@@ -73,6 +73,8 @@ public sealed class BrowserMediaAdapterTests
         var target = Assert.Single(snapshot.ObservedTargets);
         Assert.Equal(MediaTargetProviderId.Browser, target.Id.Provider);
         Assert.Equal("Big Buck Bunny — Brave", target.Presentation.SourceDisplayName);
+        Assert.Equal("browser-family:brave", target.Presentation.SourceGroup?.Key);
+        Assert.Equal("Brave", target.Presentation.SourceGroup?.DisplayName);
         Assert.Equal(1.75, target.Presentation.PlaybackRate);
 
         var dispatch = adapter.TryExecuteAsync(

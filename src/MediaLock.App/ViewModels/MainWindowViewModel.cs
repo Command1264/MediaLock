@@ -19,8 +19,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private readonly AsyncCommand lockCommand;
-    private readonly AsyncCommand lockBrowserTargetCommand;
     private readonly AsyncCommand revokeBrowserTargetAuthorizationCommand;
+    private readonly AsyncCommand selectMediaSourceGroupCommand;
+    private readonly AsyncCommand toggleMediaSourceGroupCommand;
     private readonly AsyncCommand appLockCommand;
     private readonly AsyncCommand priorityRulesCommand;
     private readonly AsyncCommand windowsAutoCommand;
@@ -34,6 +35,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private IReadOnlyList<string> priorityRuleSourceIds = [];
     private SessionItemViewModel? selectedSession;
     private BrowserTargetItemViewModel? selectedBrowserTarget;
+    private MediaSourceGroupViewModel? selectedMediaSourceGroup;
     private RouterState routerState = RouterState.Initial;
     private RoutingMode startupRoutingMode = RoutingMode.WindowsAuto;
     private PlaybackStateLockState playbackStateLock = PlaybackStateLockState.Off;
@@ -45,6 +47,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private bool selectionInitialized;
     private bool selectionRecoveryPending;
     private bool projectingSelection;
+    private bool changingMediaSourceSelection;
     private string? errorMessage;
     private string? presentedApplicationError;
     private string? dismissedApplicationError;
@@ -101,16 +104,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         });
         lockCommand = new AsyncCommand(
             LockSelectedAsync,
-            _ => SelectedSession is not null);
-        lockBrowserTargetCommand = new AsyncCommand(
-            LockSelectedBrowserTargetAsync,
-            _ => SelectedBrowserTarget is not null);
+            _ => SelectedSession is not null || SelectedBrowserTarget is not null);
         revokeBrowserTargetAuthorizationCommand = new AsyncCommand(
             RevokeSelectedBrowserTargetAuthorizationAsync,
-            _ => SelectedBrowserTarget is not null);
+            parameter => parameter is BrowserTargetItemViewModel target &&
+                BrowserTargets.Contains(target));
+        selectMediaSourceGroupCommand = new AsyncCommand(
+            parameter =>
+            {
+                SelectedMediaSourceGroup = parameter as MediaSourceGroupViewModel;
+                return Task.CompletedTask;
+            },
+            parameter => parameter is MediaSourceGroupViewModel);
+        toggleMediaSourceGroupCommand = new AsyncCommand(
+            parameter =>
+            {
+                if (parameter is MediaSourceGroupViewModel group)
+                {
+                    group.IsExpanded = !group.IsExpanded;
+                }
+
+                return Task.CompletedTask;
+            },
+            parameter => parameter is MediaSourceGroupViewModel);
         appLockCommand = new AsyncCommand(
             LockSelectedApplicationAsync,
-            _ => SelectedSession is not null);
+            _ => ResolveSelectedSourceApplication() is not null);
         priorityRulesCommand = new AsyncCommand(
             _ => DispatchAsync(new ApplicationIntent.UsePriorityRules()),
             _ => routerState.Mode != RoutingMode.PriorityRules);
@@ -127,7 +146,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                 PlaybackStateLockMode.KeepPlaying)),
             _ => playbackStateLock.Mode != PlaybackStateLockMode.KeepPlaying &&
                 catalogStatus == MediaSessionCatalogStatus.Available &&
-                ResolveTarget()?.PlaybackState == PlaybackStatus.Playing);
+                ResolveTargetSnapshot()?.Presentation.PlaybackStatus == PlaybackStatus.Playing);
         PlayCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.Play);
         PauseCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.Pause);
         TogglePlayPauseCommand = MediaCommand(MediaLock.Core.Media.MediaCommand.TogglePlayPause);
@@ -158,6 +177,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     public ObservableCollection<BrowserTargetItemViewModel> BrowserTargets { get; } = [];
 
+    public ObservableCollection<MediaSourceGroupViewModel> MediaSourceGroups { get; } = [];
+
     public SettingsViewModel Settings { get; }
 
     public IAsyncCommand SettingsCommand { get; }
@@ -185,6 +206,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             }
 
             OnPropertyChanged();
+            if (value is not null && !projectingSelection)
+            {
+                ClearOtherMediaSourceSelections(MediaSourceSelection.Session);
+            }
             lockCommand.RaiseCanExecuteChanged();
             appLockCommand.RaiseCanExecuteChanged();
         }
@@ -204,12 +229,55 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
             selectedBrowserTarget = value;
             OnPropertyChanged();
-            lockBrowserTargetCommand.RaiseCanExecuteChanged();
+            if (value is not null && !projectingSelection)
+            {
+                selectionRecoveryPending = false;
+                selectionInitialized = true;
+                selectionBookmark = null;
+                ClearOtherMediaSourceSelections(MediaSourceSelection.BrowserTarget);
+            }
+            lockCommand.RaiseCanExecuteChanged();
             revokeBrowserTargetAuthorizationCommand.RaiseCanExecuteChanged();
         }
     }
 
-    public IAsyncCommand LockBrowserTargetCommand => lockBrowserTargetCommand;
+    public MediaSourceGroupViewModel? SelectedMediaSourceGroup
+    {
+        get => selectedMediaSourceGroup;
+        set
+        {
+            if (ReferenceEquals(selectedMediaSourceGroup, value))
+            {
+                return;
+            }
+
+            if (selectedMediaSourceGroup is { } previous)
+            {
+                previous.IsSelected = false;
+            }
+
+            selectedMediaSourceGroup = value;
+            if (value is not null)
+            {
+                value.IsSelected = true;
+            }
+
+            OnPropertyChanged();
+            if (value is not null && !projectingSelection)
+            {
+                selectionRecoveryPending = false;
+                selectionInitialized = true;
+                selectionBookmark = null;
+                ClearOtherMediaSourceSelections(MediaSourceSelection.Group);
+            }
+
+            appLockCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public IAsyncCommand SelectMediaSourceGroupCommand => selectMediaSourceGroupCommand;
+
+    public IAsyncCommand ToggleMediaSourceGroupCommand => toggleMediaSourceGroupCommand;
 
     public IAsyncCommand RevokeBrowserTargetAuthorizationCommand =>
         revokeBrowserTargetAuthorizationCommand;
@@ -282,6 +350,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     public bool HasSessions => Sessions.Count > 0;
 
     public bool HasBrowserTargets => BrowserTargets.Count > 0;
+
+    public bool HasMediaSourceGroups => MediaSourceGroups.Count > 0;
 
     public string EmptyStateText => catalogStatus switch
     {
@@ -500,35 +570,74 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task LockSelectedAsync(object? parameter)
     {
-        if (SelectedSession is null)
+        if (SelectedBrowserTarget is { } browserTarget)
         {
+            await DispatchAsync(new ApplicationIntent.LockTarget(browserTarget.Id));
             return;
         }
 
-        await DispatchAsync(new ApplicationIntent.LockSession(SelectedSession.Key));
+        if (SelectedSession is { } session)
+        {
+            await DispatchAsync(new ApplicationIntent.LockSession(session.Key));
+        }
     }
 
     private async Task LockSelectedApplicationAsync(object? parameter)
     {
-        if (SelectedSession is null)
+        if (ResolveSelectedSourceApplication() is not { } sourceApplication)
         {
             return;
         }
 
-        await DispatchAsync(new ApplicationIntent.LockApplication(SelectedSession.SourceApplication));
+        await DispatchAsync(new ApplicationIntent.LockApplication(sourceApplication));
     }
 
-    private async Task LockSelectedBrowserTargetAsync(object? parameter)
+    private string? ResolveSelectedSourceApplication() =>
+        SelectedMediaSourceGroup?.SourceApplication ?? SelectedSession?.SourceApplication;
+
+    private void ClearOtherMediaSourceSelections(MediaSourceSelection selection)
     {
-        if (SelectedBrowserTarget is { } target)
+        if (changingMediaSourceSelection)
         {
-            await DispatchAsync(new ApplicationIntent.LockTarget(target.Id));
+            return;
         }
+
+        changingMediaSourceSelection = true;
+        try
+        {
+            if (selection != MediaSourceSelection.Session && selectedSession is not null)
+            {
+                selectedSession = null;
+                OnPropertyChanged(nameof(SelectedSession));
+                lockCommand.RaiseCanExecuteChanged();
+            }
+
+            if (selection != MediaSourceSelection.BrowserTarget && selectedBrowserTarget is not null)
+            {
+                selectedBrowserTarget = null;
+                OnPropertyChanged(nameof(SelectedBrowserTarget));
+                lockCommand.RaiseCanExecuteChanged();
+                revokeBrowserTargetAuthorizationCommand.RaiseCanExecuteChanged();
+            }
+
+            if (selection != MediaSourceSelection.Group && selectedMediaSourceGroup is not null)
+            {
+                selectedMediaSourceGroup.IsSelected = false;
+                selectedMediaSourceGroup = null;
+                OnPropertyChanged(nameof(SelectedMediaSourceGroup));
+            }
+        }
+        finally
+        {
+            changingMediaSourceSelection = false;
+        }
+
+        appLockCommand.RaiseCanExecuteChanged();
     }
 
     private async Task RevokeSelectedBrowserTargetAuthorizationAsync(object? parameter)
     {
-        if (SelectedBrowserTarget is { } target)
+        if (parameter is BrowserTargetItemViewModel target && BrowserTargets.Contains(target))
         {
             await DispatchAsync(new ApplicationIntent.RevokeTargetAuthorization(target.Id));
         }
@@ -735,6 +844,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
     private void RefreshLocalizedProjection()
     {
+        var expandedMediaSourceGroups = MediaSourceGroups.ToDictionary(
+            group => group.Key,
+            group => group.IsExpanded,
+            StringComparer.Ordinal);
         var presentations = SourceApplicationPresentationCatalog.Resolve(
             routerState.Sessions
                 .Select(session => session.SourceAppUserModelId)
@@ -752,6 +865,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             }
 
             var selectedBrowserTargetId = SelectedBrowserTarget?.Id;
+            var selectedMediaSourceGroupKey = SelectedMediaSourceGroup?.Key;
             BrowserTargets.Clear();
             foreach (var target in routerState.Targets.Where(
                 target => target.Id.Provider == MediaTargetProviderId.Browser))
@@ -759,9 +873,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                 BrowserTargets.Add(BrowserTargetItemViewModel.From(target));
             }
 
+            MediaSourceGroups.Clear();
+            foreach (var group in MediaSourceGroupProjection.Create(
+                Sessions,
+                BrowserTargets,
+                expandedMediaSourceGroups))
+            {
+                MediaSourceGroups.Add(group);
+            }
+
+            SelectedMediaSourceGroup = selectedMediaSourceGroupKey is { } groupKey
+                ? MediaSourceGroups.FirstOrDefault(group => group.Key == groupKey)
+                : null;
+
             SelectedBrowserTarget = selectedBrowserTargetId is { } id
                 ? BrowserTargets.FirstOrDefault(target => target.Id == id)
-                : BrowserTargets.FirstOrDefault();
+                : null;
 
             var nextSelection = ResolveSelection();
             SelectedSession = nextSelection;
@@ -776,6 +903,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(HasSessions));
         OnPropertyChanged(nameof(BrowserTargets));
         OnPropertyChanged(nameof(HasBrowserTargets));
+        OnPropertyChanged(nameof(MediaSourceGroups));
+        OnPropertyChanged(nameof(HasMediaSourceGroups));
+        OnPropertyChanged(nameof(SelectedMediaSourceGroup));
         OnPropertyChanged(nameof(EmptyStateText));
         OnPropertyChanged(nameof(RoutingStatus));
         OnPropertyChanged(nameof(RoutingStatusLine));
@@ -1038,5 +1168,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             session.Key,
             session.SourceApplication,
             MissingSince: null);
+    }
+
+    private enum MediaSourceSelection
+    {
+        Group,
+        BrowserTarget,
+        Session,
     }
 }

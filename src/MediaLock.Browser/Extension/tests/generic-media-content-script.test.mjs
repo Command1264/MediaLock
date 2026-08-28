@@ -242,3 +242,65 @@ test('an invalidated Extension context does not leak from a stale media listener
   assert.equal(debugMessages.length, 1);
   assert.equal(debugMessages[0][0], 'Media Lock presentation update was not delivered.');
 });
+
+test('the content message boundary delivers exact unbind and clears Popup authorization', () => {
+  const listeners = [];
+  class FakeMediaElement {}
+  const media = new FakeMediaElement();
+  Object.assign(media, {
+    isConnected: true,
+    pause() {},
+    async play() {},
+  });
+  const extensionId = 'abcdefghijklmnopabcdefghijklmnop';
+  const context = vm.createContext({
+    HTMLMediaElement: FakeMediaElement,
+    document: { title: 'Revoked Video', querySelectorAll: () => [media] },
+    window: { location: { origin: 'https://media.example.test' } },
+    crypto: { randomUUID: () => 'endpoint-runtime-revoke' },
+    chrome: {
+      runtime: {
+        id: extensionId,
+        onMessage: {
+          addListener(listener) {
+            listeners.push(listener);
+          },
+        },
+      },
+    },
+  });
+  context.globalThis = context;
+  for (const source of sourceFiles) {
+    vm.runInContext(source, context);
+  }
+  const sender = {
+    id: extensionId,
+    url: `chrome-extension://${extensionId}/service-worker.mjs`,
+  };
+  const binding = {
+    bindingId: 'binding-runtime-revoke',
+    scope: 'temporary',
+    tabId: 42,
+    frameId: 0,
+    documentId: 'document-runtime-revoke',
+    pageOrigin: 'https://media.example.test',
+  };
+  let endpoint;
+  listeners[0]({ type: 'bindGenericEndpoint', binding }, sender, (response) => {
+    endpoint = response;
+  });
+  const target = { ...binding, endpointId: endpoint.endpointId };
+  const responses = [];
+
+  listeners[0]({ type: 'unbindGenericEndpoint', target }, sender, (response) => {
+    responses.push(response);
+  });
+  listeners[0]({ type: 'getGenericEndpointStatus' }, sender, (response) => {
+    responses.push(response);
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(responses)), [
+    { accepted: true },
+    { authorized: false },
+  ]);
+});

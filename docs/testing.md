@@ -573,10 +573,17 @@ only to the bound page. App Lock must use its explicit Browser Application Scope
 Windows Auto may change targets by policy, but its visible selection must still identify the exact page. Reload,
 same-origin navigation, cross-origin navigation, tab duplication, tab replacement and browser restart must never
 silently rebind a saved lock or rule to the other page.
-For the first production Browser Session Lock candidate, any tab `loading` event removes every temporary or exact-site
-binding for that tab and never automatically rebinds it. Deterministic Extension tests also require same-tab repeated
-authorization to publish the old binding's removal before its replacement, reject stale-document observations,
-republish page-originated playback changes and carry bounded playback rate into desktop timeline interpolation.
+For the first production Browser Session Lock candidate, any tab `loading` event removes every old temporary or
+exact-site binding for that tab. Temporary authorization never automatically rebinds. A completed top-level HTTPS
+document under a retained exact-site grant may publish exactly one new opaque target, but Router and Playback State
+Lock tests require the predecessor identity to remain unavailable until the user explicitly locks the successor.
+An intervening `loading` generation or tab close invalidates any pending permission check before it can bind.
+The same generation must be revalidated after Endpoint binding／Native Host negotiation and immediately before target
+publication. A deterministic delayed-bind test invalidates the tab while binding is pending, requires the stale
+result to be discarded, and proves that exact discard cannot remove a newer same-tab successor.
+Deterministic Extension tests also require same-tab repeated authorization to publish the old binding's removal
+before its replacement, reject stale-document observations, republish page-originated playback changes and carry
+bounded playback rate into desktop timeline interpolation.
 Application tests lock and route an exact Browser target with a recording runtime repository and require zero
 post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
 creating or replacing `state.json`.
@@ -608,6 +615,20 @@ Every production candidate runs two independent compositions:
    its exact Page Binding, while disconnect after binding preserves the target in Recovery／Unavailable and never
    controls a competing page or GSMTC Session. Provider-neutral input coverage proves a supported physical Toggle is
    consumed and dispatched with the exact captured Browser target rather than being passed through to Windows.
+   Provider-neutral Playback State Lock coverage arms a playing Browser target, corrects an external Pause with one
+   explicit Play to that exact target, applies repeated-pause release and suspends without correcting a replacement
+   binding or GSMTC competitor when the armed target disappears.
+   Popup contract coverage opens the real Popup entry with a fake DOM, requires an active Binding to display
+   Authorized, requires a retained exact-site permission without a Binding to display trusted-site waiting, and
+   requires a page with neither state to display Not authorized. The top-level document Endpoint status message fails
+   closed when no live Binding can answer. Controller coverage proves a Popup reopened against the same bound
+   document receives only authorization state and scope; locale and layout contracts cover English fallback,
+   Traditional Chinese projection and the vertically spaced action group. A revoked exact-site permission overrides
+   any stale live-document status response and projects Not authorized. Exact temporary or site revocation sends an
+   exact-document unbind, after which the same document reports Not authorized and rejects later commands. Popup
+   failures must render localized actionable prose and a stable `ML-BR-*` support code rather than a raw internal
+   kebab-case identifier. The content-script runtime boundary test must include `unbindGenericEndpoint`; testing only
+   the controller is insufficient because the outer message allowlist can otherwise drop a valid revoke request.
    Extension lifecycle coverage proves Native Messaging disconnect consumes Chromium's scoped last error and never
    calls `disconnect()` on the already-closed port.
 
