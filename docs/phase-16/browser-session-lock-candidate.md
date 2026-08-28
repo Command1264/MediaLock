@@ -49,9 +49,10 @@ one Play or Pause; it never retries an unknown result.
 Browser-specific regression tests additionally require same-tab reauthorization to remove the prior binding before
 publishing its replacement, any tab reload to remove the old temporary or exact-site target, temporary grants never
 to auto-bind, and trusted-site replacement documents to publish at most one new target without satisfying the old
-lock. Stale document observations must be ignored, page-originated Play／Pause must refresh the desktop snapshot, and
-non-1× playback rate must reach WPF timeline interpolation. Native port disconnect handling must consume Chromium's
-`runtime.lastError` and must not disconnect the already-closed port again.
+lock. A reload during explicit authorization and permission loss during trusted-site binding must discard the
+uncommitted target before publication. Stale document observations must be ignored, page-originated Play／Pause must
+refresh the desktop snapshot, and non-1× playback rate must reach WPF timeline interpolation. Native port disconnect
+handling must consume Chromium's `runtime.lastError` and must not disconnect the already-closed port again.
 Popup coverage must execute the real Popup entry against a fake DOM and top-level document message contract. A live
 Binding reports Authorized; a retained exact-site permission without a current Binding reports trusted-site waiting;
 and neither state reports Not authorized. The status response never exposes URL, title, Binding identity or media
@@ -202,6 +203,13 @@ The final focused manual regression completed 4／4 rows on 2026-08-28:
 The revocation check initially exposed stale Popup authorization projection; the Popup now revalidates exact-site
 permission for every site-scoped live-document response. The corrected run showed no duplicate target, warning,
 Extension error or crash.
+
+Final two-axis review found one remaining pre-publication race: explicit authorization did not share the tab-generation
+guard, and trusted-site binding did not revalidate its permission after the asynchronous Endpoint／Native Host work.
+The production paths now share one guarded coordinator. RED regressions prove that reload during explicit
+authorization and permission loss during trusted-site binding both discard the exact uncommitted target instead of
+publishing it. The complete Extension suite passes 61／61 after this correction; it changes no visible interaction, so
+the accepted rapid-reload and revoke rows above remain the corresponding manual evidence.
 
 The grouped Browser row's overflow revocation was then exercised once against the locked Nuevo target. The exact
 Browser target disappeared, Router retained the unavailable provider-qualified identity, transport controls failed

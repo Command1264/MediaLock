@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createTrustedSiteAutoBinding } from '../trusted-site-auto-binding.mjs';
+import { createAuthorizedPageBindingCoordinator } from '../authorized-page-binding.mjs';
 
 test('a completed trusted-site document automatically creates one new exact target', async () => {
   const events = [];
-  const autoBinding = createTrustedSiteAutoBinding({
+  const autoBinding = createAuthorizedPageBindingCoordinator({
     hasTarget: () => false,
     async hasSitePermission(origin) {
       events.push(['permission', origin]);
@@ -35,13 +35,14 @@ test('a completed trusted-site document automatically creates one new exact targ
   assert.deepEqual(events, [
     ['permission', 'https://media.example.test'],
     ['bind', 42],
+    ['permission', 'https://media.example.test'],
     ['commit', 42],
   ]);
 });
 
 test('temporary or ineligible pages never auto-bind', async () => {
   const bound = [];
-  const autoBinding = createTrustedSiteAutoBinding({
+  const autoBinding = createAuthorizedPageBindingCoordinator({
     hasTarget: () => false,
     async hasSitePermission() {
       return false;
@@ -72,7 +73,7 @@ test('a newer loading generation cancels an older pending auto-bind', async () =
     resolvePermission = resolve;
   });
   let bindCount = 0;
-  const autoBinding = createTrustedSiteAutoBinding({
+  const autoBinding = createAuthorizedPageBindingCoordinator({
     hasTarget: () => false,
     hasSitePermission: () => permission,
     async bindTab() {
@@ -105,7 +106,7 @@ test('loading invalidation discards a binding that finishes after its document w
   });
   const committed = [];
   const discarded = [];
-  const autoBinding = createTrustedSiteAutoBinding({
+  const autoBinding = createAuthorizedPageBindingCoordinator({
     hasTarget: () => false,
     async hasSitePermission() {
       return true;
@@ -139,4 +140,85 @@ test('loading invalidation discards a binding that finishes after its document w
   });
   assert.deepEqual(committed, []);
   assert.deepEqual(discarded, ['stale-binding']);
+});
+
+test('permission loss during binding discards the uncommitted trusted-site target', async () => {
+  let resolveBinding;
+  const binding = new Promise((resolve) => {
+    resolveBinding = resolve;
+  });
+  let permissionGranted = true;
+  const committed = [];
+  const discarded = [];
+  const autoBinding = createAuthorizedPageBindingCoordinator({
+    hasTarget: () => false,
+    async hasSitePermission() {
+      return permissionGranted;
+    },
+    bindTab: () => binding,
+    async commitBinding(result) {
+      committed.push(result.target.bindingId);
+    },
+    discardBinding(target) {
+      discarded.push(target.bindingId);
+    },
+  });
+
+  const pending = autoBinding.handleTabUpdated(42, { status: 'complete' }, {
+    id: 42,
+    url: 'https://media.example.test/watch',
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  permissionGranted = false;
+  resolveBinding({
+    accepted: true,
+    target: { tabId: 42, bindingId: 'revoked-binding' },
+  });
+
+  assert.deepEqual(await pending, {
+    accepted: false,
+    errorCode: 'permission-denied',
+  });
+  assert.deepEqual(committed, []);
+  assert.deepEqual(discarded, ['revoked-binding']);
+});
+
+test('page loading during explicit authorization discards the uncommitted target', async () => {
+  let resolveBinding;
+  const binding = new Promise((resolve) => {
+    resolveBinding = resolve;
+  });
+  const committed = [];
+  const discarded = [];
+  const coordinator = createAuthorizedPageBindingCoordinator({
+    hasTarget: () => false,
+    async hasSitePermission() {
+      return true;
+    },
+    bindTab: () => binding,
+    async commitBinding(result) {
+      committed.push(result.target.bindingId);
+    },
+    discardBinding(target) {
+      discarded.push(target.bindingId);
+    },
+  });
+
+  const pending = coordinator.authorizeTab({
+    scope: 'temporary',
+    tab: { id: 42, url: 'https://media.example.test/watch' },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  coordinator.invalidate(42);
+  resolveBinding({
+    accepted: true,
+    target: { tabId: 42, bindingId: 'stale-explicit-binding' },
+  });
+
+  assert.deepEqual(await pending, {
+    accepted: false,
+    errorCode: 'document-replaced',
+  });
+  assert.deepEqual(committed, []);
+  assert.deepEqual(discarded, ['stale-explicit-binding']);
 });

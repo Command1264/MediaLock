@@ -1,4 +1,4 @@
-export function createTrustedSiteAutoBinding({
+export function createAuthorizedPageBindingCoordinator({
   hasTarget,
   hasSitePermission,
   bindTab,
@@ -15,7 +15,59 @@ export function createTrustedSiteAutoBinding({
     pendingTabs.delete(tabId);
   };
 
+  const bindCurrent = async ({
+    tab,
+    scope,
+    generation,
+    permissionChecked = false,
+    rejectExistingTarget = false,
+  }) => {
+    let pageUrl;
+    try {
+      pageUrl = new URL(tab?.url);
+    } catch {
+      return { accepted: false, errorCode: 'page-not-eligible' };
+    }
+    if (pageUrl.protocol !== 'https:') {
+      return { accepted: false, errorCode: 'page-not-eligible' };
+    }
+    if (scope === 'site'
+        && permissionChecked !== true
+        && await hasSitePermission(pageUrl.origin) !== true) {
+      return { accepted: false, errorCode: 'permission-denied' };
+    }
+
+    const result = await bindTab(tab, scope);
+    if (result?.accepted !== true) {
+      return result;
+    }
+    if (scope === 'site' && await hasSitePermission(pageUrl.origin) !== true) {
+      discardBinding(result.target);
+      return { accepted: false, errorCode: 'permission-denied' };
+    }
+    if ((generations.get(tab.id) ?? 0) !== generation
+        || (rejectExistingTarget && hasTarget(tab.id))) {
+      discardBinding(result.target);
+      return { accepted: false, errorCode: 'document-replaced' };
+    }
+    await commitBinding(result);
+    return { accepted: true };
+  };
+
   return Object.freeze({
+    authorizeTab({ scope, tab }) {
+      if ((scope !== 'temporary' && scope !== 'site')
+          || !Number.isSafeInteger(tab?.id)) {
+        return Promise.resolve({ accepted: false, errorCode: 'target-unavailable' });
+      }
+      invalidate(tab.id);
+      return bindCurrent({
+        tab,
+        scope,
+        generation: generations.get(tab.id),
+      });
+    },
+
     handleTabUpdated(tabId, changeInfo, tab) {
       if (changeInfo?.status === 'loading') {
         invalidate(tabId);
@@ -50,16 +102,13 @@ export function createTrustedSiteAutoBinding({
               || hasTarget(tabId)) {
             return { accepted: false, errorCode: 'permission-denied' };
           }
-          const result = await bindTab(tab);
-          if (result?.accepted !== true) {
-            return result;
-          }
-          if ((generations.get(tabId) ?? 0) !== generation || hasTarget(tabId)) {
-            discardBinding(result.target);
-            return { accepted: false, errorCode: 'document-replaced' };
-          }
-          await commitBinding(result);
-          return { accepted: true };
+          return bindCurrent({
+            tab,
+            scope: 'site',
+            generation,
+            permissionChecked: true,
+            rejectExistingTarget: true,
+          });
         })
         .finally(() => {
           if (pendingTabs.get(tabId)?.promise === operation) {

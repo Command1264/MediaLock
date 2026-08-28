@@ -1,9 +1,9 @@
 import { createBrowserAuthorizationModule } from './browser-authorization.mjs';
+import { createAuthorizedPageBindingCoordinator } from './authorized-page-binding.mjs';
 import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.mjs';
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 import { handleNativePortDisconnect } from './native-connection-lifecycle.mjs';
-import { createTrustedSiteAutoBinding } from './trusted-site-auto-binding.mjs';
 import {
   createInboundCommandGuard,
   validateHelloAck,
@@ -27,10 +27,12 @@ const authorizedTargetLifecycle = createAuthorizedTargetLifecycle({
   publishTargetRemoved,
   clearTab: (tabId) => genericTargetRegistry.clearTab(tabId),
 });
-const trustedSiteAutoBinding = createTrustedSiteAutoBinding({
+const pageBindingCoordinator = createAuthorizedPageBindingCoordinator({
   hasTarget: (tabId) => authorizedTargetLifecycle.get(tabId) !== undefined,
   hasSitePermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
-  bindTab: authorizeTrustedSiteTab,
+  bindTab: (tab, scope) => prepareBinding(
+    () => genericTargetRegistry.bindTab({ scope, tab }),
+  ),
   commitBinding: (result) => authorizedTargetLifecycle.replace(result),
   discardBinding: (target) => genericTargetRegistry.discard(target),
 });
@@ -67,7 +69,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo?.status === 'loading' && removed !== true) {
     genericTargetRegistry.clearTab(tabId);
   }
-  trustedSiteAutoBinding.handleTabUpdated(tabId, changeInfo, tab).catch((error) => {
+  pageBindingCoordinator.handleTabUpdated(tabId, changeInfo, tab).catch((error) => {
     console.debug(
       'Media Lock trusted-site auto-binding did not complete.',
       error instanceof Error ? error.name : 'UnknownError',
@@ -76,7 +78,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  trustedSiteAutoBinding.invalidate(tabId);
+  pageBindingCoordinator.invalidate(tabId);
   if (removeTarget(tabId, 'tab-closed') !== true) {
     genericTargetRegistry.clearTab(tabId);
   }
@@ -103,21 +105,7 @@ async function authorizeTarget(scope) {
     return { accepted: false, errorCode: 'target-unavailable' };
   }
   const [activeTab] = activeTabs;
-  trustedSiteAutoBinding.invalidate(activeTab.id);
-  const result = await prepareBinding(
-    () => genericTargetRegistry.bindTab({ scope, tab: activeTab }),
-  );
-  if (result.accepted !== true) {
-    return result;
-  }
-  await authorizedTargetLifecycle.replace(result);
-  return { accepted: true };
-}
-
-async function authorizeTrustedSiteTab(tab) {
-  return prepareBinding(
-    () => genericTargetRegistry.bindTab({ scope: 'site', tab }),
-  );
+  return pageBindingCoordinator.authorizeTab({ scope, tab: activeTab });
 }
 
 async function prepareBinding(bind) {
