@@ -6,9 +6,15 @@ public interface IMediaLockApplication : IAsyncDisposable
 
     MediaLockApplicationState State { get; }
 
+    string? LastReportedProblemCode { get; }
+
     ValueTask StartAsync(CancellationToken cancellationToken);
 
     ValueTask<ApplicationResult> DispatchAsync(
         ApplicationIntent intent,
+        CancellationToken cancellationToken);
+
+    ValueTask ReportProblemAsync(
+        MediaLockProblem problem,
         CancellationToken cancellationToken);
 }

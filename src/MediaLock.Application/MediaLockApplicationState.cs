@@ -8,10 +8,9 @@ namespace MediaLock.Application;
 
 public sealed record MediaLockApplicationState(
     RouterState Router,
-    string? ErrorMessage,
+    MediaLockProblem? Problem,
     MediaLockSettings Settings,
-    MediaSessionCatalogStatus CatalogStatus = MediaSessionCatalogStatus.Available,
-    string? CatalogStatusMessage = null)
+    MediaSessionCatalogStatus CatalogStatus = MediaSessionCatalogStatus.Available)
 {
     public ImmutableArray<MediaTargetSnapshot> Targets { get; init; } = [];
 
@@ -20,8 +19,8 @@ public sealed record MediaLockApplicationState(
 
     public MediaLockApplicationState(
         RouterState router,
-        string? errorMessage = null)
-        : this(router, errorMessage, MediaLockSettings.Default)
+        MediaLockProblem? problem = null)
+        : this(router, problem, MediaLockSettings.Default)
     {
     }
 
@@ -44,7 +43,7 @@ public sealed record PlaybackStateLockState(
     PlaybackStateLockMode Mode,
     PlaybackStateLockStatus Status,
     MediaTargetId? ArmedTarget,
-    string? Message = null)
+    MediaLockProblem? Problem = null)
 {
     public static PlaybackStateLockState Off { get; } = new(
         PlaybackStateLockMode.Off,

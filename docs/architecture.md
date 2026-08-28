@@ -229,6 +229,14 @@ User-triggered desktop effects cross the single-method `IDesktopSupportActions` 
 Clipboard, Shell and `%LocalAppData%\MediaLock\logs` behavior plus the canonical GitHub support URLs. Settings
 ViewModel supplies diagnostic text only for the copy action, catches adapter failures as localized actionable UI
 errors and otherwise remains independent of Registry, Clipboard and process launch details.
+
+Phase 17 replaces those presentation strings with the structured problem boundary defined by
+[ADR 0008](adr/0008-use-structured-problems-for-user-facing-failures.md). Application owns semantic identifiers,
+stable codes, severity, occurrence identity and an optional exception type. App owns exact English／Traditional
+Chinese resource lookup and fallback. Core Route Decisions expose semantic reasons and at most an exception type;
+they never expose localized copy or raw exception messages. `ProblemCode` is an optional structured diagnostic field,
+and `DiagnosticSummary` receives the latest reported code without promoting it into active UI state. This keeps localization out of Core and private path／media／
+target data out of the standard failure contract.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
 fallback and Priority Rule edits also update the running router immediately. A successful explicit main-window Routing
 Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the

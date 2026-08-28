@@ -38,6 +38,32 @@ public sealed class JsonLinesDiagnosticLogTests
         Assert.DoesNotContain("artist", content, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ProblemEventsWriteTheStableCodeWithoutPrivateExceptionText()
+    {
+        using var directory = new TemporaryDirectory();
+        await using var log = new JsonLinesDiagnosticLog(
+            directory.Path,
+            maxFileBytes: 4096,
+            maxFiles: 1);
+
+        await log.WriteAsync(
+            new DiagnosticEvent(
+                "runtime.state.save_failed",
+                new Dictionary<string, string>
+                {
+                    ["exceptionType"] = typeof(IOException).FullName!,
+                },
+                "ML-CFG-009"),
+            CancellationToken.None);
+
+        var content = File.ReadAllText(Path.Combine(directory.Path, "medialock.jsonl"));
+
+        Assert.Contains("ML-CFG-009", content, StringComparison.Ordinal);
+        Assert.Contains(nameof(IOException), content, StringComparison.Ordinal);
+        Assert.DoesNotContain("PrivateAccount", content, StringComparison.Ordinal);
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()

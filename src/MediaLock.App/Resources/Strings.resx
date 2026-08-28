@@ -4,10 +4,7 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
-  <data name="App_StartupFailed" xml:space="preserve"><value>Media Lock could not start.</value></data>
   <data name="App_StartupErrorTitle" xml:space="preserve"><value>Media Lock startup error</value></data>
-  <data name="App_CleanupAlsoFailed" xml:space="preserve"><value>Cleanup also failed: {0}</value></data>
-  <data name="App_ShutdownFailed" xml:space="preserve"><value>Media Lock could not shut down cleanly.</value></data>
   <data name="App_ShutdownErrorTitle" xml:space="preserve"><value>Media Lock shutdown error</value></data>
   <data name="App_ShutdownAggregate" xml:space="preserve"><value>One or more Media Lock resources failed to shut down.</value></data>
   <data name="Main_RoutingStatus" xml:space="preserve"><value>Routing status</value></data>
@@ -23,7 +20,6 @@
   <data name="Main_KeepPlaying" xml:space="preserve"><value>Keep Playing</value></data>
   <data name="Main_KeepPlayingAutomation" xml:space="preserve"><value>Keep the current media target playing</value></data>
   <data name="Main_KeepPlayingSuspended" xml:space="preserve"><value>Waiting for the locked media target to return.</value></data>
-  <data name="Main_KeepPlayingFailed" xml:space="preserve"><value>Playback could not be confirmed after two corrections. Turn this off or play the target before enabling it again.</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>Open Media Lock settings</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ Settings</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock error</value></data>
@@ -75,9 +71,6 @@
   <data name="Target_WindowsUnavailable" xml:space="preserve"><value>Windows Current Session is unavailable.</value></data>
   <data name="Target_RulesUnavailable" xml:space="preserve"><value>No Priority Rule or Windows Current Session is available.</value></data>
   <data name="Target_LockedUnavailable" xml:space="preserve"><value>Locked Target is unavailable.</value></data>
-  <data name="Error_CommandNotCompleted" xml:space="preserve"><value>Media command was not completed: {0}.</value></data>
-  <data name="Error_SeekNotConfirmed" xml:space="preserve"><value>The requested playback position was not confirmed.</value></data>
-  <data name="Error_SeekInterrupted" xml:space="preserve"><value>Seeking was interrupted because the media target changed or became unavailable.</value></data>
   <data name="Media_UnknownTitle" xml:space="preserve"><value>Unknown title</value></data>
   <data name="Media_UnknownArtist" xml:space="preserve"><value>Unknown artist</value></data>
   <data name="Playback_Unknown" xml:space="preserve"><value>Unknown</value></data>
@@ -112,7 +105,6 @@
   <data name="Settings_StartupMode" xml:space="preserve"><value>Startup routing mode</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>Recovery timeout (seconds)</value></data>
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>Recovery timeout in seconds</value></data>
-  <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>Enter a finite number from 0 to 300.</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>Fallback policy</value></data>
   <data name="Settings_RoutingHelp" xml:space="preserve"><value>Startup follows the last routing choice made on the main window. Recovery and Priority Rule changes apply immediately after you save. Priority Rules use the first available enabled application, then Windows Current Session. App Lock restores a saved source application; Session Lock restores only one unambiguous Session match.</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>Application Priority Rules</value></data>
@@ -143,14 +135,11 @@
   <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>Intercept global media keys</value></data>
   <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>Route global media keys through Media Lock</value></data>
   <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>Media key interception unavailable</value></data>
-  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock could not start global media-key interception. Media controls in the app remain available, but physical media keys will be handled by Windows.</value></data>
-  <data name="App_MediaInputStopped" xml:space="preserve"><value>Global media-key interception encountered an error. Physical media keys may be handled by Windows until Media Lock is restarted.</value></data>
   <data name="Settings_ReleasePrerelease" xml:space="preserve"><value>Prerelease</value></data>
   <data name="Settings_ReleaseStable" xml:space="preserve"><value>Stable release</value></data>
   <data name="Settings_SignatureSigned" xml:space="preserve"><value>Signed</value></data>
   <data name="Settings_SignatureUnsigned" xml:space="preserve"><value>Unsigned</value></data>
   <data name="Settings_DiagnosticsCopied" xml:space="preserve"><value>Diagnostics copied. Review the text before sharing it.</value></data>
-  <data name="Settings_SupportActionFailed" xml:space="preserve"><value>Could not complete the support action: {0}</value></data>
   <data name="Settings_AboutDiagnostics" xml:space="preserve"><value>About and diagnostics</value></data>
   <data name="Settings_AboutDescription" xml:space="preserve"><value>Check this installation and open the resources needed for troubleshooting.</value></data>
   <data name="Settings_Version" xml:space="preserve"><value>Version</value></data>
@@ -166,15 +155,50 @@
   <data name="Settings_ReportBug" xml:space="preserve"><value>Report a bug</value></data>
   <data name="Settings_ReportBugAutomation" xml:space="preserve"><value>Open the Media Lock bug report form</value></data>
   <data name="Main_KeepPlayingReleased" xml:space="preserve"><value>Keep Playing was turned off after repeated pause requests.</value></data>
-  <data name="Main_NotificationSoundFailed" xml:space="preserve"><value>The notification sound could not be played: {0}</value></data>
   <data name="Settings_PlaybackStateLock" xml:space="preserve"><value>Playback State Lock</value></data>
   <data name="Settings_RepeatedPauseOverride" xml:space="preserve"><value>Allow repeated pause requests to turn off Keep Playing</value></data>
   <data name="Settings_RepeatedPauseWindow" xml:space="preserve"><value>Time window (seconds)</value></data>
   <data name="Settings_RepeatedPauseWindowAutomation" xml:space="preserve"><value>Repeated pause time window in seconds</value></data>
-  <data name="Settings_RepeatedPauseWindowValidation" xml:space="preserve"><value>Enter a whole number from 1 to 60.</value></data>
   <data name="Settings_RepeatedPauseCount" xml:space="preserve"><value>Pause requests</value></data>
   <data name="Settings_RepeatedPauseCountAutomation" xml:space="preserve"><value>Number of repeated pause requests</value></data>
-  <data name="Settings_RepeatedPauseCountValidation" xml:space="preserve"><value>Enter a whole number from 2 to 10.</value></data>
   <data name="Settings_RepeatedPauseSound" xml:space="preserve"><value>Play a notification sound when Keep Playing turns off</value></data>
   <data name="Settings_RepeatedPauseHelp" xml:space="preserve"><value>Only distinct Playing-to-Paused transitions count. Buffering, recovery, target changes, Media Lock commands, and lock-screen pause requests do not count.</value></data>
+  <data name="Problem_Unknown" xml:space="preserve"><value>An unexpected Media Lock error occurred. Try again.</value></data>
+  <data name="Problem_StartupFailed" xml:space="preserve"><value>Media Lock could not start. Restart the app; if this continues, report this code.</value></data>
+  <data name="Problem_ShutdownFailed" xml:space="preserve"><value>Media Lock could not shut down cleanly. Close any remaining process before restarting.</value></data>
+  <data name="Problem_ApplicationOperationFailed" xml:space="preserve"><value>Media Lock could not complete this action. Try again.</value></data>
+  <data name="Problem_SettingsLoadFailed" xml:space="preserve"><value>Settings could not be read, so safe defaults are active. Review Settings before saving.</value></data>
+  <data name="Problem_RuntimeStateLoadFailed" xml:space="preserve"><value>The previous runtime state could not be read. Windows Auto is active.</value></data>
+  <data name="Problem_DefaultSessionLockTargetInvalid" xml:space="preserve"><value>The saved Session Lock target is no longer valid. Windows Auto is active; select a target and lock it again.</value></data>
+  <data name="Problem_DefaultAppLockTargetInvalid" xml:space="preserve"><value>The saved App Lock target is no longer valid. Windows Auto is active; select an application and lock it again.</value></data>
+  <data name="Problem_SessionLockPersistenceUnavailable" xml:space="preserve"><value>Session Lock cannot be restored because runtime-state persistence is unavailable. Windows Auto is active.</value></data>
+  <data name="Problem_AppLockPersistenceUnavailable" xml:space="preserve"><value>App Lock cannot be restored because runtime-state persistence is unavailable. Windows Auto is active.</value></data>
+  <data name="Problem_RuntimeStatePersistenceUnavailable" xml:space="preserve"><value>Runtime-state persistence is unavailable, so the startup routing mode was not changed.</value></data>
+  <data name="Problem_StartupRoutingModeSaveFailed" xml:space="preserve"><value>The routing mode changed for this run, but the startup choice could not be saved. Review Settings and try again.</value></data>
+  <data name="Problem_RuntimeStateSaveFailed" xml:space="preserve"><value>The runtime state could not be saved. Your current routing state may not be restored after restart.</value></data>
+  <data name="Problem_LoginStartupMonitoringUnavailable" xml:space="preserve"><value>Start-with-Windows monitoring is unavailable. Review that setting before relying on it.</value></data>
+  <data name="Problem_CatalogStopped" xml:space="preserve"><value>The media catalog stopped unexpectedly. Resume Windows or restart Media Lock to retry.</value></data>
+  <data name="Problem_CatalogUnavailable" xml:space="preserve"><value>The media catalog is unavailable. Resume Windows or restart Media Lock to retry.</value></data>
+  <data name="Problem_CatalogTransitionFailed" xml:space="preserve"><value>Media Lock could not update the unavailable catalog state. Restart Media Lock.</value></data>
+  <data name="Problem_CommandFailed" xml:space="preserve"><value>The media command failed. Check the locked target and try again.</value></data>
+  <data name="Problem_CommandRejected" xml:space="preserve"><value>The media target rejected the command. Control the target directly, then try again.</value></data>
+  <data name="Problem_CommandOutcomeUnknown" xml:space="preserve"><value>Media Lock could not confirm whether the command completed. Check the target before trying again.</value></data>
+  <data name="Problem_CommandUnsupported" xml:space="preserve"><value>The selected media target does not support this command.</value></data>
+  <data name="Problem_CommandTargetUnavailable" xml:space="preserve"><value>The selected media target is unavailable. Select or restore the target, then try again.</value></data>
+  <data name="Problem_SeekTimelineUnavailable" xml:space="preserve"><value>The selected media target does not provide a seekable timeline.</value></data>
+  <data name="Problem_SeekOutOfRange" xml:space="preserve"><value>The requested position is outside the media timeline.</value></data>
+  <data name="Problem_SeekNotConfirmed" xml:space="preserve"><value>The requested playback position was not confirmed. Check the media page or app.</value></data>
+  <data name="Problem_SeekInterrupted" xml:space="preserve"><value>Seeking was interrupted because the media target changed or became unavailable.</value></data>
+  <data name="Problem_SettingsSaveFailed" xml:space="preserve"><value>Settings could not be saved. Review the values and try again.</value></data>
+  <data name="Problem_SettingsPresentationApplyFailed" xml:space="preserve"><value>The language or theme could not be applied. The previous presentation was restored.</value></data>
+  <data name="Problem_SupportActionFailed" xml:space="preserve"><value>The support action could not be completed. Try again or open the destination manually.</value></data>
+  <data name="Problem_RecoveryTimeoutInvalid" xml:space="preserve"><value>Enter a finite recovery timeout from 0 to 300 seconds.</value></data>
+  <data name="Problem_RepeatedPauseWindowInvalid" xml:space="preserve"><value>Enter a whole-number repeated-pause window from 1 to 60 seconds.</value></data>
+  <data name="Problem_RepeatedPauseCountInvalid" xml:space="preserve"><value>Enter a repeated-pause count from 2 to 10.</value></data>
+  <data name="Problem_NotificationSoundFailed" xml:space="preserve"><value>The notification sound could not be played. Media control remains available.</value></data>
+  <data name="Problem_DiagnosticLoggingUnavailable" xml:space="preserve"><value>Diagnostic logging is unavailable. Media control remains available.</value></data>
+  <data name="Problem_MediaInputStartupFailed" xml:space="preserve"><value>Global media-key interception could not start. In-app controls remain available, but Windows will handle physical media keys.</value></data>
+  <data name="Problem_MediaInputStopped" xml:space="preserve"><value>Global media-key interception stopped. In-app controls remain available, but Windows will handle physical media keys.</value></data>
+  <data name="Problem_TargetAuthorizationRevokeFailed" xml:space="preserve"><value>Browser target access could not be revoked. Reload the Extension and try again.</value></data>
+  <data name="Problem_PlaybackCorrectionFailed" xml:space="preserve"><value>Playback could not be confirmed after two corrections. Turn Keep Playing off or play the target before enabling it again.</value></data>
 </root>

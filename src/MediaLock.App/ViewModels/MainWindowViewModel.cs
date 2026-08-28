@@ -48,9 +48,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private bool selectionRecoveryPending;
     private bool projectingSelection;
     private bool changingMediaSourceSelection;
-    private string? errorMessage;
-    private string? presentedApplicationError;
-    private string? dismissedApplicationError;
+    private MediaLockProblem? errorProblem;
+    private MediaLockProblem? presentedApplicationProblem;
+    private MediaLockProblem? dismissedApplicationProblem;
     private bool releasedPlaybackStateLockNoticeVisible;
     private CancellationTokenSource? playbackStateLockNoticeCancellation;
     private bool disposed;
@@ -95,9 +95,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         });
         DismissErrorCommand = new AsyncCommand(_ =>
         {
-            dismissedApplicationError = presentedApplicationError;
-            presentedApplicationError = null;
-            errorMessage = null;
+            dismissedApplicationProblem = presentedApplicationProblem;
+            presentedApplicationProblem = null;
+            errorProblem = null;
             OnPropertyChanged(nameof(HasError));
             OnPropertyChanged(nameof(ErrorMessage));
             return Task.CompletedTask;
@@ -310,7 +310,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         _ when releasedPlaybackStateLockNoticeVisible => UiText.Get("Main_KeepPlayingReleased"),
         PlaybackStateLockStatus.Suspended => UiText.Get("Main_KeepPlayingSuspended"),
-        PlaybackStateLockStatus.Failed => UiText.Get("Main_KeepPlayingFailed"),
+        PlaybackStateLockStatus.Failed when playbackStateLock.Problem is { } problem =>
+            ProblemPresentation.Describe(problem),
         _ => string.Empty,
     };
 
@@ -448,9 +449,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public bool HasError => errorMessage is not null;
+    public bool HasError => errorProblem is not null;
 
-    public string? ErrorMessage => errorMessage;
+    public string? ErrorMessage => errorProblem is null
+        ? null
+        : ProblemPresentation.Describe(errorProblem);
 
     public void RefreshTimeline()
     {
@@ -459,7 +462,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             timeProvider.GetUtcNow() - pending.RequestedAt >= SeekConfirmationTimeout)
         {
             pendingSeek = null;
-            SetError(UiText.Get("Error_SeekNotConfirmed"));
+            SetProblem(MediaLockProblem.Warning(MediaLockProblemId.SeekNotConfirmed));
         }
 
         OnPropertyChanged(nameof(NowPlayingProgress));
@@ -535,8 +538,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
                     Decision.Reason: not RouteReason.ControlRejected,
                 })
             {
-                SetError(result.Decision.Error ??
-                    UiText.Format("Error_CommandNotCompleted", result.Decision.Reason));
+                SetProblem(ProblemPresentation.FromRouteDecision(result.Decision));
             }
 
             RefreshTimeline();
@@ -665,23 +667,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             if (result.Decision.Kind == RouteDecisionKind.Failed ||
                 result.Decision.Reason == RouteReason.ControlRejected)
             {
-                SetError(result.Decision.Error ??
-                    UiText.Format("Error_CommandNotCompleted", result.Decision.Reason));
+                SetProblem(ProblemPresentation.FromRouteDecision(result.Decision));
             }
 
             return result;
         }
         catch (Exception exception)
         {
-            SetError(exception.Message);
+            SetProblem(MediaLockProblem.Error(
+                intent is ApplicationIntent.RevokeTargetAuthorization
+                    ? MediaLockProblemId.TargetAuthorizationRevokeFailed
+                    : MediaLockProblemId.ApplicationOperationFailed,
+                exception));
             return null;
         }
     }
 
-    private void SetError(string message)
+    private void SetProblem(MediaLockProblem problem)
     {
-        presentedApplicationError = null;
-        errorMessage = message;
+        presentedApplicationProblem = null;
+        errorProblem = problem;
+        _ = application.ReportProblemAsync(problem, CancellationToken.None);
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));
     }
@@ -744,30 +750,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         }
         catalogStatus = state.CatalogStatus;
         selectionBookmarkTimeout = state.Settings.Recovery?.Timeout ?? TimeSpan.FromSeconds(15);
-        var applicationError = state.ErrorMessage ??
-            (state.CatalogStatus == MediaSessionCatalogStatus.Unavailable
-                ? state.CatalogStatusMessage
-                : null);
-        if (applicationError is null)
+        var applicationProblem = state.Problem;
+        if (applicationProblem is null)
         {
-            dismissedApplicationError = null;
+            dismissedApplicationProblem = null;
         }
-        else if (dismissedApplicationError is not null &&
-            !string.Equals(
-                dismissedApplicationError,
-                applicationError,
-                StringComparison.Ordinal))
+        else if (dismissedApplicationProblem is not null &&
+            dismissedApplicationProblem.OccurrenceId != applicationProblem.OccurrenceId)
         {
-            dismissedApplicationError = null;
+            dismissedApplicationProblem = null;
         }
 
-        presentedApplicationError = string.Equals(
-            dismissedApplicationError,
-            applicationError,
-            StringComparison.Ordinal)
+        presentedApplicationProblem = dismissedApplicationProblem?.OccurrenceId ==
+            applicationProblem?.OccurrenceId
                 ? null
-                : applicationError;
-        errorMessage = presentedApplicationError;
+                : applicationProblem;
+        errorProblem = presentedApplicationProblem;
         RefreshLocalizedProjection();
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorMessage));
@@ -795,7 +793,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             }
             catch (Exception exception)
             {
-                SetError(UiText.Format("Main_NotificationSoundFailed", exception.Message));
+                SetProblem(MediaLockProblem.Warning(
+                    MediaLockProblemId.NotificationSoundFailed,
+                    exception));
             }
         }
 
@@ -918,6 +918,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(HasPlaybackStateLockNotice));
         OnPropertyChanged(nameof(IsPlaybackStateLockFailed));
         OnPropertyChanged(nameof(PlaybackStateLockNotice));
+        OnPropertyChanged(nameof(ErrorMessage));
         OnPropertyChanged(nameof(TargetDescription));
         OnPropertyChanged(nameof(CurrentTargetSourceDetails));
         OnPropertyChanged(nameof(NowPlayingTitle));
@@ -1023,7 +1024,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
             pendingSeek = null;
             if (seekWasInterrupted)
             {
-                SetError(UiText.Get("Error_SeekInterrupted"));
+                SetProblem(MediaLockProblem.Warning(MediaLockProblemId.SeekInterrupted));
             }
 
             return;
@@ -1032,7 +1033,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         if (seekPreview is { } preview && preview.Target != target.Id)
         {
             seekPreview = null;
-            SetError(UiText.Get("Error_SeekInterrupted"));
+            SetProblem(MediaLockProblem.Warning(MediaLockProblemId.SeekInterrupted));
         }
 
         if (pendingSeek is not { } pending)
@@ -1043,7 +1044,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         if (pending.Target != target.Id)
         {
             pendingSeek = null;
-            SetError(UiText.Get("Error_SeekInterrupted"));
+            SetProblem(MediaLockProblem.Warning(MediaLockProblemId.SeekInterrupted));
             return;
         }
 

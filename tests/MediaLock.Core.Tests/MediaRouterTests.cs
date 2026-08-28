@@ -1501,7 +1501,7 @@ public sealed class MediaRouterTests
 
         Assert.Equal(RouteDecisionKind.Failed, failed.Decision.Kind);
         Assert.Equal(RouteReason.ControlFailed, failed.Decision.Reason);
-        Assert.Equal("controller unavailable", failed.Decision.Error);
+        Assert.Equal(typeof(InvalidOperationException).FullName, failed.Decision.ExceptionType);
         Assert.Equal(RouteDecisionKind.Routed, later.Decision.Kind);
     }
 

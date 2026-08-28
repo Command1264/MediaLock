@@ -87,6 +87,8 @@ internal sealed class FakeMediaLockApplication : IMediaLockApplication
 
     public MediaLockApplicationState State { get; private set; }
 
+    public string? LastReportedProblemCode { get; private set; }
+
     public ValueTask StartAsync(CancellationToken cancellationToken) =>
         ValueTask.CompletedTask;
 
@@ -96,6 +98,14 @@ internal sealed class FakeMediaLockApplication : IMediaLockApplication
     {
         Intents.Add(intent);
         return ValueTask.FromResult(new ApplicationResult(State, Decision));
+    }
+
+    public ValueTask ReportProblemAsync(
+        MediaLockProblem problem,
+        CancellationToken cancellationToken)
+    {
+        LastReportedProblemCode = problem.Code;
+        return ValueTask.CompletedTask;
     }
 
     public void Publish(MediaLockApplicationState state)

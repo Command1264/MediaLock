@@ -14,6 +14,29 @@ test('Popup actions use one spaced vertical action group', async () => {
   assert.match(css, /\.actions\s*\{[^}]*flex-direction:\s*column;[^}]*gap:\s*(?:10|12)px;/s);
 });
 
+test('Browser problem codes remain unique and compatibility-stable', async () => {
+  const source = await readFile(new URL('popup.js', extensionRoot), 'utf8');
+  const codes = [...source.matchAll(/\(ML-BR-(\d{3})\)/g)]
+    .map((match) => `ML-BR-${match[1]}`)
+    .sort();
+
+  assert.deepEqual(codes, [
+    'ML-BR-000',
+    'ML-BR-001',
+    'ML-BR-002',
+    'ML-BR-003',
+    'ML-BR-004',
+    'ML-BR-005',
+    'ML-BR-006',
+    'ML-BR-007',
+    'ML-BR-008',
+    'ML-BR-009',
+    'ML-BR-010',
+    'ML-BR-011',
+  ]);
+  assert.equal(new Set(codes).size, codes.length);
+});
+
 test('opening the Popup reports an active Page Binding instead of Ready', async () => {
   const elements = createPopupElements();
   const messages = [];

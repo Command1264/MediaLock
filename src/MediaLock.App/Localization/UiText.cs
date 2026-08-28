@@ -77,6 +77,40 @@ internal static class UiText
             throw new MissingManifestResourceException($"Missing UI text resource '{key}'.");
     }
 
+    public static string? TryGetExact(string key, CultureInfo culture)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(culture);
+        var resourceCulture = culture.Name.Equals(
+            UiLanguagePreference.EnglishUnitedStates,
+            StringComparison.OrdinalIgnoreCase)
+                ? CultureInfo.InvariantCulture
+                : culture;
+        return Resources.GetResourceSet(
+            resourceCulture,
+            createIfNotExists: true,
+            tryParents: false)?.GetString(key, ignoreCase: false);
+    }
+
+    public static IReadOnlySet<string> GetExactResourceKeys(CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(culture);
+        var resourceCulture = culture.Name.Equals(
+            UiLanguagePreference.EnglishUnitedStates,
+            StringComparison.OrdinalIgnoreCase)
+                ? CultureInfo.InvariantCulture
+                : culture;
+        var set = Resources.GetResourceSet(
+            resourceCulture,
+            createIfNotExists: true,
+            tryParents: false);
+        return set is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : set.Cast<System.Collections.DictionaryEntry>()
+                .Select(entry => (string)entry.Key)
+                .ToHashSet(StringComparer.Ordinal);
+    }
+
     public static string Format(string key, params object?[] arguments) =>
         string.Format(CurrentCulture, Get(key), arguments);
 

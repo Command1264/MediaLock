@@ -4,10 +4,7 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
-  <data name="App_StartupFailed" xml:space="preserve"><value>Media Lock 無法啟動。</value></data>
   <data name="App_StartupErrorTitle" xml:space="preserve"><value>Media Lock 啟動錯誤</value></data>
-  <data name="App_CleanupAlsoFailed" xml:space="preserve"><value>清理也失敗：{0}</value></data>
-  <data name="App_ShutdownFailed" xml:space="preserve"><value>Media Lock 無法正常關閉。</value></data>
   <data name="App_ShutdownErrorTitle" xml:space="preserve"><value>Media Lock 關閉錯誤</value></data>
   <data name="App_ShutdownAggregate" xml:space="preserve"><value>一或多個 Media Lock 資源無法正常關閉。</value></data>
   <data name="Main_RoutingStatus" xml:space="preserve"><value>路由狀態</value></data>
@@ -23,7 +20,6 @@
   <data name="Main_KeepPlaying" xml:space="preserve"><value>保持播放</value></data>
   <data name="Main_KeepPlayingAutomation" xml:space="preserve"><value>讓目前媒體目標保持播放</value></data>
   <data name="Main_KeepPlayingSuspended" xml:space="preserve"><value>正在等待鎖定的媒體目標恢復。</value></data>
-  <data name="Main_KeepPlayingFailed" xml:space="preserve"><value>修正兩次後仍無法確認播放。請先關閉此功能，或播放目標後再重新啟用。</value></data>
   <data name="Main_OpenSettings" xml:space="preserve"><value>開啟 Media Lock 設定</value></data>
   <data name="Main_Settings" xml:space="preserve"><value>⚙ 設定</value></data>
   <data name="Main_Error" xml:space="preserve"><value>Media Lock 錯誤</value></data>
@@ -75,9 +71,6 @@
   <data name="Target_WindowsUnavailable" xml:space="preserve"><value>Windows 目前的工作階段無法使用。</value></data>
   <data name="Target_RulesUnavailable" xml:space="preserve"><value>沒有可用的優先規則或 Windows 目前工作階段。</value></data>
   <data name="Target_LockedUnavailable" xml:space="preserve"><value>鎖定目標無法使用。</value></data>
-  <data name="Error_CommandNotCompleted" xml:space="preserve"><value>媒體命令未完成：{0}。</value></data>
-  <data name="Error_SeekNotConfirmed" xml:space="preserve"><value>無法確認要求的播放位置。</value></data>
-  <data name="Error_SeekInterrupted" xml:space="preserve"><value>媒體目標已變更或無法使用，因此已中斷跳轉。</value></data>
   <data name="Media_UnknownTitle" xml:space="preserve"><value>未知標題</value></data>
   <data name="Media_UnknownArtist" xml:space="preserve"><value>未知演出者</value></data>
   <data name="Playback_Unknown" xml:space="preserve"><value>未知</value></data>
@@ -112,7 +105,6 @@
   <data name="Settings_StartupMode" xml:space="preserve"><value>啟動時路由模式</value></data>
   <data name="Settings_RecoveryTimeout" xml:space="preserve"><value>復原逾時（秒）</value></data>
   <data name="Settings_RecoveryTimeoutAutomation" xml:space="preserve"><value>復原逾時秒數</value></data>
-  <data name="Settings_RecoveryTimeoutValidation" xml:space="preserve"><value>請輸入 0 到 300 之間的有限數值。</value></data>
   <data name="Settings_FallbackPolicy" xml:space="preserve"><value>備援政策</value></data>
   <data name="Settings_RoutingHelp" xml:space="preserve"><value>啟動時會沿用主畫面最後選擇的路由模式。復原與優先規則變更會在儲存後立即套用。優先規則會使用第一個可用且已啟用的應用程式，否則使用 Windows 目前工作階段。應用程式鎖定會還原已儲存的來源應用程式；工作階段鎖定只會還原唯一且明確相符的工作階段。</value></data>
   <data name="Settings_PriorityRules" xml:space="preserve"><value>應用程式優先規則</value></data>
@@ -143,14 +135,11 @@
   <data name="Settings_InterceptMediaKeys" xml:space="preserve"><value>攔截全域媒體鍵</value></data>
   <data name="Settings_InterceptMediaKeysAutomation" xml:space="preserve"><value>透過 Media Lock 路由全域媒體鍵</value></data>
   <data name="App_MediaInputErrorTitle" xml:space="preserve"><value>無法使用媒體鍵攔截</value></data>
-  <data name="App_MediaInputStartupFailed" xml:space="preserve"><value>Media Lock 無法啟動全域媒體鍵攔截。應用程式內的媒體控制仍可使用，但實體媒體鍵將交由 Windows 處理。</value></data>
-  <data name="App_MediaInputStopped" xml:space="preserve"><value>全域媒體鍵攔截發生錯誤。在重新啟動 Media Lock 前，實體媒體鍵可能會交由 Windows 處理。</value></data>
   <data name="Settings_ReleasePrerelease" xml:space="preserve"><value>預發行版本</value></data>
   <data name="Settings_ReleaseStable" xml:space="preserve"><value>穩定版本</value></data>
   <data name="Settings_SignatureSigned" xml:space="preserve"><value>已簽署</value></data>
   <data name="Settings_SignatureUnsigned" xml:space="preserve"><value>未簽署</value></data>
   <data name="Settings_DiagnosticsCopied" xml:space="preserve"><value>已複製診斷摘要。分享前請先檢閱內容。</value></data>
-  <data name="Settings_SupportActionFailed" xml:space="preserve"><value>無法完成支援動作：{0}</value></data>
   <data name="Settings_AboutDiagnostics" xml:space="preserve"><value>關於與診斷</value></data>
   <data name="Settings_AboutDescription" xml:space="preserve"><value>檢查目前安裝資訊，並開啟疑難排解所需資源。</value></data>
   <data name="Settings_Version" xml:space="preserve"><value>版本</value></data>
@@ -166,15 +155,50 @@
   <data name="Settings_ReportBug" xml:space="preserve"><value>回報問題</value></data>
   <data name="Settings_ReportBugAutomation" xml:space="preserve"><value>開啟 Media Lock 問題回報表單</value></data>
   <data name="Main_KeepPlayingReleased" xml:space="preserve"><value>偵測到重複暫停要求，已關閉「保持播放」。</value></data>
-  <data name="Main_NotificationSoundFailed" xml:space="preserve"><value>無法播放提示音：{0}</value></data>
   <data name="Settings_PlaybackStateLock" xml:space="preserve"><value>播放狀態鎖定</value></data>
   <data name="Settings_RepeatedPauseOverride" xml:space="preserve"><value>允許重複暫停要求關閉「保持播放」</value></data>
   <data name="Settings_RepeatedPauseWindow" xml:space="preserve"><value>計算區間（秒）</value></data>
   <data name="Settings_RepeatedPauseWindowAutomation" xml:space="preserve"><value>重複暫停的計算區間秒數</value></data>
-  <data name="Settings_RepeatedPauseWindowValidation" xml:space="preserve"><value>請輸入 1 到 60 的整數。</value></data>
   <data name="Settings_RepeatedPauseCount" xml:space="preserve"><value>暫停次數</value></data>
   <data name="Settings_RepeatedPauseCountAutomation" xml:space="preserve"><value>重複暫停要求次數</value></data>
-  <data name="Settings_RepeatedPauseCountValidation" xml:space="preserve"><value>請輸入 2 到 10 的整數。</value></data>
   <data name="Settings_RepeatedPauseSound" xml:space="preserve"><value>關閉「保持播放」時播放提示音</value></data>
   <data name="Settings_RepeatedPauseHelp" xml:space="preserve"><value>只計算明確的「播放中 → 已暫停」轉換。緩衝、復原、目標變更、Media Lock 指令與鎖定畫面暫停均不計入。</value></data>
+  <data name="Problem_Unknown" xml:space="preserve"><value>Media Lock 發生未預期的錯誤，請再試一次。</value></data>
+  <data name="Problem_StartupFailed" xml:space="preserve"><value>Media Lock 無法啟動。請重新啟動應用程式；若持續發生，請回報此代碼。</value></data>
+  <data name="Problem_ShutdownFailed" xml:space="preserve"><value>Media Lock 無法正常關閉。再次啟動前，請先關閉仍在執行的程序。</value></data>
+  <data name="Problem_ApplicationOperationFailed" xml:space="preserve"><value>Media Lock 無法完成此操作，請再試一次。</value></data>
+  <data name="Problem_SettingsLoadFailed" xml:space="preserve"><value>無法讀取設定，因此目前使用安全預設值。儲存前請先檢查設定。</value></data>
+  <data name="Problem_RuntimeStateLoadFailed" xml:space="preserve"><value>無法讀取先前的執行期狀態，目前已使用 Windows 自動。</value></data>
+  <data name="Problem_DefaultSessionLockTargetInvalid" xml:space="preserve"><value>已儲存的工作階段鎖定目標已無效。目前已使用 Windows 自動；請重新選取並鎖定目標。</value></data>
+  <data name="Problem_DefaultAppLockTargetInvalid" xml:space="preserve"><value>已儲存的應用程式鎖定目標已無效。目前已使用 Windows 自動；請重新選取並鎖定應用程式。</value></data>
+  <data name="Problem_SessionLockPersistenceUnavailable" xml:space="preserve"><value>執行期狀態持久化無法使用，因此不能復原工作階段鎖定。目前已使用 Windows 自動。</value></data>
+  <data name="Problem_AppLockPersistenceUnavailable" xml:space="preserve"><value>執行期狀態持久化無法使用，因此不能復原應用程式鎖定。目前已使用 Windows 自動。</value></data>
+  <data name="Problem_RuntimeStatePersistenceUnavailable" xml:space="preserve"><value>執行期狀態持久化無法使用，因此沒有變更啟動時的路由模式。</value></data>
+  <data name="Problem_StartupRoutingModeSaveFailed" xml:space="preserve"><value>本次執行的路由模式已變更，但無法儲存啟動選項。請檢查設定後再試一次。</value></data>
+  <data name="Problem_RuntimeStateSaveFailed" xml:space="preserve"><value>無法儲存執行期狀態。重新啟動後，可能無法復原目前的路由狀態。</value></data>
+  <data name="Problem_LoginStartupMonitoringUnavailable" xml:space="preserve"><value>「隨 Windows 啟動」監控無法使用。依賴此功能前，請先檢查該設定。</value></data>
+  <data name="Problem_CatalogStopped" xml:space="preserve"><value>媒體目錄非預期停止。請喚醒 Windows 或重新啟動 Media Lock 後再試。</value></data>
+  <data name="Problem_CatalogUnavailable" xml:space="preserve"><value>媒體目錄目前無法使用。請喚醒 Windows 或重新啟動 Media Lock 後再試。</value></data>
+  <data name="Problem_CatalogTransitionFailed" xml:space="preserve"><value>Media Lock 無法更新媒體目錄的不可用狀態，請重新啟動 Media Lock。</value></data>
+  <data name="Problem_CommandFailed" xml:space="preserve"><value>媒體命令失敗。請檢查鎖定目標後再試一次。</value></data>
+  <data name="Problem_CommandRejected" xml:space="preserve"><value>媒體目標拒絕此命令。請先直接操作目標，再試一次。</value></data>
+  <data name="Problem_CommandOutcomeUnknown" xml:space="preserve"><value>Media Lock 無法確認命令是否完成。再次操作前，請先檢查目標。</value></data>
+  <data name="Problem_CommandUnsupported" xml:space="preserve"><value>選取的媒體目標不支援此命令。</value></data>
+  <data name="Problem_CommandTargetUnavailable" xml:space="preserve"><value>選取的媒體目標無法使用。請選取或復原目標後再試一次。</value></data>
+  <data name="Problem_SeekTimelineUnavailable" xml:space="preserve"><value>選取的媒體目標沒有提供可跳轉的時間軸。</value></data>
+  <data name="Problem_SeekOutOfRange" xml:space="preserve"><value>要求的位置超出媒體時間軸範圍。</value></data>
+  <data name="Problem_SeekNotConfirmed" xml:space="preserve"><value>無法確認要求的播放位置。請檢查媒體頁面或應用程式。</value></data>
+  <data name="Problem_SeekInterrupted" xml:space="preserve"><value>媒體目標已變更或無法使用，因此已中斷跳轉。</value></data>
+  <data name="Problem_SettingsSaveFailed" xml:space="preserve"><value>無法儲存設定。請檢查輸入值後再試一次。</value></data>
+  <data name="Problem_SettingsPresentationApplyFailed" xml:space="preserve"><value>無法套用語言或主題，已復原先前的顯示設定。</value></data>
+  <data name="Problem_SupportActionFailed" xml:space="preserve"><value>無法完成支援操作。請再試一次，或手動開啟目的地。</value></data>
+  <data name="Problem_RecoveryTimeoutInvalid" xml:space="preserve"><value>請輸入 0 到 300 秒之間的有限復原逾時值。</value></data>
+  <data name="Problem_RepeatedPauseWindowInvalid" xml:space="preserve"><value>請輸入 1 到 60 秒之間的整數重複暫停計算區間。</value></data>
+  <data name="Problem_RepeatedPauseCountInvalid" xml:space="preserve"><value>請輸入 2 到 10 之間的重複暫停次數。</value></data>
+  <data name="Problem_NotificationSoundFailed" xml:space="preserve"><value>無法播放提示音，但媒體控制仍可使用。</value></data>
+  <data name="Problem_DiagnosticLoggingUnavailable" xml:space="preserve"><value>診斷紀錄無法使用，但媒體控制仍可使用。</value></data>
+  <data name="Problem_MediaInputStartupFailed" xml:space="preserve"><value>無法啟動全域媒體鍵攔截。應用程式內控制仍可使用，但實體媒體鍵將交由 Windows 處理。</value></data>
+  <data name="Problem_MediaInputStopped" xml:space="preserve"><value>全域媒體鍵攔截已停止。應用程式內控制仍可使用，但實體媒體鍵將交由 Windows 處理。</value></data>
+  <data name="Problem_TargetAuthorizationRevokeFailed" xml:space="preserve"><value>無法撤銷瀏覽器目標存取。請重新載入擴充功能後再試一次。</value></data>
+  <data name="Problem_PlaybackCorrectionFailed" xml:space="preserve"><value>修正兩次後仍無法確認播放。請關閉「保持播放」，或播放目標後再重新啟用。</value></data>
 </root>

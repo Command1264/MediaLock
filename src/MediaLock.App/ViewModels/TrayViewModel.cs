@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.Application;
 using MediaLock.Core.Media;
 using MediaLock.Core.Routing;
@@ -12,7 +13,7 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
     private string statusText;
-    private string? errorMessage;
+    private MediaLockProblem? errorProblem;
     private bool disposed;
 
     public TrayViewModel(
@@ -83,20 +84,9 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
 
     public IAsyncCommand ExitCommand { get; }
 
-    public string? ErrorMessage
-    {
-        get => errorMessage;
-        private set
-        {
-            if (errorMessage == value)
-            {
-                return;
-            }
-
-            errorMessage = value;
-            OnPropertyChanged();
-        }
-    }
+    public string? ErrorMessage => errorProblem is null
+        ? null
+        : ProblemPresentation.Describe(errorProblem);
 
     public void Dispose()
     {
@@ -117,12 +107,17 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
     {
         try
         {
-            await application.DispatchAsync(intent, CancellationToken.None);
-            ErrorMessage = null;
+            var result = await application.DispatchAsync(intent, CancellationToken.None);
+            SetProblem(result.Decision.Kind == RouteDecisionKind.Failed ||
+                result.Decision.Reason == RouteReason.ControlRejected
+                    ? ProblemPresentation.FromRouteDecision(result.Decision)
+                    : null);
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            SetProblem(MediaLockProblem.Error(
+                MediaLockProblemId.ApplicationOperationFailed,
+                exception));
         }
     }
 
@@ -147,11 +142,26 @@ public sealed class TrayViewModel : INotifyPropertyChanged, IDisposable
         if (synchronizationContext is not null &&
             SynchronizationContext.Current != synchronizationContext)
         {
-            synchronizationContext.Post(_ => StatusText = next, null);
+            synchronizationContext.Post(_ =>
+            {
+                StatusText = next;
+                OnPropertyChanged(nameof(ErrorMessage));
+            }, null);
             return;
         }
 
         StatusText = next;
+        OnPropertyChanged(nameof(ErrorMessage));
+    }
+
+    private void SetProblem(MediaLockProblem? problem)
+    {
+        errorProblem = problem;
+        if (problem is not null)
+        {
+            _ = application.ReportProblemAsync(problem, CancellationToken.None);
+        }
+        OnPropertyChanged(nameof(ErrorMessage));
     }
 
     private static string Describe(MediaLockApplicationState state) => state.CatalogStatus switch

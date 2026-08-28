@@ -132,6 +132,14 @@ Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English
 successful Settings save across the existing WPF windows, notification-area surface and presentation projections.
 Language choices display `English` and `繁體中文` as language-native names regardless of the current UI culture.
 
+Every known user-facing warning or error resolves from one structured semantic problem rather than raw English or an
+exception message. It displays one stable public `ML-*` code and actionable copy in the active English or Traditional
+Chinese language. A visible problem re-renders immediately after a successful language change. Logs and the
+privacy-safe diagnostic summary carry the same latest reported code; bounded technical context is limited to non-private categories
+such as exception type. Missing locale text falls back to English without changing the code, and unknown failures use
+an identifiable localized fallback. The public catalog and compatibility policy are in
+[Media Lock error codes](error-codes.md).
+
 The desktop settings also persist a WPF client-area theme preference: Windows theme, Light or Dark. Windows-theme
 selection reads the current Windows app-theme preference at startup and reacts to later Windows preference changes.
 A successful Settings save applies the selected theme immediately; a failed save leaves the current theme unchanged.
@@ -385,8 +393,8 @@ reopening the Popup preserves Authorized for the same live document. Popup label
 UI language, with English fallback and a Traditional Chinese locale; its two authorization actions remain vertically
 separated rather than collapsing into adjacent controls. Internal Extension error identifiers are never shown as the
 primary prose. Known failures resolve to localized, actionable English／Traditional Chinese text and one stable
-`ML-BR-*` support code; unknown failures use an identifiable localized fallback. This Browser Integration subset does
-not mark the application-wide Phase 17 warning and error contract complete.
+`ML-BR-*` support code; unknown failures use an identifiable localized fallback. This earlier Browser Integration
+subset remains compatibility-stable under the application-wide Phase 17 warning and error contract.
 The generic direct target also exposes Toggle Play／Pause: execution reads the exact bound media element's live paused
 state and performs one explicit Play or Pause. This enables the existing UI toggle and provider-neutral physical
 media-key path without adding generic Previous, Next or Stop semantics that `HTMLMediaElement` does not define.
