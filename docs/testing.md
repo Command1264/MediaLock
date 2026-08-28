@@ -104,6 +104,31 @@ exception messages.
 Browser Extension coverage keeps `ML-BR-000` through `ML-BR-011` unique and localized; desktop Browser codes begin at
 `ML-BR-012`. The full gate must prove routing, Recovery and persistence behavior remains unchanged.
 
+Phase 18 tests the Playback Rate Estimator at its public Core Interface with a fake monotonic `TimeProvider` and no
+wall-clock sleeps. RED cases first distinguish missing from explicitly reported 1×, then cover authoritative finite
+reported values, 0.5×／1×／1.5×／2× convergence, insufficient samples, duplicate and reversed timestamps, position
+quantization, jitter, outliers, accepted-rate bounds, bounded memory and continuous 1×→2×→0.5× changes with hysteresis.
+Every discontinuity row—Seek, Pause, Stop, Changing, Recovery, reconnect, invalid bounds, position jump, target removal
+and document／target replacement—must lose confidence before later samples can establish a new estimate.
+
+Application tests feed independent same-title GSMTC and Browser targets through one catalog projection and prove their
+samples never mix. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
+confident estimate or 1× fallback. ViewModel tests use the projected Effective Playback Rate and monotonic anchor,
+clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. Existing Router,
+Recovery, persistence and exactly-once command tests remain unchanged.
+
+Manual Phase 18 acceptance contains exactly six numbered rows, and every guided result reports `目前第 N／6 項`:
+
+1. 1× baseline slider and `mm:ss` cadence;
+2. 2× playback over a measured interval;
+3. continuous 1×→2×→0.5× changes without stale-rate drift;
+4. external Pause／Play and Seek reset behavior;
+5. reload／replacement plus competing YouTube Music isolation; and
+6. English／Traditional Chinese and Light／Dark visual parity for rate source, slider and labels.
+
+Automated estimator tests remain the acceptance authority when no real provider can reproducibly omit its reported
+rate; manual rows evaluate visible cadence and integration, not internal confidence math.
+
 Phase 7B tests theme-preference validation, schema-v4 migration, Windows-theme and DWM-frame mapping, Settings choices,
 successful-save application, failed-save suppression, Cancel discard behavior and the fixed frameless Settings
 contract. Build-time XAML compilation covers both palette and shared control dictionaries. A manual WPF smoke test

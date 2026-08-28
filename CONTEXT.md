@@ -14,6 +14,22 @@ Router 在單次 Route Decision 中可解析並控制的 provider-qualified 目�
 Browser Media Target 提供。它不是需要跨失效狀態保存的 Locked Target。
 _Avoid_: Player, Locked Target, generic Media Session
 
+**Reported Playback Rate**:
+provider 對目前 Media Target 明確回報、經有限值與產品範圍驗證後可直接使用的播放倍率。缺失、非有限值或
+範圍外數值都不是 1× 的同義詞。
+_Avoid_: Playback Rate, default rate
+
+**Effective Playback Rate**:
+目前時間軸投影使用的播放倍率；依序取自有效的 Reported Playback Rate、具足夠信心的 Playback Rate
+Estimate，或中性的 1× fallback。它只影響 presentation，不參與 Route Decision、Recovery、Media Target
+identity 或 persistence。
+_Avoid_: Reported Playback Rate, routing rate
+
+**Playback Rate Estimate**:
+同一 Media Target 在連續 Playing 觀測中的位置差與單調時間差所形成、帶來源與信心的短生命週期倍率推算。
+Seek、非 Playing 狀態、Recovery、重新連線、文件／目標更換或位置不連續會使既有 estimate 失效。
+_Avoid_: saved speed, UI interpolation rate
+
 **Authoritative Media Target Correlation**:
 provider 對一個 Browser Media Target 與一個 GSMTC Media Target 是同一播放來源所提出的精確證據。
 只有此證據可以在可見 target projection 中隱藏該 GSMTC duplicate；瀏覽器 executable、title、URL、

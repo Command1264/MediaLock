@@ -322,6 +322,36 @@ non-playing states remain at the observed position, and all values clamp to vali
 timer only requests property refresh; it never writes an estimated position into Core, dispatches routing intents or
 survives the window lifetime. Seek remains outside the command model until separate hardware/player evidence exists.
 
+Phase 18 generalizes that boundary to every provider-neutral Media Target and separates raw observation from projected
+presentation:
+
+```text
+provider snapshots + monotonic timestamp
+                  │
+                  ▼
+ Application catalog observation
+                  │
+                  ▼
+ Core Playback Rate Estimator ──▶ Effective Playback Rate + source + confidence
+                  │
+                  ▼
+ Application target projection ──▶ WPF timeline interpolation
+```
+
+`PlaybackRateEstimator` is one pure in-process Core Module with a small concrete Interface; a single implementation
+does not justify an `I*` abstraction or Adapter. Each observation carries a provider-qualified `MediaTargetId`, raw
+timeline, playback state, monotonic timestamp and optional Reported Playback Rate. The Module owns per-target rolling
+samples, robust slope calculation, confidence, hysteresis, numerical tolerances and bounded state retention. It never
+accepts a WPF-interpolated position.
+
+Application supplies timestamps from `TimeProvider.GetTimestamp()`, projects the resolved Effective Playback Rate and
+forgets estimator state when a target leaves the catalog. A valid reported value is authoritative. Missing or invalid
+values may use a confident estimate; otherwise the result is the 1× fallback. Seek, non-Playing state, Recovery,
+reconnect, invalid bounds, target／document replacement, non-monotonic time and discontinuous position reset the affected
+target before later samples can regain confidence. Reset and projection do not alter Router state, Media Target identity,
+command capability, Recovery correlation or persisted schemas. See
+[ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).
+
 Phase 8A keeps Seek inside the disposable Probe. A small immutable request parses invariant seconds and validates the
 absolute position against the selected live Session's current timeline before the Probe calls
 `TryChangePlaybackPositionAsync(TimeSpan.Ticks)`. The Probe reports capability, API acceptance and observed position as
