@@ -9,6 +9,17 @@
     let boundEndpoint;
     let detachObservation = () => {};
 
+    const currentCapabilities = () => {
+      const capabilities = ['pause', 'play', 'toggle'];
+      if (typeof isSeekAllowed === 'function'
+          && Number.isFinite(boundEndpoint.media.duration)
+          && Number.isSafeInteger(boundEndpoint.media.seekable?.length)
+          && boundEndpoint.media.seekable.length > 0) {
+        capabilities.push('seek');
+      }
+      return Object.freeze(capabilities);
+    };
+
     const createPresentation = () => {
       const timeline = Number.isFinite(boundEndpoint.media.duration)
         && boundEndpoint.media.duration > 0
@@ -27,7 +38,7 @@
           || 'Authorized web media',
         playbackStatus: boundEndpoint.media.paused ? 'paused' : 'playing',
         playbackRate: normalizePlaybackRate(boundEndpoint.media.playbackRate),
-        capabilities: boundEndpoint.capabilities,
+        capabilities: currentCapabilities(),
         observedAt: new Date().toISOString(),
         timeline,
       });
@@ -49,18 +60,10 @@
           };
         }
 
-        const capabilities = ['pause', 'play', 'toggle'];
-        if (typeof isSeekAllowed === 'function'
-            && Number.isFinite(candidates[0].duration)
-            && Number.isSafeInteger(candidates[0].seekable?.length)
-            && candidates[0].seekable.length > 0) {
-          capabilities.push('seek');
-        }
         detachObservation();
         boundEndpoint = Object.freeze({
           endpointId: createEndpointId(),
           media: candidates[0],
-          capabilities: Object.freeze(capabilities),
         });
         detachObservation = observeMedia(
           boundEndpoint,
@@ -70,7 +73,7 @@
         return Object.freeze({
           accepted: true,
           endpointId: boundEndpoint.endpointId,
-          capabilities: boundEndpoint.capabilities,
+          capabilities: currentCapabilities(),
           presentation: createPresentation(),
         });
       },
@@ -79,7 +82,7 @@
         if (!boundEndpoint
             || endpointId !== boundEndpoint.endpointId
             || boundEndpoint.media.isConnected !== true
-            || !boundEndpoint.capabilities.includes(command?.name)) {
+            || !currentCapabilities().includes(command?.name)) {
           return { accepted: false, errorCode: 'media-element-unavailable' };
         }
 
@@ -173,11 +176,13 @@
       endpoint.media.addEventListener(eventName, publishImmediate);
     }
     endpoint.media.addEventListener('timeupdate', publishTimeline);
+    endpoint.media.addEventListener('progress', publishTimeline);
     return () => {
       for (const eventName of immediateEvents) {
         endpoint.media.removeEventListener(eventName, publishImmediate);
       }
       endpoint.media.removeEventListener('timeupdate', publishTimeline);
+      endpoint.media.removeEventListener('progress', publishTimeline);
       if (timelineTimer !== undefined) {
         clearTimeout(timelineTimer);
       }

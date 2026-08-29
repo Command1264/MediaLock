@@ -35,6 +35,14 @@ the predecessor's lock. Native port disconnect consumes Chromium's scoped `runti
 state without disconnecting the already-closed port again and still reports an unavailable Host through the Popup
 authorization result.
 
+Capabilities in those snapshots are re-evaluated from the exact live Endpoint. A finite seekable range that appears
+after initial binding updates the registry's command gate before publication, so stale identity cannot gain control.
+The Extension requests `alarms` only to recover optional Native Host availability when an already-authorized browser
+page precedes Media Lock startup. One serialized monitor revalidates the exact completed HTTPS document and retained
+site permission, uses capped 1／2／5／10／30-second backoff with a Manifest V3 alarm wake-up, and stops after connection
+or when no eligible trusted page remains. It never retries a media command, broadens host permission, auto-selects a
+replacement target or satisfies the predecessor's lock.
+
 The candidate registration script writes only the exact current-user Chrome-compatible Native Messaging value and
 uses a content-addressed Host output. Unregistration removes only a value that still points to its exact owned
 manifest. Chrome and Brave share this one verified registry seam. The files remain unsigned and same-user replacement
