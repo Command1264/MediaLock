@@ -2,7 +2,7 @@
 
 Issue: [#65](https://github.com/Command1264/MediaLock/issues/65)
 
-Status: implementation candidate in validation; not yet merged.
+Status: implementation and exact-candidate acceptance complete on 2026-08-30; not yet merged.
 
 ## Goal and boundary
 
@@ -113,3 +113,6 @@ Media Command. Unexpected implementation exceptions remain ordinary structured A
 Phase 18 is complete only when all Issue #65 acceptance cases pass deterministically, full relevant regressions pass,
 the six manual rows are recorded, documentation matches final thresholds, and no Critical／High review finding remains.
 Implementation, push, PR and merge each retain their normal approval boundaries.
+
+The exact candidate and six-row result are recorded in
+[Phase 18 playback-rate estimation smoke](playback-rate-estimation-smoke.md).
