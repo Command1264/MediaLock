@@ -703,6 +703,25 @@ mandatory because the no-Extension composition must preserve every GSMTC test. M
 named lanes in that runbook; Probe results do not transfer. Until those rows pass, the candidate must not be described
 as packaged, distributed or production-qualified.
 
+### Phase 19 installed Browser Integration lifecycle
+
+Phase 19 tests installed ownership through the installation Module Interface rather than asserting directly on
+installer script internals. Deterministic coverage supplies isolated filesystem and registry adapters for Absent,
+Owned Current, Owned Stale, Owned Damaged and Foreign states; Ensure and Remove Owned must be idempotent, path-safe and
+atomic from the caller's perspective. A foreign, development or portable registration is preserved byte-for-byte.
+
+The packaging gate binds `MediaLock.exe`, the self-contained Browser Host, fixed configuration and Extension files to
+one source identity. Fresh install, repair, forward upgrade, rejected downgrade, cancellation and uninstall run in a
+clean supported Windows environment. The Host must start without a separately installed .NET runtime. Uninstall must
+remove the exact owned registration while preserving settings, browser-owned permission state and any replacement
+foreign registration.
+
+Every exact candidate repeats two independent compatibility lanes: no Extension installed retains the complete GSMTC
+suite without a blocking Browser prompt, while the manually enabled bundled Extension launches the installed Host and
+passes exact Browser Session Lock Play／Pause／Toggle／Seek, reconnect, target-loss and competitor-isolation checks.
+Development registration-script evidence does not qualify the installed package. See the
+[Phase 19 plan](phase-19/installed-browser-integration-plan.md).
+
 ## 7. Manual evidence
 
 When a check cannot be automated, preserve a repeatable test record containing environment, exact steps, expected

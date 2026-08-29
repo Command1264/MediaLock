@@ -292,6 +292,14 @@ separately scoped; candidate versioning does not imply those unfinished features
 Playback State Lock and a feasibility-gated Windows Media Surface Mirror. Optional Chromium and Firefox adapters that
 correlate browser tabs with GSMTC Sessions remain later `v0.3.x` work when technically feasible.
 
+Phase 19 packages the accepted Chromium Browser Session Lock bridge for an installed candidate without expanding its
+Routing Mode semantics. The installed payload owns a self-contained Native Messaging Host, fixed-ID Extension files,
+one exact current-user registration and ownership-safe repair／upgrade／uninstall behavior. Chromium launches the Host
+on demand; the user does not separately start it. Extension installation remains an explicit browser action, while
+portable and no-Extension compositions stay fully GSMTC-capable and never claim installed-package registration.
+Store publication, silent Extension installation, Browser App Lock, Browser Priority Rules, Browser Windows Auto and
+Browser lock persistence remain later independent work.
+
 Before browser integration, Phase 7 establishes localization and visual foundations as independently reviewed
 post-RC work. Localization does not alter Session matching or routing semantics.
 
