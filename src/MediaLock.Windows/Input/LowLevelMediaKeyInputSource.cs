@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using MediaLock.Core.Diagnostics;
 using MediaLock.Core.Input;
 
 namespace MediaLock.Windows.Input;
@@ -221,7 +222,7 @@ public sealed class LowLevelMediaKeyInputSource : IMediaInputSource
         var subscribers = Faulted;
         if (subscribers is null)
         {
-            Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("input.low_level_hook", exception);
             return;
         }
 
@@ -234,7 +235,9 @@ public sealed class LowLevelMediaKeyInputSource : IMediaInputSource
             }
             catch (Exception subscriberException)
             {
-                Trace.TraceError(subscriberException.ToString());
+                BoundedDiagnosticTrace.WriteFailure(
+                    "input.low_level_hook_subscriber",
+                    subscriberException);
             }
         }
     }

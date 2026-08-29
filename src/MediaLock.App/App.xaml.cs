@@ -10,6 +10,7 @@ using MediaLock.Windows.Startup;
 using MediaLock.Windows.Gsmtc;
 using MediaLock.Windows.Diagnostics;
 using MediaLock.App.Localization;
+using MediaLock.App.Presentation;
 using MediaLock.App.Theming;
 using MediaLock.Application;
 using MediaLock.Core.Configuration;
@@ -58,7 +59,7 @@ public partial class App : System.Windows.Application
             }
             catch (Exception exception)
             {
-                System.Diagnostics.Trace.TraceError(exception.ToString());
+                BoundedDiagnosticTrace.WriteFailure("app.uninstall_cleanup", exception);
                 Shutdown(1);
             }
 
@@ -111,7 +112,7 @@ public partial class App : System.Windows.Application
             await mediaApplication.StartAsync(CancellationToken.None);
             UiText.Apply(mediaApplication.State.Settings.Desktop!.Language);
             ApplyTheme(mediaApplication.State.Settings.Desktop.Theme);
-            Exception? mediaInputStartupFailure = null;
+            MediaLockProblem? mediaInputStartupProblem = null;
             mediaInputCoordinator = new MediaInputCoordinator(
                 mediaApplication,
                 new LowLevelMediaKeyInputSource(),
@@ -123,8 +124,12 @@ public partial class App : System.Windows.Application
             }
             catch (Exception exception)
             {
-                mediaInputStartupFailure = exception;
-                await RecordMediaInputFailureAsync("input.hook.start_failed", exception);
+                mediaInputStartupProblem = AppProblemFactory.Create(
+                    AppFailureKind.MediaInputStartup,
+                    exception);
+                await RecordProblemAsync(
+                    "input.hook.start_failed",
+                    mediaInputStartupProblem);
                 mediaInputCoordinator.Faulted -= OnMediaInputFaulted;
                 await mediaInputCoordinator.DisposeAsync();
                 mediaInputCoordinator = null;
@@ -168,11 +173,11 @@ public partial class App : System.Windows.Application
                 ShowMainWindow();
             }
 
-            if (mediaInputStartupFailure is not null)
+            if (mediaInputStartupProblem is not null)
             {
                 System.Windows.MessageBox.Show(
                     window,
-                    $"{UiText.Get("App_MediaInputStartupFailed")}\n\n{mediaInputStartupFailure.Message}",
+                    ProblemPresentation.Describe(mediaInputStartupProblem),
                     UiText.Get("App_MediaInputErrorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -180,18 +185,21 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            var details = exception.Message;
+            var problem = AppProblemFactory.Create(AppFailureKind.Startup, exception);
+            await RecordProblemAsync("app.startup.failed", problem);
             try
             {
                 await ShutdownAsync();
             }
             catch (Exception cleanupException)
             {
-                details += $"\n\n{UiText.Format("App_CleanupAlsoFailed", cleanupException.Message)}";
+                await RecordProblemAsync(
+                    "app.startup.cleanup_failed",
+                    AppProblemFactory.Create(AppFailureKind.Shutdown, cleanupException));
             }
 
             System.Windows.MessageBox.Show(
-                $"{UiText.Get("App_StartupFailed")}\n\n{details}",
+                ProblemPresentation.Describe(problem),
                 UiText.Get("App_StartupErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -233,8 +241,10 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            var problem = AppProblemFactory.Create(AppFailureKind.Shutdown, exception);
+            await RecordProblemAsync("app.shutdown.failed", problem);
             System.Windows.MessageBox.Show(
-                $"{UiText.Get("App_ShutdownFailed")}\n\n{exception.Message}",
+                ProblemPresentation.Describe(problem),
                 UiText.Get("App_ShutdownErrorTitle"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -358,7 +368,12 @@ public partial class App : System.Windows.Application
 
         try
         {
-            await RecordMediaInputFailureAsync("input.hook.faulted", args.Exception);
+            var problem = AppProblemFactory.Create(
+                AppFailureKind.MediaInputStopped,
+                args.Exception);
+            await RecordProblemAsync(
+                "input.hook.faulted",
+                problem);
             await Dispatcher.InvokeAsync(() =>
             {
                 if (mediaInputFaultReported || shutdownStarted)
@@ -369,7 +384,7 @@ public partial class App : System.Windows.Application
                 mediaInputFaultReported = true;
                 System.Windows.MessageBox.Show(
                     mainWindow,
-                    $"{UiText.Get("App_MediaInputStopped")}\n\n{args.Exception.Message}",
+                    ProblemPresentation.Describe(problem),
                     UiText.Get("App_MediaInputErrorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -377,12 +392,20 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("input.hook.fault_handler", exception);
         }
     }
 
-    private async ValueTask RecordMediaInputFailureAsync(string name, Exception exception)
+    private async ValueTask RecordProblemAsync(
+        string name,
+        MediaLockProblem problem)
     {
+        if (mediaApplication is not null)
+        {
+            await mediaApplication.ReportProblemAsync(problem, CancellationToken.None);
+            return;
+        }
+
         if (diagnosticLog is null)
         {
             return;
@@ -395,14 +418,17 @@ public partial class App : System.Windows.Application
                     name,
                     new Dictionary<string, string>
                     {
-                        ["exceptionType"] = exception.GetType().FullName ?? exception.GetType().Name,
-                        ["message"] = exception.Message,
-                    }),
+                        ["exceptionType"] = problem.ExceptionType ?? "Unknown",
+                    },
+                    problem.Code),
                 CancellationToken.None);
         }
         catch (Exception diagnosticException)
         {
-            System.Diagnostics.Trace.TraceError(diagnosticException.ToString());
+            BoundedDiagnosticTrace.WriteFailure(
+                "problem.diagnostic_write",
+                diagnosticException,
+                problem.Code);
         }
     }
 
@@ -469,7 +495,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError(exception.ToString());
+            BoundedDiagnosticTrace.WriteFailure("settings.startup_sync_diagnostic", exception);
         }
     }
 

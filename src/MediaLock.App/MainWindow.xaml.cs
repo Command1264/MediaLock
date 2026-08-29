@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -25,10 +26,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         timelineTimer = new DispatcherTimer(
-            TimeSpan.FromMilliseconds(500),
+            viewModel.TimelineRefreshInterval,
             DispatcherPriority.Background,
             (_, _) => viewModel.RefreshTimeline(),
             Dispatcher);
+        viewModel.PropertyChanged += OnViewModelPropertyChanged;
         Loaded += OnLoaded;
         SourceInitialized += OnSourceInitialized;
         Closed += OnClosed;
@@ -36,6 +38,8 @@ public partial class MainWindow : Window
     }
 
     private void OnSourceInitialized(object? sender, EventArgs args) => ApplyFrameTheme();
+
+    internal TimeSpan TimelineTimerInterval => timelineTimer.Interval;
 
     private void OnLoaded(object sender, RoutedEventArgs args) => timelineTimer.Start();
 
@@ -51,6 +55,24 @@ public partial class MainWindow : Window
     }
 
     private void ApplyFrameTheme() => WindowFrameTheme.TryApply(this, UiTheme.Current);
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(MainWindowViewModel.TimelineRefreshInterval))
+        {
+            return;
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            timelineTimer.Interval = viewModel.TimelineRefreshInterval;
+            return;
+        }
+
+        Dispatcher.InvokeAsync(
+            () => timelineTimer.Interval = viewModel.TimelineRefreshInterval,
+            DispatcherPriority.Background);
+    }
 
     private void OnBrowserTargetActionsClick(object sender, RoutedEventArgs args)
     {
@@ -356,6 +378,7 @@ public partial class MainWindow : Window
         SourceInitialized -= OnSourceInitialized;
         Closed -= OnClosed;
         UiTheme.ThemeChanged -= OnThemeChanged;
+        viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     private enum SeekGestureInput

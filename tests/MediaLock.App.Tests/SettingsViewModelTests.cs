@@ -67,6 +67,24 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task CopiedDiagnosticsIncludesTheLatestReportedSurfaceProblemCode()
+    {
+        var application = new FakeApplication(MediaLockApplicationState.Initial);
+        await application.ReportProblemAsync(
+            MediaLockProblem.Error(MediaLockProblemId.SupportActionFailed),
+            CancellationToken.None);
+        var actions = new FakeDesktopSupportActions();
+        using var viewModel = new SettingsViewModel(
+            application,
+            desktopSupportActions: actions);
+
+        await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
+
+        var copied = Assert.Single(actions.Requests);
+        Assert.Contains("Problem code: ML-SET-003", copied.DiagnosticSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CopiedDiagnosticsConfirmationExpires()
     {
         var application = new FakeApplication(MediaLockApplicationState.Initial);
@@ -157,7 +175,8 @@ public sealed class SettingsViewModelTests
 
         await viewModel.CopyDiagnosticsCommand.ExecuteAsync(null);
 
-        Assert.Contains("Clipboard is unavailable.", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("ML-SET-003", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Clipboard is unavailable", viewModel.ErrorMessage, StringComparison.Ordinal);
         Assert.Null(viewModel.SupportStatusMessage);
     }
 
@@ -440,7 +459,7 @@ public sealed class SettingsViewModelTests
         Assert.Equal(0, closeRequests);
         Assert.Equal(0, languageApplyRequests);
         Assert.Equal(0, themeApplyRequests);
-        Assert.Equal("Settings could not be saved.", viewModel.ErrorMessage);
+        Assert.Contains("ML-SET-001", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -475,10 +494,7 @@ public sealed class SettingsViewModelTests
             [UiLanguagePreference.TraditionalChinese, UiLanguagePreference.System],
             appliedLanguages);
         Assert.Equal([UiThemePreference.Dark, UiThemePreference.System], appliedThemes);
-        Assert.Contains(
-            "Settings presentation could not be applied",
-            viewModel.ErrorMessage,
-            StringComparison.Ordinal);
+        Assert.Contains("ML-SET-002", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -606,6 +622,8 @@ public sealed class SettingsViewModelTests
 
         public MediaLockApplicationState State { get; private set; } = initial;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask<ApplicationResult> DispatchAsync(
@@ -628,6 +646,14 @@ public sealed class SettingsViewModelTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
+        }
 
         public void Publish(MediaLockApplicationState state)
         {

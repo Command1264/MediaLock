@@ -44,7 +44,6 @@ public sealed class TrayViewModelTests
         application.Publish(application.State with
         {
             CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
-            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
         });
         Assert.Equal("Reacquiring", viewModel.StatusText);
 
@@ -76,7 +75,8 @@ public sealed class TrayViewModelTests
 
         await viewModel.NextCommand.ExecuteAsync(null);
 
-        Assert.Equal("GSMTC unavailable", viewModel.ErrorMessage);
+        Assert.Contains("ML-APP-003", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("GSMTC unavailable", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,6 +126,8 @@ public sealed class TrayViewModelTests
 
         public MediaLockApplicationState State { get; private set; } = initial;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public void Publish(MediaLockApplicationState state)
         {
             State = state;
@@ -145,6 +147,14 @@ public sealed class TrayViewModelTests
 
             Intents.Add(intent);
             return ValueTask.FromResult(new ApplicationResult(State, RouteDecision.StateUpdated));
+        }
+
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

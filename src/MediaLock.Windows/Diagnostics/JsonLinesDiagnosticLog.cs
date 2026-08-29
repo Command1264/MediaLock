@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MediaLock.Core.Diagnostics;
 
 namespace MediaLock.Windows.Diagnostics;
@@ -56,7 +57,8 @@ public sealed class JsonLinesDiagnosticLog : IDiagnosticLog, IAsyncDisposable
             var line = JsonSerializer.Serialize(new LogLine(
                 timeProvider.GetUtcNow(),
                 diagnosticEvent.Name,
-                diagnosticEvent.Properties));
+                diagnosticEvent.Properties,
+                diagnosticEvent.ProblemCode));
             var bytes = System.Text.Encoding.UTF8.GetByteCount(line + Environment.NewLine);
             RotateIfNeeded(bytes);
             await File.AppendAllTextAsync(
@@ -122,5 +124,7 @@ public sealed class JsonLinesDiagnosticLog : IDiagnosticLog, IAsyncDisposable
     private sealed record LogLine(
         DateTimeOffset Timestamp,
         string Event,
-        IReadOnlyDictionary<string, string>? Properties);
+        IReadOnlyDictionary<string, string>? Properties,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? ProblemCode);
 }

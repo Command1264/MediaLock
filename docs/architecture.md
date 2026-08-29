@@ -229,6 +229,14 @@ User-triggered desktop effects cross the single-method `IDesktopSupportActions` 
 Clipboard, Shell and `%LocalAppData%\MediaLock\logs` behavior plus the canonical GitHub support URLs. Settings
 ViewModel supplies diagnostic text only for the copy action, catches adapter failures as localized actionable UI
 errors and otherwise remains independent of Registry, Clipboard and process launch details.
+
+Phase 17 replaces those presentation strings with the structured problem boundary defined by
+[ADR 0008](adr/0008-use-structured-problems-for-user-facing-failures.md). Application owns semantic identifiers,
+stable codes, severity, occurrence identity and an optional exception type. App owns exact English／Traditional
+Chinese resource lookup and fallback. Core Route Decisions expose semantic reasons and at most an exception type;
+they never expose localized copy or raw exception messages. `ProblemCode` is an optional structured diagnostic field,
+and `DiagnosticSummary` receives the latest reported code without promoting it into active UI state. This keeps localization out of Core and private path／media／
+target data out of the standard failure contract.
 Loaded Recovery timeout and Fallback Policy configure the router before its first catalog snapshot. Recovery,
 fallback and Priority Rule edits also update the running router immediately. A successful explicit main-window Routing
 Mode intent performs the router transition first, saves any required Locked Target runtime state, then commits the
@@ -314,6 +322,57 @@ non-playing states remain at the observed position, and all values clamp to vali
 timer only requests property refresh; it never writes an estimated position into Core, dispatches routing intents or
 survives the window lifetime. Seek remains outside the command model until separate hardware/player evidence exists.
 
+Phase 18 generalizes that boundary to every provider-neutral Media Target and separates raw observation from projected
+presentation:
+
+```text
+provider snapshots + monotonic timestamp
+                  │
+                  ▼
+ Application catalog observation
+                  │
+                  ▼
+ Core Playback Rate Estimator ──▶ Effective Playback Rate + source + confidence
+                  │
+                  ▼
+ Application target projection ──▶ WPF timeline interpolation
+```
+
+`PlaybackRateEstimator` is one pure in-process Core Module with a small concrete Interface; a single implementation
+does not justify an `I*` abstraction or Adapter. Each observation carries a provider-qualified `MediaTargetId`, raw
+timeline, playback state, monotonic timestamp and optional Reported Playback Rate. The Module owns per-target rolling
+samples, robust slope calculation, confidence, hysteresis, numerical tolerances and bounded state retention. It never
+accepts a WPF-interpolated position.
+
+The candidate uses a five-second window, at least three observations spanning three seconds, the median of all valid
+pairwise slopes, 10% published-rate tolerance and two consecutive same-direction challengers. Per-target samples expire
+with the window and an LRU cap retains at most 256 target states. These are private Module policy, not caller options.
+
+Application supplies timestamps from `TimeProvider.GetTimestamp()`, projects the resolved Effective Playback Rate and
+forgets estimator state when a target leaves the catalog. Composite catalog snapshots may contain cached targets from
+providers that did not publish the current update, so Application fingerprints the authoritative observation fields
+and preserves their previous monotonic anchor instead of sampling them again. Projected targets always cross the
+provider-neutral `MediaTargetsUpdated` path, including GSMTC-only catalogs, so Router／WPF cannot lose the projection.
+A valid reported value is authoritative. Missing or invalid values may use a confident estimate; otherwise the result
+is the 1× fallback. Seek, non-Playing state, Recovery,
+reconnect, invalid bounds, target／document replacement, non-monotonic time and discontinuous position reset the affected
+target before later samples can regain confidence. Reset and projection do not alter Router state, Media Target identity,
+command capability, Recovery correlation or persisted schemas. See
+[ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).
+
+When an already-confident target produces a finite but divergent incremental slope, Core keeps it outside the rolling
+window until the next observation. Continuation at the divergent slope starts a new-rate window; continuation at the
+published slope classifies the intermediate position as a discontinuity and clears confidence. A bounded position
+residual prevents normal quantized timelines from being mistaken for either transition.
+If the trusted observations on both sides still match the published slope, Core discards only the isolated pending
+sample and retains confidence.
+
+If a cached provider observation remains unchanged for the full five-second estimator window, Application expires an
+Estimated result to Fallback. A monotonic Application confidence worker checks this independently of catalog traffic,
+so a completely silent provider cannot keep an estimate alive indefinitely. It rebases only the presentation timeline
+to the already-displayed bounded position so the visible timeline does not jump backward; the raw provider position
+remains the sole estimator input.
+
 Phase 8A keeps Seek inside the disposable Probe. A small immutable request parses invariant seconds and validates the
 absolute position against the selected live Session's current timeline before the Probe calls
 `TryChangePlaybackPositionAsync(TimeSpan.Ticks)`. The Probe reports capability, API acceptance and observed position as
@@ -328,6 +387,12 @@ The WPF timeline owns only a gesture preview. One completed mouse, touch or keyb
 An accepted request is pending presentation state, not a new routing state: the preview yields only when a later catalog
 snapshot confirms the requested position. A bounded presentation timeout, target change or command failure restores the
 latest observed timeline. No optimistic position is written into Core or persisted.
+
+The Main ViewModel also projects a presentation-only refresh interval from the Effective Playback Rate. While Playing
+with a finite timeline, it targets at most approximately one media second per refresh and clamps the Dispatcher timer
+to 50–500 milliseconds. Rate changes update that interval through ordinary ViewModel notification; Pause, target loss
+or a missing timeline returns to the 500-millisecond idle cadence. This affects only WPF repaint frequency and never
+changes estimator sampling, authoritative observations or command dispatch.
 
 The Main ViewModel owns a presentation-only selection bookmark independently from Routing Mode. It first preserves an
 exact selected Session Key. If Windows replaces that ephemeral Key during catalog reconstruction, the presentation
@@ -469,6 +534,14 @@ captured target through the shared target catalog, so a supported Browser Toggle
 capability lookup. A minimal Native Host validates the fixed Extension launch origin and relays bounded frames over the
 fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
 [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
+
+Generic Endpoint capabilities are live observations rather than bind-time constants. Metadata, duration, buffering
+and timeline events recompute bounded Seek availability; the exact target registry updates its command gate before
+publishing the corresponding neutral snapshot. Stale Page Binding／document／Endpoint observations cannot alter that
+gate. If a trusted completed page exists before the desktop process, a serialized Extension-owned availability
+monitor revalidates exact HTTPS permission and current document generation before rebinding. Its in-memory backoff is
+1／2／5／10 seconds and then at most once per 30 seconds, with `chrome.alarms` as the Manifest V3 wake-up fallback.
+Success, permission loss or absence of eligible trusted pages cancels pending work; no media command is retried.
 
 This composition enables only exact Browser Session Lock at runtime. It emits no inferred GSMTC correlation, so Brave
 GSMTC targets remain visible unless a future provider supplies an authoritative exact link. Browser target loss keeps

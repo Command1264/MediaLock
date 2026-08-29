@@ -58,6 +58,14 @@ Binding reports Authorized; a retained exact-site permission without a current B
 and neither state reports Not authorized. The status response never exposes URL, title, Binding identity or media
 metadata. Closing and reopening the Popup must preserve Authorized for the same live document. Browser-locale tests
 cover English fallback and Traditional Chinese, and layout coverage keeps the two actions vertically separated.
+Because Chromium may replace the Popup while its native exact-site permission prompt is open, the production Service
+Worker owns the permission-added continuation. A first exact HTTPS grant binds matching completed tabs without a
+second Popup action; broad, wildcard, malformed, non-HTTPS and unrelated permission additions fail closed.
+If the browser and a retained exact-site page precede Media Lock startup, Native Host availability recovery must
+publish exactly one current target without page reload. The recovery cadence is serialized and capped, revalidates
+the current completed document and exact HTTPS permission on every reconciliation, and stops when connection succeeds
+or no eligible trusted page remains. A media element that gains a finite seekable range after binding must likewise
+gain Seek in both presentation and exact command dispatch without creating a replacement target.
 ViewModel coverage requires Browser Play to be disabled while Playing, Pause disabled while Paused and Toggle to
 remain enabled in both states.
 The Application gate also proves that the runtime-only Browser lock never enters the GSMTC runtime-state repository,

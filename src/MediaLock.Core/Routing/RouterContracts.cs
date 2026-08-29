@@ -91,7 +91,7 @@ public sealed record RouteDecision(
     MediaCommand? Command = null,
     MediaTargetId? Target = null,
     MediaCommandOutcome? ControlOutcome = null,
-    string? Error = null)
+    string? ExceptionType = null)
 {
     public static RouteDecision StateUpdated { get; } = new(
         RouteDecisionKind.None,

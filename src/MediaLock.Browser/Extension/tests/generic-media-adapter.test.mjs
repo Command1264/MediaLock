@@ -220,6 +220,53 @@ test('presentation includes playback rate and publishes external media changes',
   assert.equal(observations[0].playbackRate, 1.75);
 });
 
+test('seek capability appears when media metadata becomes seekable after binding', async () => {
+  const listeners = new Map();
+  const observations = [];
+  let currentTime = 0;
+  const media = {
+    paused: false,
+    playbackRate: 1,
+    duration: Number.NaN,
+    seekable: { length: 0 },
+    isConnected: true,
+    pause() {},
+    async play() {},
+    addEventListener(name, listener) {
+      listeners.set(name, listener);
+    },
+    removeEventListener() {},
+  };
+  Object.defineProperty(media, 'currentTime', {
+    get: () => currentTime,
+    set: (value) => { currentTime = value; },
+  });
+  const adapter = createGenericMediaAdapter({
+    getCandidates: () => [media],
+    isMediaElement: (candidate) => candidate === media,
+    createEndpointId: () => 'endpoint-late-seek-0123456789',
+    isSeekAllowed,
+  });
+
+  const binding = adapter.bindSingleEndpoint((presentation) => {
+    observations.push(presentation);
+  });
+  assert.equal(binding.capabilities.includes('seek'), false);
+
+  media.duration = 120;
+  media.seekable = { length: 1, start: () => 0, end: () => 120 };
+  listeners.get('loadedmetadata')();
+  await Promise.resolve();
+
+  assert.equal(observations.at(-1).capabilities.includes('seek'), true);
+  const result = adapter.execute({
+    endpointId: binding.endpointId,
+    command: { name: 'seek', positionSeconds: 30 },
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(currentTime, 30);
+});
+
 test('an out-of-range Seek is rejected without moving the media element', () => {
   let currentTime = 10;
   let seekCount = 0;

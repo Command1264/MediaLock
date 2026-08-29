@@ -44,6 +44,9 @@ Media Lock 目前是 unsigned prerelease，維護者不承諾回覆時間或個�
 
 ## 診斷資料與隱私
 
+若畫面顯示 `ML-*` 代碼，請一併提供該代碼。代碼的意義、建議處理方式與相容性政策列於
+[Media Lock 錯誤代碼目錄](docs/error-codes.md)；請勿以代碼取代必要的重現步驟。
+
 使用者資料位於 `%LocalAppData%\MediaLock\`：
 
 - `settings.json`：偏好設定。

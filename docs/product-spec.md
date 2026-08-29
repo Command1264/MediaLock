@@ -79,10 +79,17 @@ For each available Session, collect available values including:
 - playback status and supported controls
 - title, artist, album title, track number and playback type
 - timeline position and bounds
+- an optional Reported Playback Rate when the provider supplies a finite value in the supported product range
 
 Prefer `SessionsChanged`, `CurrentSessionChanged`, `MediaPropertiesChanged`, `PlaybackInfoChanged` and
 `TimelinePropertiesChanged` over continuous polling. Event handlers schedule refresh work; they do not directly
 mutate UI-bound collections from arbitrary threads.
+
+A missing, invalid or out-of-range playback-rate observation remains absent rather than being normalized to 1× at the
+provider boundary. Presentation resolves one Effective Playback Rate in this order: valid reported value, sufficiently
+confident estimate from authoritative same-target timeline observations, then 1× fallback. The estimate is continuously
+re-evaluated while Playing so a sustained mid-play rate change can replace the prior value. It is presentation-only and
+must not influence identity, routing, Recovery, persistence or media-command capability.
 
 ## 6. Identity and Recovery
 
@@ -131,6 +138,14 @@ Windows language, English (`en-US`) and Traditional Chinese (`zh-TW`). Windows-l
 Chinese for a Traditional-Chinese Windows UI and otherwise falls back to English. Language changes take effect on
 successful Settings save across the existing WPF windows, notification-area surface and presentation projections.
 Language choices display `English` and `繁體中文` as language-native names regardless of the current UI culture.
+
+Every known user-facing warning or error resolves from one structured semantic problem rather than raw English or an
+exception message. It displays one stable public `ML-*` code and actionable copy in the active English or Traditional
+Chinese language. A visible problem re-renders immediately after a successful language change. Logs and the
+privacy-safe diagnostic summary carry the same latest reported code; bounded technical context is limited to non-private categories
+such as exception type. Missing locale text falls back to English without changing the code, and unknown failures use
+an identifiable localized fallback. The public catalog and compatibility policy are in
+[Media Lock error codes](error-codes.md).
 
 The desktop settings also persist a WPF client-area theme preference: Windows theme, Light or Dark. Windows-theme
 selection reads the current Windows app-theme preference at startup and reacts to later Windows preference changes.
@@ -208,8 +223,14 @@ Motion is short, non-blocking and disabled when Windows client-area animation is
 The current-target surface may show optional Now Playing artwork and a read-only timeline. Both are projections of
 the Session that would receive a command at that moment; selecting a different list row does not change them. Artwork
 failure falls back to a neutral placeholder and never changes routing state. Timeline interpolation is presentation
-only, clamps to the last observed GSMTC bounds and resets when the routed target disappears or changes. The progress
-indicator is not seekable until player-specific GSMTC capability and acceptance evidence is documented.
+only, clamps to the last observed provider bounds and resets when the routed target disappears or changes. Playing
+interpolation uses the Effective Playback Rate and a monotonic observation anchor. It never feeds an interpolated UI
+position back into rate estimation. The slider may refresh smoothly while localized `mm:ss` text changes only when its
+displayed unit changes. While Playing, WPF adapts its presentation refresh interval to the Effective Playback Rate so
+one refresh spans no more than approximately one media second, bounded from 50 through 500 milliseconds; Paused or
+missing-timeline presentation returns to the 500-millisecond idle cadence. An occasional bounded label step is not
+equivalent to a frozen timeline. The progress indicator
+is not seekable until player-specific capability and acceptance evidence is documented.
 
 Phase 8A may request absolute playback positions only from the disposable Console Probe. It does not add Seek to the
 production router, input backend, persisted settings or WPF interaction model. A Session advertising playback-position
@@ -376,7 +397,9 @@ exact-site grant, a replacement top-level HTTPS document automatically receives 
 and the Extension revalidates the exact origin permission. The new opaque target is never auto-selected and never
 satisfies a lock on its predecessor. Reauthorizing one unchanged tab likewise replaces its old binding instead of
 accumulating opaque ghost targets. Direct presentation observes page-originated Play／Pause,
-timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback.
+timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback. Seek capability follows
+the exact Endpoint's live finite duration and seekable ranges; metadata or buffering that becomes ready after binding
+must enable both the desktop slider and the exact command gate without reauthorizing the page.
 The Extension Popup queries the exact active tab's current Page Binding when opened. It distinguishes Checking,
 Authorized, trusted-site waiting, Not authorized and unavailable-page results. An exact-site permission without a
 live Binding displays trusted-site waiting; a page with neither Binding nor site grant displays Not authorized. The
@@ -385,8 +408,12 @@ reopening the Popup preserves Authorized for the same live document. Popup label
 UI language, with English fallback and a Traditional Chinese locale; its two authorization actions remain vertically
 separated rather than collapsing into adjacent controls. Internal Extension error identifiers are never shown as the
 primary prose. Known failures resolve to localized, actionable English／Traditional Chinese text and one stable
-`ML-BR-*` support code; unknown failures use an identifiable localized fallback. This Browser Integration subset does
-not mark the application-wide Phase 17 warning and error contract complete.
+`ML-BR-*` support code; unknown failures use an identifiable localized fallback. This earlier Browser Integration
+subset remains compatibility-stable under the application-wide Phase 17 warning and error contract.
+When an exact-site page is already eligible but Media Lock starts after the browser, the Extension reconciles that
+completed, still-authorized HTTPS document automatically. Native Host discovery uses one serialized availability
+monitor with capped backoff and a Manifest V3 alarm wake-up; it stops when no eligible trusted page remains or the
+desktop connection succeeds, and never auto-selects or repairs a prior Page Binding lock.
 The generic direct target also exposes Toggle Play／Pause: execution reads the exact bound media element's live paused
 state and performs one explicit Play or Pause. This enables the existing UI toggle and provider-neutral physical
 media-key path without adding generic Previous, Next or Stop semantics that `HTMLMediaElement` does not define.

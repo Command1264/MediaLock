@@ -381,13 +381,14 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void FailedKeepPlayingHasAnActionableLocalizedNotice()
     {
+        var problem = MediaLockProblem.Warning(MediaLockProblemId.PlaybackCorrectionFailed);
         var application = new FakeApplication(MediaLockApplicationState.Initial with
         {
             PlaybackStateLock = new PlaybackStateLockState(
                 PlaybackStateLockMode.KeepPlaying,
                 PlaybackStateLockStatus.Failed,
                 new SessionKey("music"),
-                "diagnostic detail"),
+                problem),
         });
         using var viewModel = new MainWindowViewModel(
             application,
@@ -395,7 +396,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.HasPlaybackStateLockNotice);
         Assert.Equal(
-            UiText.Get("Main_KeepPlayingFailed"),
+            ProblemPresentation.Describe(problem),
             viewModel.PlaybackStateLockNotice);
     }
 
@@ -536,7 +537,7 @@ public sealed class MainWindowViewModelTests
                     TimeSpan.FromMinutes(4),
                     TimeSpan.FromSeconds(30),
                     observedAt),
-                PlaybackRate: 1.75));
+                ReportedPlaybackRate: 1.75));
         var application = new FakeApplication(MediaLockApplicationState.Initial with
         {
             Router = RouterState.Initial with
@@ -555,8 +556,259 @@ public sealed class MainWindowViewModelTests
 
         viewModel.RefreshTimeline();
 
+        Assert.True(viewModel.CanSeek);
         Assert.Equal("0:37", viewModel.NowPlayingElapsed);
         Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
+    }
+
+    [Theory]
+    [InlineData(0.5, 500)]
+    [InlineData(1, 500)]
+    [InlineData(2, 500)]
+    [InlineData(3, 1000d / 3d)]
+    [InlineData(10, 100)]
+    [InlineData(16, 62.5)]
+    public void TimelineRefreshIntervalAdaptsToTheEffectivePlaybackRate(
+        double playbackRate,
+        double expectedMilliseconds)
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-refresh-cadence",
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                ReportedPlaybackRate: playbackRate));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.InRange(
+            Math.Abs(expectedMilliseconds - viewModel.TimelineRefreshInterval.TotalMilliseconds),
+            0,
+            0.001);
+    }
+
+    [Fact]
+    public void TimelineRefreshIntervalTracksRateChangesAndReturnsToIdleWhenPaused()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        MediaTargetSnapshot Target(PlaybackStatus status, double rate) =>
+            MediaTargetSnapshot.FromBrowserPageBinding(
+                "page-binding-changing-refresh-cadence",
+                new MediaTargetPresentation(
+                    "Big Buck Bunny",
+                    status,
+                    MediaCommandCapabilities.None,
+                    observedAt,
+                    Timeline: new MediaTimeline(
+                        TimeSpan.Zero,
+                        TimeSpan.FromMinutes(10),
+                        TimeSpan.FromSeconds(30),
+                        observedAt),
+                    ReportedPlaybackRate: rate));
+        var initial = Target(PlaybackStatus.Playing, 1);
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [initial],
+                LockedMediaTarget = initial.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.Equal(500, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [Target(PlaybackStatus.Playing, 10)],
+                Revision = 2,
+            },
+        });
+        Assert.Equal(100, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [Target(PlaybackStatus.Paused, 10)],
+                Revision = 3,
+            },
+        });
+        Assert.Equal(500, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+    }
+
+    [Fact]
+    public void TimelineRefreshIntervalUsesAnEstimatedPlaybackRate()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var targetId = MediaTargetId.FromBrowserPageBinding("page-binding-estimated-refresh-cadence");
+        var estimator = new PlaybackRateEstimator();
+        PlaybackRateResolution resolution = default;
+        foreach (var second in new[] { 0, 2, 4 })
+        {
+            resolution = estimator.Observe(new PlaybackRateObservation(
+                targetId,
+                PlaybackStatus.Playing,
+                new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(second * 3),
+                    observedAt.AddSeconds(second)),
+                TimeSpan.FromSeconds(second)));
+        }
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            targetId.Value,
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(12),
+                    observedAt.AddSeconds(4)))
+                .WithPlaybackRateProjection(resolution, null));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.Equal(PlaybackRateResolutionSource.Estimated, resolution.Source);
+        Assert.InRange(
+            Math.Abs((1000d / 3d) - viewModel.TimelineRefreshInterval.TotalMilliseconds),
+            0,
+            0.001);
+    }
+
+    [Fact]
+    public void MonotonicTimelineAnchorIgnoresUtcClockAdjustment()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var clock = new TestTimeProvider(observedAt);
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "monotonic-timeline",
+            new MediaTargetPresentation(
+                "Monotonic media",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(4),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                ReportedPlaybackRate: 1d).WithPlaybackRateProjection(
+                    PlaybackRateResolution.FromReported(1d),
+                    new MonotonicTimestamp(0, TimeSpan.TicksPerSecond)));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+            Targets = [target],
+        });
+        using var viewModel = new MainWindowViewModel(
+            application,
+            synchronizationContext: null,
+            timeProvider: clock);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        viewModel.RefreshTimeline();
+        var beforeClockAdjustment = viewModel.NowPlayingPositionSeconds;
+
+        clock.AdjustUtc(TimeSpan.FromHours(1));
+        viewModel.RefreshTimeline();
+
+        Assert.Equal(34d, beforeClockAdjustment, precision: 6);
+        Assert.Equal(beforeClockAdjustment, viewModel.NowPlayingPositionSeconds, precision: 6);
+    }
+
+    [Fact]
+    public void BrowserSeekAvailabilityUpdatesWhenTheSameTargetGainsTheCapability()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var timeline = new MediaTimeline(
+            TimeSpan.Zero,
+            TimeSpan.FromMinutes(4),
+            TimeSpan.FromSeconds(30),
+            observedAt);
+        var initial = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-dynamic-seek",
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play,
+                observedAt,
+                Timeline: timeline));
+        var updated = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-dynamic-seek",
+            initial.Presentation with
+            {
+                Capabilities = MediaCommandCapabilities.Play |
+                    MediaCommandCapabilities.SeekAbsolute,
+                ObservedAt = observedAt.AddSeconds(1),
+            });
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [initial],
+                LockedMediaTarget = initial.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.False(viewModel.CanSeek);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [updated],
+                Revision = 2,
+            },
+        });
+
+        Assert.True(viewModel.CanSeek);
     }
 
     [Fact]
@@ -724,7 +976,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:30", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Equal("The requested playback position was not confirmed.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-008", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -790,8 +1042,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.False(viewModel.CanSeek);
         Assert.True(viewModel.HasError);
-        Assert.Equal("Seeking was interrupted because the media target changed or became unavailable.",
-            viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-009", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -880,7 +1131,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:30", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Contains(nameof(RouteReason.SeekTimelineUnavailable), viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-006", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -921,8 +1172,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("0:20", viewModel.NowPlayingElapsed);
         Assert.True(viewModel.HasError);
-        Assert.Equal("Seeking was interrupted because the media target changed or became unavailable.",
-            viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-009", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1033,7 +1283,7 @@ public sealed class MainWindowViewModelTests
     {
         var application = new FakeApplication(new MediaLockApplicationState(
             RouterState.Initial,
-            "Default App Lock target is unavailable.",
+            MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid),
             MediaLockSettings.Default with
             {
                 DefaultRoutingMode = RoutingMode.AppLock,
@@ -1466,7 +1716,6 @@ public sealed class MainWindowViewModelTests
         application.Publish(MediaLockApplicationState.Initial with
         {
             CatalogStatus = MediaSessionCatalogStatus.Reacquiring,
-            CatalogStatusMessage = "Reacquiring GSMTC after Windows resumed.",
         });
 
         Assert.Equal("Reacquiring", viewModel.RoutingStatus);
@@ -1585,10 +1834,35 @@ public sealed class MainWindowViewModelTests
 
         application.Publish(new MediaLockApplicationState(
             RouterState.Initial,
-            "GSMTC catalog became unavailable."));
+            MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable)));
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("GSMTC catalog became unavailable.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CAT-002", viewModel.ErrorMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void VisibleApplicationProblemImmediatelyFollowsTheUiLanguage()
+    {
+        UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        try
+        {
+            var problem = MediaLockProblem.Error(MediaLockProblemId.RuntimeStateSaveFailed);
+            var application = new FakeApplication(
+                new MediaLockApplicationState(RouterState.Initial, problem));
+            using var viewModel = new MainWindowViewModel(
+                application,
+                synchronizationContext: null);
+
+            Assert.Contains("runtime state", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+            UiText.Apply(UiLanguagePreference.TraditionalChinese);
+
+            Assert.Contains("執行期狀態", viewModel.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains("ML-CFG-009", viewModel.ErrorMessage, StringComparison.Ordinal);
+        }
+        finally
+        {
+            UiText.Apply(UiLanguagePreference.EnglishUnitedStates);
+        }
     }
 
     [Fact]
@@ -1598,7 +1872,7 @@ public sealed class MainWindowViewModelTests
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
         application.Publish(new MediaLockApplicationState(
             RouterState.Initial,
-            "GSMTC catalog became unavailable."));
+            MediaLockProblem.Error(MediaLockProblemId.CatalogUnavailable)));
 
         await viewModel.DismissErrorCommand.ExecuteAsync(null);
 
@@ -1609,7 +1883,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task DismissedApplicationErrorDoesNotReturnUntilItClearsAndRecurs()
     {
-        const string warning = "Default App Lock target is unavailable.";
+        var warning = MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid);
         var initial = new MediaLockApplicationState(RouterState.Initial, warning);
         var application = new FakeApplication(initial);
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
@@ -1626,15 +1900,16 @@ public sealed class MainWindowViewModelTests
         application.Publish(initial with
         {
             Router = initial.Router with { Revision = 2 },
-            ErrorMessage = null,
+            Problem = null,
         });
         application.Publish(initial with
         {
             Router = initial.Router with { Revision = 3 },
+            Problem = MediaLockProblem.Warning(MediaLockProblemId.DefaultAppLockTargetInvalid),
         });
 
         Assert.True(viewModel.HasError);
-        Assert.Equal(warning, viewModel.ErrorMessage);
+        Assert.Contains("ML-CFG-004", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1653,14 +1928,15 @@ public sealed class MainWindowViewModelTests
                 RouteReason.ControlFailed,
                 MediaCommand.Next,
                 session.Key,
-                Error: "GSMTC control failed."),
+                ExceptionType: typeof(InvalidOperationException).FullName),
         };
         using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
 
         await viewModel.NextCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("GSMTC control failed.", viewModel.ErrorMessage);
+        Assert.Contains("ML-CMD-001", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("GSMTC control failed", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1681,7 +1957,8 @@ public sealed class MainWindowViewModelTests
         await viewModel.NextCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("Session changed before lock.", viewModel.ErrorMessage);
+        Assert.Contains("ML-APP-003", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Session changed before lock", viewModel.ErrorMessage, StringComparison.Ordinal);
     }
 
     private static MediaLockApplicationState StateWith(MediaSessionSnapshot session) => new(
@@ -1704,6 +1981,8 @@ public sealed class MainWindowViewModelTests
 
         public MediaLockApplicationState State { get; private set; } = state;
 
+        public string? LastReportedProblemCode { get; private set; }
+
         public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public ValueTask<ApplicationResult> DispatchAsync(
@@ -1719,6 +1998,14 @@ public sealed class MainWindowViewModelTests
             return ValueTask.FromResult(new ApplicationResult(State, Decision));
         }
 
+        public ValueTask ReportProblemAsync(
+            MediaLockProblem problem,
+            CancellationToken cancellationToken)
+        {
+            LastReportedProblemCode = problem.Code;
+            return ValueTask.CompletedTask;
+        }
+
         public void Publish(MediaLockApplicationState next)
         {
             State = next;
@@ -1731,10 +2018,21 @@ public sealed class MainWindowViewModelTests
     private sealed class TestTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset current = utcNow;
+        private long timestamp;
 
         public override DateTimeOffset GetUtcNow() => current;
 
-        public void Advance(TimeSpan amount) => current += amount;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => timestamp;
+
+        public void Advance(TimeSpan amount)
+        {
+            current += amount;
+            timestamp += amount.Ticks;
+        }
+
+        public void AdjustUtc(TimeSpan amount) => current += amount;
     }
 
     private sealed class RecordingPlaybackStateLockFeedback : IPlaybackStateLockFeedback

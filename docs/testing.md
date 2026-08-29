@@ -93,6 +93,57 @@ choices, language-native choice names, successful-save application and failed-sa
 must confirm that main-window text, Settings, playback/status labels, accessibility names and notification-area
 commands switch immediately after Save without restarting routing or duplicating a media command.
 
+Phase 17 tests the structured problem contract independently from localized presentation. Application coverage
+requires one catalog entry per semantic identifier, globally unique stable desktop codes, distinct occurrence IDs and
+exception-type-only technical context. App coverage requires exact English／Traditional Chinese resource parity,
+unknown and missing-locale fallback, immediate re-rendering of an already visible problem, stable dismissal across
+ordinary state refresh and recurrence after a new occurrence. Main, Settings, tray and startup paths must show the
+same latest reported code that `problem.reported` diagnostics and the privacy-safe diagnostic summary expose. JSONL
+coverage verifies the explicit `ProblemCode` field without media metadata, complete target identity, private paths or
+exception messages.
+Browser Extension coverage keeps `ML-BR-000` through `ML-BR-011` unique and localized; desktop Browser codes begin at
+`ML-BR-012`. The full gate must prove routing, Recovery and persistence behavior remains unchanged.
+
+Phase 18 tests the Playback Rate Estimator at its public Core Interface with a fake monotonic `TimeProvider` and no
+wall-clock sleeps. RED cases first distinguish missing from explicitly reported 1×, then cover authoritative finite
+reported values, 0.5×／1×／1.5×／2× convergence, insufficient samples, duplicate and reversed timestamps, position
+quantization, jitter, outliers, accepted-rate bounds, bounded memory and continuous 1×→2×→0.5× changes with hysteresis.
+Every discontinuity row—Seek, Pause, Stop, Changing, Recovery, reconnect, invalid bounds, position jump, target removal
+and document／target replacement—must lose confidence before later samples can establish a new estimate.
+An external forward Seek whose instantaneous slope remains inside the accepted estimator range must also be rejected:
+one divergent slope is pending only, and a following observation at the prior rate clears confidence rather than
+letting the Seek replace the estimate. Sustained matching slopes must still converge as a genuine rate change.
+Conversely, bridging across one delayed observation at the published rate must discard only that outlier and retain
+the confident estimate.
+The candidate contract fixes a five-second window, three-second／three-observation confidence floor, pairwise-slope
+median, 10% published-rate tolerance, two same-direction challenger observations and a 256-target LRU bound.
+
+Application tests feed independent same-title GSMTC and Browser targets through one catalog projection and prove their
+samples never mix. They also republish one provider's cached target while another provider advances, verify the cached
+target retains its previous monotonic anchor, and prove GSMTC-only catalogs keep the provider-neutral projection in
+Router state. Routed Seek, Recovery／reconnect and same-ID document replacement each discard confidence before a new
+window begins. A fake monotonic timer proves a stale cached estimate expires after five seconds even with no catalog
+traffic, using a presentation-only rebased Fallback without moving the displayed position backward or feeding that
+position into Core. An injected worker failure must become an existing structured Application problem and cannot
+prevent orderly disposal. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
+confident estimate or 1× fallback. ViewModel tests use the projected Effective Playback Rate and monotonic anchor,
+clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. WPF cadence tests cover
+0.5×／1×／2×／3×／10×／16×, require approximately one media second or less per refresh inside a 50–500 millisecond
+timer bound, react to mid-play rate changes and return to the idle cadence on Pause. Existing Router,
+Recovery, persistence and exactly-once command tests remain unchanged.
+
+Manual Phase 18 acceptance contains exactly six numbered rows, and every guided result reports `目前第 N／6 項`:
+
+1. 1× baseline slider and `mm:ss` cadence;
+2. 2× playback over a measured interval;
+3. continuous 1×→2×→0.5× changes without stale-rate drift, plus smooth 3×／10×／16× reported-rate cadence;
+4. external Pause／Play and Seek reset behavior;
+5. reload／replacement plus competing YouTube Music isolation; and
+6. English／Traditional Chinese and Light／Dark visual parity for rate source, slider and labels.
+
+Automated estimator tests remain the acceptance authority when no real provider can reproducibly omit its reported
+rate; manual rows evaluate visible cadence and integration, not internal confidence math.
+
 Phase 7B tests theme-preference validation, schema-v4 migration, Windows-theme and DWM-frame mapping, Settings choices,
 successful-save application, failed-save suppression, Cancel discard behavior and the fixed frameless Settings
 contract. Build-time XAML compilation covers both palette and shared control dictionaries. A manual WPF smoke test
@@ -584,6 +635,15 @@ result to be discarded, and proves that exact discard cannot remove a newer same
 Deterministic Extension tests also require same-tab repeated authorization to publish the old binding's removal
 before its replacement, reject stale-document observations, republish page-originated playback changes and carry
 bounded playback rate into desktop timeline interpolation.
+Exact-site permission acceptance must also be continued by the production Service Worker: Chromium may replace the
+Popup while displaying its permission prompt, so the first newly granted exact HTTPS origin must bind each matching
+completed tab without a second Popup action. Wildcard, broad, malformed, non-HTTPS and unrelated permission additions
+must never create a Browser target.
+Browser capability tests bind before media metadata is ready, then expose a finite seekable range and require the live
+presentation, exact registry command gate and WPF slider to become seekable without reauthorization. Production
+Service Worker tests also start with a completed exact-site page while the Native Host is unavailable, then require a
+later alarm wake-up to retry discovery without reload. Recovery requests coalesce, use capped backoff, survive an
+in-flight reconciliation race and stop after connection or when no eligible trusted page remains.
 Application tests lock and route an exact Browser target with a recording runtime repository and require zero
 post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
 creating or replacing `state.json`.

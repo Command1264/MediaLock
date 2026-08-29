@@ -758,5 +758,35 @@ Exit criteria:
 - Missing translations and unknown codes fail to a safe, identifiable fallback while routing and recovery behavior
   remain unchanged.
 
-Status: planned in [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
+Status: complete for [GitHub Issue #64](https://github.com/Command1264/MediaLock/issues/64). Phase 17 does not add
 telemetry or automatic remote reporting.
+
+## Phase 18 — Provider-neutral playback-rate estimation
+
+Keep Now Playing position and time labels aligned when a provider omits a usable playback rate or changes rate during
+playback. A provider-neutral Core Module observes authoritative timeline samples with monotonic timestamps and
+resolves one Effective Playback Rate as Reported, Estimated or Fallback. Application owns observation and catalog
+projection; WPF consumes the resolved value without owning sample windows, confidence or hysteresis.
+
+Exit criteria:
+
+- A valid Reported Playback Rate remains authoritative and is distinguishable from a missing value; missing or invalid
+  input no longer silently means reported 1×.
+- Estimation uses only same-target, Playing, monotonic authoritative observations and converges for 0.5×, 1×, 1.5×
+  and 2× within documented confidence and latency bounds.
+- Mid-play rate changes replace the prior estimate only after sustained evidence, while jitter, duplicate snapshots and
+  quantized labels do not create visible oscillation.
+- Seek, Pause, Stop, Changing, Recovery, reconnect, target／document replacement, invalid bounds and position jumps
+  reset confidence before a new estimate can affect presentation.
+- Different provider-qualified Media Targets never share samples, and Effective Playback Rate never affects Router
+  policy, identity, Recovery, persistence or command dispatch.
+- Deterministic tests use a fake monotonic clock without sleeps. A bounded manual matrix checks slider cadence, time
+  labels, language／theme parity and competing-source isolation.
+
+Status: complete on 2026-08-30 for [GitHub Issue #65](https://github.com/Command1264/MediaLock/issues/65). Automated
+gates, two-axis review and exact-candidate six-row manual acceptance passed;
+[PR #71](https://github.com/Command1264/MediaLock/pull/71) integrated the implementation into `develop` and the Issue
+is closed. See the
+[Phase 18 implementation plan](phase-18/playback-rate-estimation-plan.md) and
+[exact-candidate smoke record](phase-18/playback-rate-estimation-smoke.md), plus
+[ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).

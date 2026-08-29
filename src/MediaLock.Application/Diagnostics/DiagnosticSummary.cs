@@ -7,7 +7,8 @@ public static class DiagnosticSummary
     public static string Create(
         AppEnvironmentInfo environment,
         MediaLockApplicationState state,
-        bool isMediaInputRunning)
+        bool isMediaInputRunning,
+        string? lastReportedProblemCode = null)
     {
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentNullException.ThrowIfNull(state);
@@ -25,6 +26,7 @@ public static class DiagnosticSummary
             $"Routing mode: {state.Router.Mode}",
             $"Routing status: {state.Router.Status}",
             $"Media catalog: {state.CatalogStatus}",
+            $"Problem code: {lastReportedProblemCode ?? state.Problem?.Code ?? "None"}",
             $"Media-key interception: {FormatInterception(desktop?.InterceptMediaKeys, isMediaInputRunning)}",
             $"Session count: {state.Router.Sessions.Length}",
             $"Recovery timeout: {FormatTimeout(recovery?.Timeout)}",

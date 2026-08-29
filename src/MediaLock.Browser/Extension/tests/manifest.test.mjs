@@ -27,7 +27,7 @@ test('pins one stable candidate Extension ID in both manifests', () => {
 test('requests only the production-candidate user-authorized least-privilege surface', () => {
   assert.deepEqual(
     [...manifest.permissions].sort(),
-    ['activeTab', 'nativeMessaging', 'scripting', 'storage', 'tabs'],
+    ['activeTab', 'alarms', 'nativeMessaging', 'scripting', 'storage', 'tabs'],
   );
   assert.equal(manifest.permissions.includes('clipboardRead'), false);
   assert.equal(manifest.permissions.includes('<all_urls>'), false);
