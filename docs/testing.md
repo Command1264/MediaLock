@@ -127,14 +127,16 @@ traffic, using a presentation-only rebased Fallback without moving the displayed
 position into Core. An injected worker failure must become an existing structured Application problem and cannot
 prevent orderly disposal. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
 confident estimate or 1× fallback. ViewModel tests use the projected Effective Playback Rate and monotonic anchor,
-clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. Existing Router,
+clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. WPF cadence tests cover
+0.5×／1×／2×／3×／10×／16×, require approximately one media second or less per refresh inside a 50–500 millisecond
+timer bound, react to mid-play rate changes and return to the idle cadence on Pause. Existing Router,
 Recovery, persistence and exactly-once command tests remain unchanged.
 
 Manual Phase 18 acceptance contains exactly six numbered rows, and every guided result reports `目前第 N／6 項`:
 
 1. 1× baseline slider and `mm:ss` cadence;
 2. 2× playback over a measured interval;
-3. continuous 1×→2×→0.5× changes without stale-rate drift;
+3. continuous 1×→2×→0.5× changes without stale-rate drift, plus smooth 3×／10×／16× reported-rate cadence;
 4. external Pause／Play and Seek reset behavior;
 5. reload／replacement plus competing YouTube Music isolation; and
 6. English／Traditional Chinese and Light／Dark visual parity for rate source, slider and labels.

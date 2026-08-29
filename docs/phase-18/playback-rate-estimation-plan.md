@@ -89,8 +89,10 @@ states as a second safety bound. These constants remain private to the Module an
 ### Slice 4 — WPF timeline
 
 1. Advance Playing position from a monotonic anchor and Effective Playback Rate.
-2. Keep Pause, bounds clamp, target replacement and Seek preview／confirmation behavior unchanged.
-3. Keep rate source／confidence out of the primary media controls. If manual diagnosis needs visibility, expose it in a
+2. Adapt the WPF refresh interval to approximately one media second per refresh within a 50–500 millisecond bound;
+   recompute on rate changes and return to idle cadence on Pause or missing timeline.
+3. Keep Pause, bounds clamp, target replacement and Seek preview／confirmation behavior unchanged.
+4. Keep rate source／confidence out of the primary media controls. If manual diagnosis needs visibility, expose it in a
    bounded accessible／diagnostic detail without target identity or media metadata; it remains presentation state.
 
 ### Slice 5 — regression and human acceptance

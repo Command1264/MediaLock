@@ -15,6 +15,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     private static readonly TimeSpan SeekConfirmationTolerance = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan SeekConfirmationTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan DefaultPlaybackStateLockNoticeDuration = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultTimelineRefreshInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan MinimumTimelineRefreshInterval = TimeSpan.FromMilliseconds(50);
+    private const double TargetMediaSecondsPerTimelineRefresh = 1d;
 
     private readonly IMediaLockApplication application;
     private readonly SynchronizationContext? synchronizationContext;
@@ -399,6 +402,31 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         ResolveTargetSnapshot()?.Presentation.Artwork;
 
     public bool HasNowPlayingTimeline => ResolveTimeline() is not null;
+
+    public TimeSpan TimelineRefreshInterval
+    {
+        get
+        {
+            var presentation = ResolveTargetSnapshot()?.Presentation;
+            if (presentation?.PlaybackStatus != PlaybackStatus.Playing ||
+                presentation.Timeline is null)
+            {
+                return DefaultTimelineRefreshInterval;
+            }
+
+            var rate = presentation.PlaybackRate.Rate;
+            if (!double.IsFinite(rate) || rate <= 0)
+            {
+                return DefaultTimelineRefreshInterval;
+            }
+
+            var interval = TimeSpan.FromSeconds(TargetMediaSecondsPerTimelineRefresh / rate);
+            return TimeSpan.FromTicks(Math.Clamp(
+                interval.Ticks,
+                MinimumTimelineRefreshInterval.Ticks,
+                DefaultTimelineRefreshInterval.Ticks));
+        }
+    }
 
     public bool CanSeek
     {
@@ -925,6 +953,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(NowPlayingArtist));
         OnPropertyChanged(nameof(NowPlayingArtwork));
         OnPropertyChanged(nameof(HasNowPlayingTimeline));
+        OnPropertyChanged(nameof(TimelineRefreshInterval));
         OnPropertyChanged(nameof(CanSeek));
         OnPropertyChanged(nameof(NowPlayingProgress));
         OnPropertyChanged(nameof(NowPlayingPositionSeconds));

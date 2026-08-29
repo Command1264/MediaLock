@@ -226,7 +226,10 @@ failure falls back to a neutral placeholder and never changes routing state. Tim
 only, clamps to the last observed provider bounds and resets when the routed target disappears or changes. Playing
 interpolation uses the Effective Playback Rate and a monotonic observation anchor. It never feeds an interpolated UI
 position back into rate estimation. The slider may refresh smoothly while localized `mm:ss` text changes only when its
-displayed unit changes; an occasional bounded label step is not equivalent to a frozen timeline. The progress indicator
+displayed unit changes. While Playing, WPF adapts its presentation refresh interval to the Effective Playback Rate so
+one refresh spans no more than approximately one media second, bounded from 50 through 500 milliseconds; Paused or
+missing-timeline presentation returns to the 500-millisecond idle cadence. An occasional bounded label step is not
+equivalent to a frozen timeline. The progress indicator
 is not seekable until player-specific capability and acceptance evidence is documented.
 
 Phase 8A may request absolute playback positions only from the disposable Console Probe. It does not add Seek to the

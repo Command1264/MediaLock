@@ -388,6 +388,12 @@ An accepted request is pending presentation state, not a new routing state: the 
 snapshot confirms the requested position. A bounded presentation timeout, target change or command failure restores the
 latest observed timeline. No optimistic position is written into Core or persisted.
 
+The Main ViewModel also projects a presentation-only refresh interval from the Effective Playback Rate. While Playing
+with a finite timeline, it targets at most approximately one media second per refresh and clamps the Dispatcher timer
+to 50–500 milliseconds. Rate changes update that interval through ordinary ViewModel notification; Pause, target loss
+or a missing timeline returns to the 500-millisecond idle cadence. This affects only WPF repaint frequency and never
+changes estimator sampling, authoritative observations or command dispatch.
+
 The Main ViewModel owns a presentation-only selection bookmark independently from Routing Mode. It first preserves an
 exact selected Session Key. If Windows replaces that ephemeral Key during catalog reconstruction, the presentation
 carries selection forward only when the old source-application identity has exactly one candidate. Missing or ambiguous

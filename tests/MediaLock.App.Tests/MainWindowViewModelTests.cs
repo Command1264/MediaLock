@@ -560,6 +560,157 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
     }
 
+    [Theory]
+    [InlineData(0.5, 500)]
+    [InlineData(1, 500)]
+    [InlineData(2, 500)]
+    [InlineData(3, 1000d / 3d)]
+    [InlineData(10, 100)]
+    [InlineData(16, 62.5)]
+    public void TimelineRefreshIntervalAdaptsToTheEffectivePlaybackRate(
+        double playbackRate,
+        double expectedMilliseconds)
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-refresh-cadence",
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(30),
+                    observedAt),
+                ReportedPlaybackRate: playbackRate));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.InRange(
+            Math.Abs(expectedMilliseconds - viewModel.TimelineRefreshInterval.TotalMilliseconds),
+            0,
+            0.001);
+    }
+
+    [Fact]
+    public void TimelineRefreshIntervalTracksRateChangesAndReturnsToIdleWhenPaused()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        MediaTargetSnapshot Target(PlaybackStatus status, double rate) =>
+            MediaTargetSnapshot.FromBrowserPageBinding(
+                "page-binding-changing-refresh-cadence",
+                new MediaTargetPresentation(
+                    "Big Buck Bunny",
+                    status,
+                    MediaCommandCapabilities.None,
+                    observedAt,
+                    Timeline: new MediaTimeline(
+                        TimeSpan.Zero,
+                        TimeSpan.FromMinutes(10),
+                        TimeSpan.FromSeconds(30),
+                        observedAt),
+                    ReportedPlaybackRate: rate));
+        var initial = Target(PlaybackStatus.Playing, 1);
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [initial],
+                LockedMediaTarget = initial.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.Equal(500, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [Target(PlaybackStatus.Playing, 10)],
+                Revision = 2,
+            },
+        });
+        Assert.Equal(100, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [Target(PlaybackStatus.Paused, 10)],
+                Revision = 3,
+            },
+        });
+        Assert.Equal(500, viewModel.TimelineRefreshInterval.TotalMilliseconds);
+    }
+
+    [Fact]
+    public void TimelineRefreshIntervalUsesAnEstimatedPlaybackRate()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var targetId = MediaTargetId.FromBrowserPageBinding("page-binding-estimated-refresh-cadence");
+        var estimator = new PlaybackRateEstimator();
+        PlaybackRateResolution resolution = default;
+        foreach (var second in new[] { 0, 2, 4 })
+        {
+            resolution = estimator.Observe(new PlaybackRateObservation(
+                targetId,
+                PlaybackStatus.Playing,
+                new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(second * 3),
+                    observedAt.AddSeconds(second)),
+                TimeSpan.FromSeconds(second)));
+        }
+        var target = MediaTargetSnapshot.FromBrowserPageBinding(
+            targetId.Value,
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.None,
+                observedAt,
+                Timeline: new MediaTimeline(
+                    TimeSpan.Zero,
+                    TimeSpan.FromMinutes(10),
+                    TimeSpan.FromSeconds(12),
+                    observedAt.AddSeconds(4)))
+                .WithPlaybackRateProjection(resolution, null));
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [target],
+                LockedMediaTarget = target.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.Equal(PlaybackRateResolutionSource.Estimated, resolution.Source);
+        Assert.InRange(
+            Math.Abs((1000d / 3d) - viewModel.TimelineRefreshInterval.TotalMilliseconds),
+            0,
+            0.001);
+    }
+
     [Fact]
     public void MonotonicTimelineAnchorIgnoresUtcClockAdjustment()
     {
