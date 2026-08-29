@@ -123,5 +123,22 @@ export function createBrowserMediaTargetRegistry({ authorization, tabs }) {
         && matches(target)
         && current.capabilities.includes(commandName);
     },
+
+    updateCapabilities(target, capabilities) {
+      const current = targets.get(target?.tabId);
+      if (current === undefined
+          || !matches(target)
+          || !Array.isArray(capabilities)
+          || capabilities.length === 0
+          || new Set(capabilities).size !== capabilities.length
+          || capabilities.some((capability) => !GENERIC_CAPABILITIES.has(capability))) {
+        return false;
+      }
+      targets.set(target.tabId, Object.freeze({
+        target: current.target,
+        capabilities: Object.freeze([...capabilities]),
+      }));
+      return true;
+    },
   });
 }

@@ -5,6 +5,11 @@ test('the production Service Worker continues a first site grant after Popup rep
   let permissionAdded;
   const event = (capture) => ({ addListener(listener) { capture(listener); } });
   globalThis.chrome = {
+    alarms: {
+      onAlarm: event(() => {}),
+      create() {},
+      async clear() { return true; },
+    },
     tabs: {
       onUpdated: event(() => {}),
       onRemoved: event(() => {}),

@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createGrantedSiteBindingHandler } from '../site-permission-binding.mjs';
+import {
+  createGrantedSiteBindingHandler,
+  createTrustedSiteReconciler,
+} from '../site-permission-binding.mjs';
 
 test('a first exact-site grant binds matching completed tabs without a second popup click', async () => {
   const queries = [];
@@ -78,4 +81,40 @@ test('multiple newly granted origins bind each matching completed tab at most on
   ] });
 
   assert.deepEqual(bound, [42, 43]);
+});
+
+test('trusted-site reconciliation binds only completed exact HTTPS tabs with retained permission', async () => {
+  const checked = [];
+  const bound = [];
+  const reconcile = createTrustedSiteReconciler({
+    tabs: {
+      async query(query) {
+        assert.deepEqual(query, {});
+        return [
+          { id: 41, status: 'complete', url: 'https://allowed.example.test/watch' },
+          { id: 42, status: 'loading', url: 'https://allowed.example.test/loading' },
+          { id: 43, status: 'complete', url: 'http://allowed.example.test/insecure' },
+          { id: 44, status: 'complete', url: 'https://denied.example.test/watch' },
+          { id: 45, status: 'complete', url: 'not-a-url' },
+        ];
+      },
+    },
+    async hasSitePermission(origin) {
+      checked.push(origin);
+      return origin === 'https://allowed.example.test';
+    },
+    async bindCompletedTab(tab) {
+      bound.push(tab.id);
+      return { accepted: true };
+    },
+  });
+
+  const result = await reconcile();
+
+  assert.deepEqual(checked, [
+    'https://allowed.example.test',
+    'https://denied.example.test',
+  ]);
+  assert.deepEqual(bound, [41]);
+  assert.equal(result.eligibleCount, 1);
 });

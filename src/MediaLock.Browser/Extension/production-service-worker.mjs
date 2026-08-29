@@ -4,7 +4,11 @@ import { createAuthorizedTargetLifecycle } from './authorized-target-lifecycle.m
 import { dispatchBoundCommand } from './browser-dispatch.mjs';
 import { createBrowserMediaTargetRegistry } from './generic-target-registry.mjs';
 import { handleNativePortDisconnect } from './native-connection-lifecycle.mjs';
-import { createGrantedSiteBindingHandler } from './site-permission-binding.mjs';
+import { createNativeConnectionRecovery } from './native-connection-recovery.mjs';
+import {
+  createGrantedSiteBindingHandler,
+  createTrustedSiteReconciler,
+} from './site-permission-binding.mjs';
 import {
   createInboundCommandGuard,
   validateHelloAck,
@@ -33,12 +37,22 @@ const pageBindingCoordinator = createAuthorizedPageBindingCoordinator({
   hasSitePermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
   bindTab: (tab, scope) => prepareBinding(
     () => genericTargetRegistry.bindTab({ scope, tab }),
+    { retryWhenUnavailable: scope === 'site' },
   ),
   commitBinding: (result) => authorizedTargetLifecycle.replace(result),
   discardBinding: (target) => genericTargetRegistry.discard(target),
 });
 const handleGrantedSites = createGrantedSiteBindingHandler({
   tabs: chrome.tabs,
+  bindCompletedTab: (tab) => pageBindingCoordinator.handleTabUpdated(
+    tab.id,
+    { status: 'complete' },
+    tab,
+  ),
+});
+const reconcileTrustedSites = createTrustedSiteReconciler({
+  tabs: chrome.tabs,
+  hasSitePermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
   bindCompletedTab: (tab) => pageBindingCoordinator.handleTabUpdated(
     tab.id,
     { status: 'complete' },
@@ -52,6 +66,14 @@ let connectionId;
 let negotiatedCapabilities = [];
 let outboundSequence = 0;
 let inboundCommandGuard;
+const nativeConnectionRecovery = createNativeConnectionRecovery({
+  alarms: chrome.alarms,
+  attempt: attemptNativeConnectionRecovery,
+  reportFailure: reportNativeRecoveryFailure,
+});
+
+chrome.alarms.onAlarm.addListener(nativeConnectionRecovery.handleAlarm);
+nativeConnectionRecovery.start().catch(reportNativeRecoveryFailure);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender?.id !== chrome.runtime.id) {
@@ -126,13 +148,16 @@ async function authorizeTarget(scope) {
   return pageBindingCoordinator.authorizeTab({ scope, tab: activeTab });
 }
 
-async function prepareBinding(bind) {
+async function prepareBinding(bind, { retryWhenUnavailable = false } = {}) {
   const result = await bind();
   if (result.accepted !== true) {
     return result;
   }
   if (await ensureNativeConnection() !== true) {
     genericTargetRegistry.discard(result.target);
+    if (retryWhenUnavailable) {
+      nativeConnectionRecovery.request();
+    }
     return { accepted: false, errorCode: 'native-host-unavailable' };
   }
   return result;
@@ -158,6 +183,7 @@ async function ensureNativeConnection() {
     });
     nativePort.onDisconnect.addListener(() => {
       handleNativePortDisconnect(chrome.runtime, disconnectNative);
+      nativeConnectionRecovery.request();
     });
   } catch {
     disconnectNative();
@@ -207,6 +233,7 @@ async function handleNativeMessage(message) {
     connectionId = accepted.connectionId;
     negotiatedCapabilities = accepted.capabilities;
     inboundCommandGuard = createInboundCommandGuard();
+    nativeConnectionRecovery.connected();
     handshake.resolve(true);
     for (const target of authorizedTargetLifecycle.values()) {
       await publishTarget(target);
@@ -244,7 +271,7 @@ async function handleNativeMessage(message) {
       const current = authorizedTargetLifecycle.get(request.target.tabId);
       if (current?.target.bindingId === request.target.bindingId
           && current.target.endpointId === request.target.endpointId) {
-        await authorizedTargetLifecycle.observe(request.target, result.presentation);
+        await observePresentation(request.target, result.presentation);
       }
     }
     return;
@@ -327,9 +354,35 @@ async function handlePresentationChanged(message, sender) {
       || sender?.documentId !== message.target?.documentId) {
     return false;
   }
-  return authorizedTargetLifecycle.observe(
-    message.target,
-    normalizePresentation(message.presentation),
+  return observePresentation(message.target, message.presentation);
+}
+
+function observePresentation(target, value) {
+  const presentation = normalizePresentation(value);
+  if (!genericTargetRegistry.updateCapabilities(
+    target,
+    presentation.capabilities,
+  )) {
+    return Promise.resolve(false);
+  }
+  return authorizedTargetLifecycle.observe(target, presentation);
+}
+
+async function attemptNativeConnectionRecovery() {
+  if (connectionId) {
+    return false;
+  }
+  if ([...authorizedTargetLifecycle.values()].length > 0) {
+    return await ensureNativeConnection() !== true;
+  }
+  const reconciliation = await reconcileTrustedSites();
+  return reconciliation.eligibleCount > 0 && !connectionId;
+}
+
+function reportNativeRecoveryFailure(error) {
+  console.debug(
+    'Media Lock Native Host recovery did not complete.',
+    error instanceof Error ? error.name : 'UnknownError',
   );
 }
 

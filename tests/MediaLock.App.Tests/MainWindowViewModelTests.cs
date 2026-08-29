@@ -556,6 +556,7 @@ public sealed class MainWindowViewModelTests
 
         viewModel.RefreshTimeline();
 
+        Assert.True(viewModel.CanSeek);
         Assert.Equal("0:37", viewModel.NowPlayingElapsed);
         Assert.Equal(37d / 240d, viewModel.NowPlayingProgress, precision: 6);
     }

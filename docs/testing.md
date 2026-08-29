@@ -624,6 +624,11 @@ Exact-site permission acceptance must also be continued by the production Servic
 Popup while displaying its permission prompt, so the first newly granted exact HTTPS origin must bind each matching
 completed tab without a second Popup action. Wildcard, broad, malformed, non-HTTPS and unrelated permission additions
 must never create a Browser target.
+Browser capability tests bind before media metadata is ready, then expose a finite seekable range and require the live
+presentation, exact registry command gate and WPF slider to become seekable without reauthorization. Production
+Service Worker tests also start with a completed exact-site page while the Native Host is unavailable, then require a
+later alarm wake-up to retry discovery without reload. Recovery requests coalesce, use capped backoff, survive an
+in-flight reconciliation race and stop after connection or when no eligible trusted page remains.
 Application tests lock and route an exact Browser target with a recording runtime repository and require zero
 post-lock saves; persistence tests independently reject Session Lock documents without a durable Locked Target before
 creating or replacing `state.json`.
