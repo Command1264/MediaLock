@@ -887,19 +887,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     return target;
                 }
 
-                playbackRateEstimator.Reset(
+                var expired = ExpirePlaybackRateProjection(
                     target.Id,
-                    PlaybackRateResetReason.ObservationExpired);
-                var expired = projection with
-                {
-                    Resolution = PlaybackRateResolution.Fallback,
-                    ObservedAt = observedAt,
-                    PresentationTimeline = AdvancePresentationTimeline(
-                        projection,
-                        monotonicTime),
-                    PresentationAnchorTime = monotonicTime,
-                    PreventBackwardProjection = true,
-                };
+                    projection,
+                    monotonicTime,
+                    observedAt);
                 playbackRateProjections[target.Id] = expired;
                 changed = true;
                 return ApplyPlaybackRateProjection(target, expired);
@@ -934,10 +926,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
         MonotonicTimestamp observedAt)
     {
         var fingerprint = PlaybackRateObservationFingerprint.From(target.Presentation);
-        var identity = PlaybackRateObservationIdentity.From(target.Presentation);
+        var continuitySignature = PlaybackRateObservationContinuitySignature.From(
+            target.Presentation);
         if (playbackRateProjections.TryGetValue(target.Id, out var previous))
         {
-            if (previous.Identity != identity)
+            if (previous.ContinuitySignature != continuitySignature)
             {
                 playbackRateEstimator.Reset(
                     target.Id,
@@ -950,19 +943,11 @@ public sealed class MediaLockApplication : IMediaLockApplication
                     monotonicTime - previous.LastFreshObservationAt >=
                     PlaybackRateObservationTimeout)
                 {
-                    playbackRateEstimator.Reset(
+                    previous = ExpirePlaybackRateProjection(
                         target.Id,
-                        PlaybackRateResetReason.ObservationExpired);
-                    previous = previous with
-                    {
-                        Resolution = PlaybackRateResolution.Fallback,
-                        ObservedAt = observedAt,
-                        PresentationTimeline = AdvancePresentationTimeline(
-                            previous,
-                            monotonicTime),
-                        PresentationAnchorTime = monotonicTime,
-                        PreventBackwardProjection = true,
-                    };
+                        previous,
+                        monotonicTime,
+                        observedAt);
                     playbackRateProjections[target.Id] = previous;
                 }
 
@@ -1001,7 +986,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
         var projection = new PlaybackRateProjectionState(
             fingerprint,
-            identity,
+            continuitySignature,
             resolution,
             observedAt,
             presentationTimeline,
@@ -1010,6 +995,27 @@ public sealed class MediaLockApplication : IMediaLockApplication
             preventBackwardProjection);
         playbackRateProjections[target.Id] = projection;
         return ApplyPlaybackRateProjection(target, projection);
+    }
+
+    private PlaybackRateProjectionState ExpirePlaybackRateProjection(
+        MediaTargetId target,
+        PlaybackRateProjectionState projection,
+        TimeSpan monotonicTime,
+        MonotonicTimestamp observedAt)
+    {
+        playbackRateEstimator.Reset(
+            target,
+            PlaybackRateResetReason.ObservationExpired);
+        return projection with
+        {
+            Resolution = PlaybackRateResolution.Fallback,
+            ObservedAt = observedAt,
+            PresentationTimeline = AdvancePresentationTimeline(
+                projection,
+                monotonicTime),
+            PresentationAnchorTime = monotonicTime,
+            PreventBackwardProjection = true,
+        };
     }
 
     private static MediaTargetSnapshot ApplyPlaybackRateProjection(
@@ -1662,12 +1668,12 @@ public sealed class MediaLockApplication : IMediaLockApplication
             presentation.ReportedPlaybackRate);
     }
 
-    private readonly record struct PlaybackRateObservationIdentity(
+    private readonly record struct PlaybackRateObservationContinuitySignature(
         string SourceDisplayName,
         MediaMetadata? Metadata,
         MediaPlaybackType PlaybackType)
     {
-        public static PlaybackRateObservationIdentity From(
+        public static PlaybackRateObservationContinuitySignature From(
             MediaTargetPresentation presentation) => new(
             presentation.SourceDisplayName,
             presentation.Metadata,
@@ -1676,7 +1682,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
 
     private sealed record PlaybackRateProjectionState(
         PlaybackRateObservationFingerprint Fingerprint,
-        PlaybackRateObservationIdentity Identity,
+        PlaybackRateObservationContinuitySignature ContinuitySignature,
         PlaybackRateResolution Resolution,
         MonotonicTimestamp ObservedAt,
         MediaTimeline? PresentationTimeline,

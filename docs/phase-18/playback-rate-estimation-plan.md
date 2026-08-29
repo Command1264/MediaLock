@@ -54,6 +54,11 @@ claim. Explicit reported values remain subject to the product's documented provi
 negative elapsed time, position reversal without Seek, bounds change and large unexplained jumps invalidate the sample
 or reset the target. Until confidence is sufficient, publish 1× Fallback.
 
+After confidence exists, one incremental slope outside the stable-rate tolerance is held as pending evidence instead
+of entering the rolling window. A matching continuation starts a bounded new-rate window; a continuation that returns
+to the published rate classifies the pending position as a discontinuity and clears confidence. This distinguishes a
+sustained rate change from a small external forward Seek while retaining a finite allowance for quantized positions.
+
 Per-target samples retain only the five-second window, and the estimator retains at most 256 least-recently-used target
 states as a second safety bound. These constants remain private to the Module and may be tuned without changing callers.
 
@@ -67,7 +72,8 @@ states as a second safety bound. These constants remain private to the Module an
 
 ### Slice 2 — Core estimator
 
-1. RED: convergence, jitter, outlier, quantization, rate-change and target-isolation matrix with fake monotonic time.
+1. RED: convergence, jitter, outlier, quantization, small external Seek, rate-change and target-isolation matrix with
+   fake monotonic time.
 2. Implement bounded samples, robust slope, confidence and hysteresis behind the small public Interface.
 3. RED/GREEN every reset reason and bounded-state eviction.
 

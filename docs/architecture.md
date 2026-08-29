@@ -360,6 +360,11 @@ target before later samples can regain confidence. Reset and projection do not a
 command capability, Recovery correlation or persisted schemas. See
 [ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).
 
+When an already-confident target produces a finite but divergent incremental slope, Core keeps it outside the rolling
+window until the next observation. Continuation at the divergent slope starts a new-rate window; continuation at the
+published slope classifies the intermediate position as a discontinuity and clears confidence. A bounded position
+residual prevents normal quantized timelines from being mistaken for either transition.
+
 If a cached provider observation remains unchanged for the full five-second estimator window, Application expires an
 Estimated result to Fallback. A monotonic Application confidence worker checks this independently of catalog traffic,
 so a completely silent provider cannot keep an estimate alive indefinitely. It rebases only the presentation timeline

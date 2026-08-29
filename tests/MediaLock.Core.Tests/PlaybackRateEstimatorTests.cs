@@ -323,6 +323,22 @@ public sealed class PlaybackRateEstimatorTests
         Assert.Equal(PlaybackRateResolutionSource.Fallback, afterJump.Source);
     }
 
+    [Fact]
+    public void SmallForwardSeekDoesNotReplaceAConfidentEstimate()
+    {
+        var estimator = new PlaybackRateEstimator();
+        var target = MediaTargetId.FromBrowserPageBinding("small-forward-seek");
+        _ = Observe(estimator, target, 0, 10);
+        _ = Observe(estimator, target, 2, 12);
+        var established = Observe(estimator, target, 4, 14);
+
+        _ = Observe(estimator, target, 5, 18);
+        var afterSeek = Observe(estimator, target, 6, 19);
+
+        Assert.Equal(1d, established.Rate, precision: 6);
+        Assert.Equal(PlaybackRateResolutionSource.Fallback, afterSeek.Source);
+    }
+
     private static PlaybackRateResolution Observe(
         PlaybackRateEstimator estimator,
         MediaTargetId target,

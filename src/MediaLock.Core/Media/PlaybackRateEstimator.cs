@@ -27,8 +27,10 @@ public sealed class PlaybackRateEstimator
 {
     private static readonly TimeSpan MinimumObservationSpan = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan ObservationWindow = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan QuantizedPositionTolerance = TimeSpan.FromSeconds(0.75d);
     private const double MinimumEstimatedRate = 0.25d;
     private const double MaximumEstimatedRate = 4d;
+    private const double StableRateRelativeTolerance = 0.1d;
     private const int MaximumTrackedTargets = 256;
     private readonly Dictionary<MediaTargetId, TargetState> states = [];
     private readonly Dictionary<MediaTargetId, LinkedListNode<MediaTargetId>> recencyNodes = [];
@@ -83,6 +85,62 @@ public sealed class PlaybackRateEstimator
                 SetState(observation.Target, reset);
                 return reset.Resolution;
             }
+
+            if (existing.Resolution is
+                {
+                    Source: PlaybackRateResolutionSource.Estimated,
+                } published)
+            {
+                if (existing.IsRebuildingRate)
+                {
+                    if (existing.PendingDivergentSlope is not { } rebuildingSlope ||
+                        IsConsistentSlope(incrementalSlope, published.Rate, elapsed) ||
+                        !IsConsistentSlope(incrementalSlope, rebuildingSlope, elapsed))
+                    {
+                        var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
+                        SetState(observation.Target, reset);
+                        return reset.Resolution;
+                    }
+                }
+                else if (existing.PendingDivergentSample is { } pendingSample &&
+                         existing.PendingDivergentSlope is { } pendingSlope)
+                {
+                    var pendingElapsed = sample.MonotonicTime - pendingSample.MonotonicTime;
+                    var pendingPositionDelta = sample.Position - pendingSample.Position;
+                    var continuationSlope = pendingPositionDelta.TotalSeconds /
+                        pendingElapsed.TotalSeconds;
+                    if (pendingPositionDelta < TimeSpan.Zero ||
+                        continuationSlope > MaximumEstimatedRate ||
+                        IsConsistentSlope(continuationSlope, published.Rate, pendingElapsed) ||
+                        !IsConsistentSlope(continuationSlope, pendingSlope, pendingElapsed))
+                    {
+                        var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
+                        SetState(observation.Target, reset);
+                        return reset.Resolution;
+                    }
+
+                    var direction = Math.Sign(pendingSlope - published.Rate);
+                    var rebuilding = new TargetState(
+                        [pendingSample, sample],
+                        published,
+                        PendingDirection: direction,
+                        PendingCount: 1,
+                        PendingDivergentSlope: pendingSlope,
+                        IsRebuildingRate: true);
+                    SetState(observation.Target, rebuilding);
+                    return rebuilding.Resolution;
+                }
+                else if (!IsConsistentSlope(incrementalSlope, published.Rate, elapsed))
+                {
+                    var pending = existing with
+                    {
+                        PendingDivergentSample = sample,
+                        PendingDivergentSlope = incrementalSlope,
+                    };
+                    SetState(observation.Target, pending);
+                    return pending.Resolution;
+                }
+            }
         }
 
         var samples = existing is null
@@ -92,6 +150,14 @@ public sealed class PlaybackRateEstimator
             .Where(candidate => sample.MonotonicTime - candidate.MonotonicTime <= ObservationWindow)
             .ToArray();
         var candidate = Resolve(samples);
+        if (existing is { IsRebuildingRate: true } &&
+            candidate.Source != PlaybackRateResolutionSource.Estimated)
+        {
+            var rebuilding = existing with { Samples = samples };
+            SetState(observation.Target, rebuilding);
+            return rebuilding.Resolution;
+        }
+
         var next = Stabilize(samples, existing, candidate);
         SetState(observation.Target, next);
         return next.Resolution;
@@ -199,7 +265,7 @@ public sealed class PlaybackRateEstimator
         }
 
         var relativeDifference = Math.Abs(candidate.Rate - published.Rate) / published.Rate;
-        if (relativeDifference <= 0.1d)
+        if (relativeDifference <= StableRateRelativeTolerance)
         {
             return new TargetState(samples, published, PendingDirection: 0, PendingCount: 0);
         }
@@ -217,7 +283,22 @@ public sealed class PlaybackRateEstimator
         IReadOnlyList<Sample> Samples,
         PlaybackRateResolution Resolution,
         int PendingDirection = 0,
-        int PendingCount = 0);
+        int PendingCount = 0,
+        Sample? PendingDivergentSample = null,
+        double? PendingDivergentSlope = null,
+        bool IsRebuildingRate = false);
+
+    private static bool IsConsistentSlope(
+        double observed,
+        double expected,
+        TimeSpan elapsed)
+    {
+        var relativeDifference = Math.Abs(observed - expected) / expected;
+        var positionResidual = TimeSpan.FromSeconds(
+            Math.Abs(observed - expected) * elapsed.TotalSeconds);
+        return relativeDifference <= StableRateRelativeTolerance ||
+            positionResidual <= QuantizedPositionTolerance;
+    }
 
     private readonly record struct Sample(
         TimeSpan MonotonicTime,
