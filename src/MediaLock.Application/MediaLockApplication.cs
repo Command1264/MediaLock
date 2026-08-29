@@ -942,6 +942,7 @@ public sealed class MediaLockApplication : IMediaLockApplication
                 playbackRateEstimator.Reset(
                     target.Id,
                     PlaybackRateResetReason.DocumentReplaced);
+                previous = null;
             }
             else if (previous.Fingerprint == fingerprint)
             {

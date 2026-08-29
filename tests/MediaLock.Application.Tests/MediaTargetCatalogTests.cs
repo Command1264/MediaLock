@@ -421,6 +421,49 @@ public sealed class MediaTargetCatalogTests
     }
 
     [Fact]
+    public async Task DocumentIdentityChangeDoesNotReuseAnExpiredProjection()
+    {
+        var initial = BrowserTimelineTarget("expired-document", positionSeconds: 10);
+        var catalog = new PublishingTargetCatalog(new MediaTargetCatalogSnapshot([initial], null, []));
+        var clock = new ManualTimeProvider();
+        await using var application = new MediaLockApplication(
+            catalog,
+            new MediaRouter(new SuccessfulTargetController()),
+            settingsRepository: null,
+            loginStartupManager: null,
+            timeProvider: clock);
+        await application.StartAsync(CancellationToken.None);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("expired-document", positionSeconds: 14)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Timeline?.Position == TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(2));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot(
+            [BrowserTimelineTarget("expired-document", positionSeconds: 18)], null, []));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Estimated);
+        clock.Advance(TimeSpan.FromSeconds(6));
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.PlaybackRate.Source == PlaybackRateResolutionSource.Fallback);
+
+        var replacement = MediaTargetSnapshot.FromProvider(
+            initial.Id,
+            BrowserTimelineTarget("expired-document", positionSeconds: 20).Presentation with
+            {
+                Metadata = new MediaMetadata("Replacement after expiry", null, null, null),
+            });
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await catalog.PublishAsync(new MediaTargetCatalogSnapshot([replacement], null, []));
+
+        await WaitUntilAsync(() => Assert.Single(application.State.Targets)
+            .Presentation.Metadata?.Title == "Replacement after expiry");
+        var projected = Assert.Single(application.State.Targets).Presentation;
+        Assert.Equal(TimeSpan.FromSeconds(20), projected.Timeline?.Position);
+        Assert.Equal(PlaybackRateResolutionSource.Fallback, projected.PlaybackRate.Source);
+    }
+
+    [Fact]
     public async Task ReconciledTargetsRemainAvailableAcrossApplicationDispatches()
     {
         var braveSession = Session("brave-gsmtc", "Brave");
