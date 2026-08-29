@@ -81,9 +81,7 @@ public sealed class PlaybackRateEstimator
                 positionDelta < TimeSpan.Zero ||
                 incrementalSlope > MaximumEstimatedRate)
             {
-                var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
-                SetState(observation.Target, reset);
-                return reset.Resolution;
+                return ResetToFallback(observation.Target, sample);
             }
 
             if (existing.Resolution is
@@ -91,51 +89,66 @@ public sealed class PlaybackRateEstimator
                     Source: PlaybackRateResolutionSource.Estimated,
                 } published)
             {
-                if (existing.IsRebuildingRate)
+                if (existing.RateTransition is RebuildingRateTransition rebuildingTransition)
                 {
-                    if (existing.PendingDivergentSlope is not { } rebuildingSlope ||
-                        IsConsistentSlope(incrementalSlope, published.Rate, elapsed) ||
-                        !IsConsistentSlope(incrementalSlope, rebuildingSlope, elapsed))
+                    if (IsConsistentSlope(incrementalSlope, published.Rate, elapsed) ||
+                        !IsConsistentSlope(
+                            incrementalSlope,
+                            rebuildingTransition.Slope,
+                            elapsed))
                     {
-                        var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
-                        SetState(observation.Target, reset);
-                        return reset.Resolution;
+                        return ResetToFallback(observation.Target, sample);
                     }
                 }
-                else if (existing.PendingDivergentSample is { } pendingSample &&
-                         existing.PendingDivergentSlope is { } pendingSlope)
+                else if (existing.RateTransition is PendingDivergentSampleTransition pendingTransition)
                 {
+                    var pendingSample = pendingTransition.Sample;
+                    var pendingSlope = pendingTransition.Slope;
                     var pendingElapsed = sample.MonotonicTime - pendingSample.MonotonicTime;
                     var pendingPositionDelta = sample.Position - pendingSample.Position;
                     var continuationSlope = pendingPositionDelta.TotalSeconds /
                         pendingElapsed.TotalSeconds;
-                    if (pendingPositionDelta < TimeSpan.Zero ||
-                        continuationSlope > MaximumEstimatedRate ||
-                        IsConsistentSlope(continuationSlope, published.Rate, pendingElapsed) ||
-                        !IsConsistentSlope(continuationSlope, pendingSlope, pendingElapsed))
+                    var trustedSample = existing.Samples[^1];
+                    var bridgedElapsed = sample.MonotonicTime - trustedSample.MonotonicTime;
+                    var bridgedPositionDelta = sample.Position - trustedSample.Position;
+                    var bridgedSlope = bridgedPositionDelta.TotalSeconds /
+                        bridgedElapsed.TotalSeconds;
+                    if (bridgedPositionDelta >= TimeSpan.Zero &&
+                        bridgedSlope <= MaximumEstimatedRate &&
+                        IsConsistentSlope(bridgedSlope, published.Rate, bridgedElapsed))
                     {
-                        var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
-                        SetState(observation.Target, reset);
-                        return reset.Resolution;
+                        existing = existing with
+                        {
+                            RateTransition = null,
+                        };
                     }
-
-                    var direction = Math.Sign(pendingSlope - published.Rate);
-                    var rebuilding = new TargetState(
-                        [pendingSample, sample],
-                        published,
-                        PendingDirection: direction,
-                        PendingCount: 1,
-                        PendingDivergentSlope: pendingSlope,
-                        IsRebuildingRate: true);
-                    SetState(observation.Target, rebuilding);
-                    return rebuilding.Resolution;
+                    else if (pendingPositionDelta < TimeSpan.Zero ||
+                             continuationSlope > MaximumEstimatedRate ||
+                             IsConsistentSlope(continuationSlope, published.Rate, pendingElapsed) ||
+                             !IsConsistentSlope(continuationSlope, pendingSlope, pendingElapsed))
+                    {
+                        return ResetToFallback(observation.Target, sample);
+                    }
+                    else
+                    {
+                        var direction = Math.Sign(pendingSlope - published.Rate);
+                        var rebuilding = new TargetState(
+                            [pendingSample, sample],
+                            published,
+                            PendingDirection: direction,
+                            PendingCount: 1,
+                            RateTransition: new RebuildingRateTransition(pendingSlope));
+                        SetState(observation.Target, rebuilding);
+                        return rebuilding.Resolution;
+                    }
                 }
                 else if (!IsConsistentSlope(incrementalSlope, published.Rate, elapsed))
                 {
                     var pending = existing with
                     {
-                        PendingDivergentSample = sample,
-                        PendingDivergentSlope = incrementalSlope,
+                        RateTransition = new PendingDivergentSampleTransition(
+                            sample,
+                            incrementalSlope),
                     };
                     SetState(observation.Target, pending);
                     return pending.Resolution;
@@ -150,7 +163,7 @@ public sealed class PlaybackRateEstimator
             .Where(candidate => sample.MonotonicTime - candidate.MonotonicTime <= ObservationWindow)
             .ToArray();
         var candidate = Resolve(samples);
-        if (existing is { IsRebuildingRate: true } &&
+        if (existing?.RateTransition is RebuildingRateTransition &&
             candidate.Source != PlaybackRateResolutionSource.Estimated)
         {
             var rebuilding = existing with { Samples = samples };
@@ -171,6 +184,13 @@ public sealed class PlaybackRateEstimator
         {
             RemoveState(recency.First!.Value);
         }
+    }
+
+    private PlaybackRateResolution ResetToFallback(MediaTargetId target, Sample sample)
+    {
+        var reset = new TargetState([sample], PlaybackRateResolution.Fallback);
+        SetState(target, reset);
+        return reset.Resolution;
     }
 
     private void Touch(MediaTargetId target)
@@ -284,9 +304,15 @@ public sealed class PlaybackRateEstimator
         PlaybackRateResolution Resolution,
         int PendingDirection = 0,
         int PendingCount = 0,
-        Sample? PendingDivergentSample = null,
-        double? PendingDivergentSlope = null,
-        bool IsRebuildingRate = false);
+        RateTransition? RateTransition = null);
+
+    private abstract record RateTransition(double Slope);
+
+    private sealed record PendingDivergentSampleTransition(
+        Sample Sample,
+        double Slope) : RateTransition(Slope);
+
+    private sealed record RebuildingRateTransition(double Slope) : RateTransition(Slope);
 
     private static bool IsConsistentSlope(
         double observed,

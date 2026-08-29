@@ -364,6 +364,8 @@ When an already-confident target produces a finite but divergent incremental slo
 window until the next observation. Continuation at the divergent slope starts a new-rate window; continuation at the
 published slope classifies the intermediate position as a discontinuity and clears confidence. A bounded position
 residual prevents normal quantized timelines from being mistaken for either transition.
+If the trusted observations on both sides still match the published slope, Core discards only the isolated pending
+sample and retains confidence.
 
 If a cached provider observation remains unchanged for the full five-second estimator window, Application expires an
 Estimated result to Fallback. A monotonic Application confidence worker checks this independently of catalog traffic,

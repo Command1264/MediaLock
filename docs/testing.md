@@ -113,6 +113,8 @@ and document／target replacement—must lose confidence before later samples ca
 An external forward Seek whose instantaneous slope remains inside the accepted estimator range must also be rejected:
 one divergent slope is pending only, and a following observation at the prior rate clears confidence rather than
 letting the Seek replace the estimate. Sustained matching slopes must still converge as a genuine rate change.
+Conversely, bridging across one delayed observation at the published rate must discard only that outlier and retain
+the confident estimate.
 The candidate contract fixes a five-second window, three-second／three-observation confidence floor, pairwise-slope
 median, 10% published-rate tolerance, two same-direction challenger observations and a 256-target LRU bound.
 

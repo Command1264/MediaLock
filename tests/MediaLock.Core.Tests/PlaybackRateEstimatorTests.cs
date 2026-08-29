@@ -339,6 +339,23 @@ public sealed class PlaybackRateEstimatorTests
         Assert.Equal(PlaybackRateResolutionSource.Fallback, afterSeek.Source);
     }
 
+    [Fact]
+    public void OneDelayedPositionObservationDoesNotClearAConfidentEstimate()
+    {
+        var estimator = new PlaybackRateEstimator();
+        var target = MediaTargetId.FromBrowserPageBinding("delayed-position");
+        _ = Observe(estimator, target, 0, 0);
+        _ = Observe(estimator, target, 2, 4);
+        var established = Observe(estimator, target, 4, 8);
+
+        _ = Observe(estimator, target, 5, 9);
+        var recovered = Observe(estimator, target, 6, 12);
+
+        Assert.Equal(2d, established.Rate, precision: 6);
+        Assert.Equal(PlaybackRateResolutionSource.Estimated, recovered.Source);
+        Assert.Equal(2d, recovered.Rate, precision: 6);
+    }
+
     private static PlaybackRateResolution Observe(
         PlaybackRateEstimator estimator,
         MediaTargetId target,

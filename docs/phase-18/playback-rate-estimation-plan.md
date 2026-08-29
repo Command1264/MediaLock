@@ -58,6 +58,8 @@ After confidence exists, one incremental slope outside the stable-rate tolerance
 of entering the rolling window. A matching continuation starts a bounded new-rate window; a continuation that returns
 to the published rate classifies the pending position as a discontinuity and clears confidence. This distinguishes a
 sustained rate change from a small external forward Seek while retaining a finite allowance for quantized positions.
+If the samples before and after that pending observation still match the published rate, the pending observation is an
+isolated delayed／jittered value and is discarded without reducing confidence.
 
 Per-target samples retain only the five-second window, and the estimator retains at most 256 least-recently-used target
 states as a second safety bound. These constants remain private to the Module and may be tuned without changing callers.
