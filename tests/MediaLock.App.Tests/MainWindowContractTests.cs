@@ -469,6 +469,76 @@ public sealed class MainWindowContractTests
     }
 
     [Fact]
+    public void TimelineTimerFollowsPlaybackRateAndReturnsToIdleCadenceWhenPaused()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+            MediaTargetSnapshot Target(PlaybackStatus status, double rate) =>
+                MediaTargetSnapshot.FromBrowserPageBinding(
+                    "page-binding-window-refresh-cadence",
+                    new MediaTargetPresentation(
+                        "Big Buck Bunny",
+                        status,
+                        MediaCommandCapabilities.None,
+                        observedAt,
+                        Timeline: new MediaTimeline(
+                            TimeSpan.Zero,
+                            TimeSpan.FromMinutes(10),
+                            TimeSpan.FromSeconds(30),
+                            observedAt),
+                        ReportedPlaybackRate: rate));
+            var initial = Target(PlaybackStatus.Playing, 1);
+            var application = new FakeMediaLockApplication(MediaLockApplicationState.Initial with
+            {
+                Router = RouterState.Initial with
+                {
+                    Mode = RoutingMode.SessionLock,
+                    Status = RouterStatus.Locked,
+                    Targets = [initial],
+                    LockedMediaTarget = initial.Id,
+                    Revision = 1,
+                },
+            });
+            using var viewModel = new MainWindowViewModel(
+                application,
+                synchronizationContext: SynchronizationContext.Current);
+            var window = new MainWindow(viewModel);
+            window.Show();
+            try
+            {
+                Assert.Equal(500, window.TimelineTimerInterval.TotalMilliseconds);
+
+                application.Publish(application.State with
+                {
+                    Router = application.State.Router with
+                    {
+                        Targets = [Target(PlaybackStatus.Playing, 10)],
+                        Revision = 2,
+                    },
+                });
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Equal(100, window.TimelineTimerInterval.TotalMilliseconds);
+
+                application.Publish(application.State with
+                {
+                    Router = application.State.Router with
+                    {
+                        Targets = [Target(PlaybackStatus.Paused, 10)],
+                        Revision = 3,
+                    },
+                });
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.Equal(500, window.TimelineTimerInterval.TotalMilliseconds);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void MinimumWindowKeepsTheStopControlInsideTheVisibleContent()
     {
         WpfTestHost.Run(() =>

@@ -783,6 +783,8 @@ Exit criteria:
 - Deterministic tests use a fake monotonic clock without sleeps. A bounded manual matrix checks slider cadence, time
   labels, language／theme parity and competing-source isolation.
 
-Status: planned for [GitHub Issue #65](https://github.com/Command1264/MediaLock/issues/65). See the
+Status: implementation, automated gates, two-axis review and exact-candidate six-row manual acceptance completed on
+2026-08-30 for [GitHub Issue #65](https://github.com/Command1264/MediaLock/issues/65); integration remains open. See the
 [Phase 18 implementation plan](phase-18/playback-rate-estimation-plan.md) and
+[exact-candidate smoke record](phase-18/playback-rate-estimation-smoke.md), plus
 [ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).

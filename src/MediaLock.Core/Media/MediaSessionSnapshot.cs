@@ -36,7 +36,8 @@ public sealed record MediaSessionSnapshot(
     MediaMetadata? Metadata = null,
     MediaTimeline? Timeline = null,
     MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
-    MediaArtwork? Artwork = null)
+    MediaArtwork? Artwork = null,
+    double? ReportedPlaybackRate = null)
 {
     public SessionDescriptor Descriptor => new(
         SourceAppUserModelId,

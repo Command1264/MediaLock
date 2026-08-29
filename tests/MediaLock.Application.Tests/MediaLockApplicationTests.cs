@@ -1568,7 +1568,7 @@ public sealed class MediaLockApplicationTests
         var options = Assert.IsType<RouterIntent.UpdateOptions>(router.Intents[0]).Options;
         Assert.Equal(TimeSpan.FromSeconds(42), options.RecoveryTimeout);
         Assert.Equal(FallbackPolicy.Wait, options.FallbackPolicy);
-        Assert.IsType<RouterIntent.CatalogUpdated>(router.Intents[1]);
+        Assert.IsType<RouterIntent.MediaTargetsUpdated>(router.Intents[1]);
     }
 
     [Fact]

@@ -433,7 +433,7 @@ public sealed class BrowserMediaAdapter :
             capabilities,
             observedAt,
             Timeline: timeline,
-            PlaybackRate: playbackRate,
+            ReportedPlaybackRate: playbackRate,
             SourceGroup: BrowserSourceGroup(browserFamily));
     }
 

@@ -35,17 +35,65 @@ public sealed record MediaSourceGroupHint
     public string DisplayName { get; }
 }
 
-public sealed record MediaTargetPresentation(
-    string SourceDisplayName,
-    PlaybackStatus PlaybackStatus,
-    MediaCommandCapabilities Capabilities,
-    DateTimeOffset ObservedAt,
-    MediaMetadata? Metadata = null,
-    MediaTimeline? Timeline = null,
-    MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
-    MediaArtwork? Artwork = null,
-    double PlaybackRate = 1d,
-    MediaSourceGroupHint? SourceGroup = null);
+public sealed record MediaTargetPresentation
+{
+    public MediaTargetPresentation(
+        string SourceDisplayName,
+        PlaybackStatus PlaybackStatus,
+        MediaCommandCapabilities Capabilities,
+        DateTimeOffset ObservedAt,
+        MediaMetadata? Metadata = null,
+        MediaTimeline? Timeline = null,
+        MediaPlaybackType PlaybackType = MediaPlaybackType.Unknown,
+        MediaArtwork? Artwork = null,
+        double? ReportedPlaybackRate = null,
+        MediaSourceGroupHint? SourceGroup = null)
+    {
+        this.SourceDisplayName = SourceDisplayName;
+        this.PlaybackStatus = PlaybackStatus;
+        this.Capabilities = Capabilities;
+        this.ObservedAt = ObservedAt;
+        this.Metadata = Metadata;
+        this.Timeline = Timeline;
+        this.PlaybackType = PlaybackType;
+        this.Artwork = Artwork;
+        this.ReportedPlaybackRate = PlaybackRateResolution.NormalizeReported(ReportedPlaybackRate);
+        this.SourceGroup = SourceGroup;
+        PlaybackRate = PlaybackRateResolution.FromReported(this.ReportedPlaybackRate);
+    }
+
+    public string SourceDisplayName { get; init; }
+
+    public PlaybackStatus PlaybackStatus { get; init; }
+
+    public MediaCommandCapabilities Capabilities { get; init; }
+
+    public DateTimeOffset ObservedAt { get; init; }
+
+    public MediaMetadata? Metadata { get; init; }
+
+    public MediaTimeline? Timeline { get; init; }
+
+    public MediaPlaybackType PlaybackType { get; init; }
+
+    public MediaArtwork? Artwork { get; init; }
+
+    public double? ReportedPlaybackRate { get; }
+
+    public MediaSourceGroupHint? SourceGroup { get; init; }
+
+    public PlaybackRateResolution PlaybackRate { get; private init; }
+
+    public MonotonicTimestamp? MonotonicObservedAt { get; private init; }
+
+    public MediaTargetPresentation WithPlaybackRateProjection(
+        PlaybackRateResolution playbackRate,
+        MonotonicTimestamp? monotonicObservedAt) => this with
+        {
+            PlaybackRate = PlaybackRateResolution.Validate(playbackRate),
+            MonotonicObservedAt = monotonicObservedAt,
+        };
+}
 
 public sealed record MediaTargetSnapshot
 {
@@ -65,6 +113,12 @@ public sealed record MediaTargetSnapshot
 
     public MediaSessionSnapshot? GsmtcSession { get; }
 
+    public MediaTargetSnapshot WithPresentation(MediaTargetPresentation presentation)
+    {
+        ArgumentNullException.ThrowIfNull(presentation);
+        return new MediaTargetSnapshot(Id, presentation, GsmtcSession);
+    }
+
     public static MediaTargetSnapshot FromGsmtc(MediaSessionSnapshot session)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -78,7 +132,8 @@ public sealed record MediaTargetSnapshot
             session.Metadata,
             session.Timeline,
             session.PlaybackType,
-                session.Artwork),
+            session.Artwork,
+            ReportedPlaybackRate: session.ReportedPlaybackRate),
             session);
     }
 

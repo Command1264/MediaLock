@@ -110,18 +110,33 @@ reported values, 0.5×／1×／1.5×／2× convergence, insufficient samples, du
 quantization, jitter, outliers, accepted-rate bounds, bounded memory and continuous 1×→2×→0.5× changes with hysteresis.
 Every discontinuity row—Seek, Pause, Stop, Changing, Recovery, reconnect, invalid bounds, position jump, target removal
 and document／target replacement—must lose confidence before later samples can establish a new estimate.
+An external forward Seek whose instantaneous slope remains inside the accepted estimator range must also be rejected:
+one divergent slope is pending only, and a following observation at the prior rate clears confidence rather than
+letting the Seek replace the estimate. Sustained matching slopes must still converge as a genuine rate change.
+Conversely, bridging across one delayed observation at the published rate must discard only that outlier and retain
+the confident estimate.
+The candidate contract fixes a five-second window, three-second／three-observation confidence floor, pairwise-slope
+median, 10% published-rate tolerance, two same-direction challenger observations and a 256-target LRU bound.
 
 Application tests feed independent same-title GSMTC and Browser targets through one catalog projection and prove their
-samples never mix. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
+samples never mix. They also republish one provider's cached target while another provider advances, verify the cached
+target retains its previous monotonic anchor, and prove GSMTC-only catalogs keep the provider-neutral projection in
+Router state. Routed Seek, Recovery／reconnect and same-ID document replacement each discard confidence before a new
+window begins. A fake monotonic timer proves a stale cached estimate expires after five seconds even with no catalog
+traffic, using a presentation-only rebased Fallback without moving the displayed position backward or feeding that
+position into Core. An injected worker failure must become an existing structured Application problem and cannot
+prevent orderly disposal. A valid Reported Playback Rate overrides an estimate immediately; missing／invalid input uses only a
 confident estimate or 1× fallback. ViewModel tests use the projected Effective Playback Rate and monotonic anchor,
-clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. Existing Router,
+clamp to observed bounds, stop on Pause and never feed interpolated position back into Core. WPF cadence tests cover
+0.5×／1×／2×／3×／10×／16×, require approximately one media second or less per refresh inside a 50–500 millisecond
+timer bound, react to mid-play rate changes and return to the idle cadence on Pause. Existing Router,
 Recovery, persistence and exactly-once command tests remain unchanged.
 
 Manual Phase 18 acceptance contains exactly six numbered rows, and every guided result reports `目前第 N／6 項`:
 
 1. 1× baseline slider and `mm:ss` cadence;
 2. 2× playback over a measured interval;
-3. continuous 1×→2×→0.5× changes without stale-rate drift;
+3. continuous 1×→2×→0.5× changes without stale-rate drift, plus smooth 3×／10×／16× reported-rate cadence;
 4. external Pause／Play and Seek reset behavior;
 5. reload／replacement plus competing YouTube Music isolation; and
 6. English／Traditional Chinese and Light／Dark visual parity for rate source, slider and labels.
