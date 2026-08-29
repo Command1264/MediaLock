@@ -562,6 +562,58 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void BrowserSeekAvailabilityUpdatesWhenTheSameTargetGainsTheCapability()
+    {
+        var observedAt = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var timeline = new MediaTimeline(
+            TimeSpan.Zero,
+            TimeSpan.FromMinutes(4),
+            TimeSpan.FromSeconds(30),
+            observedAt);
+        var initial = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-dynamic-seek",
+            new MediaTargetPresentation(
+                "Big Buck Bunny",
+                PlaybackStatus.Playing,
+                MediaCommandCapabilities.Play,
+                observedAt,
+                Timeline: timeline));
+        var updated = MediaTargetSnapshot.FromBrowserPageBinding(
+            "page-binding-dynamic-seek",
+            initial.Presentation with
+            {
+                Capabilities = MediaCommandCapabilities.Play |
+                    MediaCommandCapabilities.SeekAbsolute,
+                ObservedAt = observedAt.AddSeconds(1),
+            });
+        var application = new FakeApplication(MediaLockApplicationState.Initial with
+        {
+            Router = RouterState.Initial with
+            {
+                Mode = RoutingMode.SessionLock,
+                Status = RouterStatus.Locked,
+                Targets = [initial],
+                LockedMediaTarget = initial.Id,
+                Revision = 1,
+            },
+        });
+        using var viewModel = new MainWindowViewModel(application, synchronizationContext: null);
+
+        Assert.False(viewModel.CanSeek);
+
+        application.Publish(application.State with
+        {
+            Router = application.State.Router with
+            {
+                Targets = [updated],
+                Revision = 2,
+            },
+        });
+
+        Assert.True(viewModel.CanSeek);
+    }
+
+    [Fact]
     public void InvalidOrMissingTimelineIsHiddenAndCannotRetainThePreviousTarget()
     {
         var observedAt = DateTimeOffset.Parse("2026-08-23T06:00:00Z");

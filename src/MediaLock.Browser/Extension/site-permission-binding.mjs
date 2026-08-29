@@ -20,11 +20,7 @@ export function createGrantedSiteBindingHandler({ tabs, bindCompletedTab }) {
           || typeof tab?.url !== 'string') {
         return false;
       }
-      try {
-        return origins.has(new URL(tab.url).origin);
-      } catch {
-        return false;
-      }
+      return origins.has(exactHttpsOriginFromUrl(tab.url));
     });
     return Promise.all(matchingTabs.map((tab) => bindCompletedTab(tab)));
   };
@@ -60,16 +56,8 @@ function exactHttpsOrigin(pattern) {
     return null;
   }
   const candidate = pattern.slice(0, -2);
-  try {
-    const url = new URL(candidate);
-    return url.protocol === 'https:'
-      && !url.hostname.includes('*')
-      && url.origin === candidate
-      ? url.origin
-      : null;
-  } catch {
-    return null;
-  }
+  const origin = exactHttpsOriginFromUrl(candidate);
+  return origin !== null && origin === candidate && !origin.includes('*') ? origin : null;
 }
 
 function exactHttpsOriginFromUrl(value) {

@@ -42,22 +42,19 @@ const pageBindingCoordinator = createAuthorizedPageBindingCoordinator({
   commitBinding: (result) => authorizedTargetLifecycle.replace(result),
   discardBinding: (target) => genericTargetRegistry.discard(target),
 });
+const bindCompletedTrustedTab = (tab) => pageBindingCoordinator.handleTabUpdated(
+  tab.id,
+  { status: 'complete' },
+  tab,
+);
 const handleGrantedSites = createGrantedSiteBindingHandler({
   tabs: chrome.tabs,
-  bindCompletedTab: (tab) => pageBindingCoordinator.handleTabUpdated(
-    tab.id,
-    { status: 'complete' },
-    tab,
-  ),
+  bindCompletedTab: bindCompletedTrustedTab,
 });
 const reconcileTrustedSites = createTrustedSiteReconciler({
   tabs: chrome.tabs,
   hasSitePermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
-  bindCompletedTab: (tab) => pageBindingCoordinator.handleTabUpdated(
-    tab.id,
-    { status: 'complete' },
-    tab,
-  ),
+  bindCompletedTab: bindCompletedTrustedTab,
 });
 
 let nativePort;
