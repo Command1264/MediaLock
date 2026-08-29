@@ -585,6 +585,31 @@ asynchronous boundary, so a result completed after reload／close is discarded w
 target. Popup failure prose maps internal transport codes to localized, actionable messages plus stable `ML-BR-*`
 support codes; this is the Browser Integration subset of the broader Phase 17 presentation contract.
 
+### Planned installed Browser Integration lifecycle
+
+Phase 19 places installed-package ownership behind one composition-time Interface rather than spreading registry and
+manifest logic across the installer, App startup and UI. One deep installation Module accepts an immutable package
+descriptor plus Ensure or Remove Owned intent, then returns a structured ownership result. It hides installed-versus-
+portable qualification, canonical path checks, atomic manifest replacement, current-user registry access, exact owner
+comparison, repair／upgrade transitions and localized problem mapping.
+
+```text
+Setup／installed startup／uninstall cleanup
+                    │ package descriptor + intent
+                    ▼
+      Browser Integration installation Module
+          │ manifest／registry  │ structured result
+          ▼                     ▼
+ current-user Windows Adapter   composition／diagnostics
+```
+
+The installed layout contains one self-contained Host and version-matched Extension files beneath the exact package
+root. Chromium starts the Host through the package-owned manifest; no user launches it. A portable copy cannot satisfy
+the installed-package descriptor and therefore cannot repair or remove that registration. Foreign, development and
+ambiguous registrations remain untouched. Core, Router and the Browser command Adapter receive no installer paths or
+ownership rules. This architecture is planned by
+[Phase 19](phase-19/installed-browser-integration-plan.md) and is not implemented by the planning change.
+
 ## 10. Composition
 
 Application startup is the composition root. It creates adapters, repositories, router and ViewModels through

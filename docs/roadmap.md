@@ -790,3 +790,30 @@ is closed. See the
 [Phase 18 implementation plan](phase-18/playback-rate-estimation-plan.md) and
 [exact-candidate smoke record](phase-18/playback-rate-estimation-smoke.md), plus
 [ADR 0009](adr/0009-separate-reported-and-effective-playback-rate.md).
+
+## Phase 19 — Installed Browser Integration lifecycle
+
+Make the installed Media Lock package own the current-user Browser Integration lifecycle. The installed payload
+contains a version-matched, self-contained Browser Host and fixed-ID Extension files; Chromium launches the Host on
+demand, so the user never builds, registers or separately starts it. One deep installation Module owns exact package
+qualification, manifest generation, registration inspection, install／repair／upgrade reconciliation and ownership-safe
+uninstall cleanup.
+
+Exit criteria:
+
+- Fresh per-user install, repair, upgrade and uninstall manage only the exact package-owned Native Messaging
+  registration without elevation.
+- Foreign, portable and development registrations are preserved unless a separately defined exact predecessor
+  migration proves ownership; ambiguous ownership fails closed with an actionable localized problem.
+- The Host starts on a clean supported Windows x64 system without a separately installed .NET runtime, and artifact
+  provenance binds the app, Host, configuration and Extension files to one source identity.
+- Portable and no-Extension compositions retain the complete GSMTC feature set without a blocking Browser prompt or
+  implicit registration claim.
+- With the bundled Extension manually enabled, Chrome and Brave launch the installed Host on demand and exact Browser
+  Session Lock retains its existing identity, Recovery and command-isolation semantics.
+- Deterministic ownership／path／atomicity tests, installer transaction tests, full automated regressions and the named
+  eight-row clean-Windows manual matrix pass for one exact candidate.
+
+Status: planned for [GitHub Issue #74](https://github.com/Command1264/MediaLock/issues/74); no installed package or
+registration behavior has changed. See the
+[Phase 19 installed Browser Integration plan](phase-19/installed-browser-integration-plan.md).
