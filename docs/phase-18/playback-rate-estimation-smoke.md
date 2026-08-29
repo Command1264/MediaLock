@@ -1,11 +1,13 @@
 # Phase 18 playback-rate estimation smoke
 
-Status: passed on 2026-08-30 for the exact local candidate below; integration remains open.
+Status: passed on 2026-08-30 for the exact local candidate below and integrated into `develop` through
+[PR #71](https://github.com/Command1264/MediaLock/pull/71).
 
 ## Candidate identity
 
 - Source commit: `de00f080ebf9ee55686c87a59cf6f7bc1e8900bb`.
-- Executable: `artifacts/phase18-estimator-candidate/de00f08/MediaLock.exe`.
+- Development artifact: `artifacts/phase18-estimator-candidate/de00f08/MediaLock.exe`; removed with its clean task
+  worktree after integration and reproducible from the source commit.
 - Executable SHA-256: `4b90baaf5804527c7e5ac4eee3afb1432c158299b3f62b13b1d754cfc7c340fc`.
 - Host: Windows 11 Pro, version `10.0.26200`, x64.
 - Browser: Brave `151.1.93.138` with the enabled candidate Extension ID
@@ -26,6 +28,12 @@ adds a rate-aware 50–500 millisecond cadence and received a fresh complete mat
 - Release build: passed with 0 warnings and 0 errors.
 - Standards review: 0 findings.
 - Issue #65 Spec review: 0 findings.
+
+After [Browser lifecycle recovery PR #70](https://github.com/Command1264/MediaLock/pull/70) entered `develop`, the
+Phase branch merged that exact baseline without conflicts. The combined gate passed 544 .NET tests, 75 Extension tests,
+PowerShell 7／Windows PowerShell 5.1 Native Messaging registration, formatting and a 0-warning／0-error Release build.
+Post-integration Standards and Spec reviews both reported 0 findings. PR #71 then merged as
+`0fe27919be73fa800f792bbe8aedf95a3ce926f8`, and Issue #65 closed as completed.
 
 ## Manual acceptance — 6／6 passed
 

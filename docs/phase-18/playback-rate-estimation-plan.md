@@ -2,7 +2,8 @@
 
 Issue: [#65](https://github.com/Command1264/MediaLock/issues/65)
 
-Status: implementation and exact-candidate acceptance complete on 2026-08-30; not yet merged.
+Status: complete and merged into `develop` through
+[PR #71](https://github.com/Command1264/MediaLock/pull/71) on 2026-08-30; Issue #65 is closed.
 
 ## Goal and boundary
 
