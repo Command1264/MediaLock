@@ -508,6 +508,14 @@ capability lookup. A minimal Native Host validates the fixed Extension launch or
 fixed current-user-only named pipe to the running desktop process; it exposes no TCP／HTTP listener. See
 [ADR 0007](adr/0007-use-a-current-user-native-messaging-bridge.md).
 
+Generic Endpoint capabilities are live observations rather than bind-time constants. Metadata, duration, buffering
+and timeline events recompute bounded Seek availability; the exact target registry updates its command gate before
+publishing the corresponding neutral snapshot. Stale Page Binding／document／Endpoint observations cannot alter that
+gate. If a trusted completed page exists before the desktop process, a serialized Extension-owned availability
+monitor revalidates exact HTTPS permission and current document generation before rebinding. Its in-memory backoff is
+1／2／5／10 seconds and then at most once per 30 seconds, with `chrome.alarms` as the Manifest V3 wake-up fallback.
+Success, permission loss or absence of eligible trusted pages cancels pending work; no media command is retried.
+
 This composition enables only exact Browser Session Lock at runtime. It emits no inferred GSMTC correlation, so Brave
 GSMTC targets remain visible unless a future provider supplies an authoritative exact link. Browser target loss keeps
 the provider-qualified lock in Recovery／Unavailable; it never asks the GSMTC primary provider for a similar target.

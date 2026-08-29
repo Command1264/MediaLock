@@ -207,3 +207,43 @@ test('discarding a stale binding never clears its newer same-tab successor', asy
   assert.equal(registry.discard(newBinding.target), true);
   assert.equal(registry.get(42), undefined);
 });
+
+test('an exact live presentation can update the command capability gate', async () => {
+  const authorization = {
+    async authorizeTab({ scope, tab }) {
+      return {
+        accepted: true,
+        binding: {
+          bindingId: 'binding-capability-update',
+          scope,
+          tabId: tab.id,
+          frameId: 0,
+          documentId: 'document-capability-update',
+          pageOrigin: 'https://media.example.test',
+        },
+      };
+    },
+    matches() { return true; },
+    clearTab() {},
+  };
+  const tabs = {
+    async sendMessage() {
+      return {
+        accepted: true,
+        endpointId: 'endpoint-capability-update',
+        capabilities: ['play'],
+      };
+    },
+  };
+  const registry = createBrowserMediaTargetRegistry({ authorization, tabs });
+  const bound = await registry.bindTab({
+    scope: 'site',
+    tab: { id: 42, url: 'https://media.example.test/watch' },
+  });
+  const stale = { ...bound.target, documentId: 'stale-document' };
+
+  assert.equal(registry.supports(bound.target, 'seek'), false);
+  assert.equal(registry.updateCapabilities(stale, ['play', 'seek']), false);
+  assert.equal(registry.updateCapabilities(bound.target, ['play', 'seek']), true);
+  assert.equal(registry.supports(bound.target, 'seek'), true);
+});

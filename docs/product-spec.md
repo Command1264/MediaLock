@@ -394,7 +394,9 @@ exact-site grant, a replacement top-level HTTPS document automatically receives 
 and the Extension revalidates the exact origin permission. The new opaque target is never auto-selected and never
 satisfies a lock on its predecessor. Reauthorizing one unchanged tab likewise replaces its old binding instead of
 accumulating opaque ghost targets. Direct presentation observes page-originated Play／Pause,
-timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback.
+timeline and bounded playback-rate changes so WPF interpolation does not assume 1× playback. Seek capability follows
+the exact Endpoint's live finite duration and seekable ranges; metadata or buffering that becomes ready after binding
+must enable both the desktop slider and the exact command gate without reauthorizing the page.
 The Extension Popup queries the exact active tab's current Page Binding when opened. It distinguishes Checking,
 Authorized, trusted-site waiting, Not authorized and unavailable-page results. An exact-site permission without a
 live Binding displays trusted-site waiting; a page with neither Binding nor site grant displays Not authorized. The
@@ -405,6 +407,10 @@ separated rather than collapsing into adjacent controls. Internal Extension erro
 primary prose. Known failures resolve to localized, actionable English／Traditional Chinese text and one stable
 `ML-BR-*` support code; unknown failures use an identifiable localized fallback. This earlier Browser Integration
 subset remains compatibility-stable under the application-wide Phase 17 warning and error contract.
+When an exact-site page is already eligible but Media Lock starts after the browser, the Extension reconciles that
+completed, still-authorized HTTPS document automatically. Native Host discovery uses one serialized availability
+monitor with capped backoff and a Manifest V3 alarm wake-up; it stops when no eligible trusted page remains or the
+desktop connection succeeds, and never auto-selects or repairs a prior Page Binding lock.
 The generic direct target also exposes Toggle Play／Pause: execution reads the exact bound media element's live paused
 state and performs one explicit Play or Pause. This enables the existing UI toggle and provider-neutral physical
 media-key path without adding generic Previous, Next or Stop semantics that `HTMLMediaElement` does not define.
